@@ -1280,7 +1280,7 @@ function Grain({ user }: { user?: any }) {
 
             {/* TAB 1: TODAY */}
             {activeTab === "today" && (
-              <div className="space-y-5 animate-fade-in pt-3">
+              <div className="space-y-5 animate-fade-in pt-12">
                 {/* Today Hero */}
                 <TodayHero
                   streak={totalStreak}
@@ -1411,7 +1411,7 @@ function Grain({ user }: { user?: any }) {
 
             {/* TAB 2: CONSISTENCY */}
             {activeTab === "consistency" && (
-              <div className="animate-fade-in pt-3">
+              <div className="animate-fade-in pt-12">
                 <section ref={heatmapRef} className="px-5">
                   <div className="card-soft p-4">
                     <div className="mb-3 flex items-center justify-between">
@@ -1518,7 +1518,7 @@ function Grain({ user }: { user?: any }) {
 
             {/* TAB 3: MATRIX */}
             {activeTab === "matrix" && (
-              <div className="animate-fade-in pt-3">
+              <div className="animate-fade-in pt-12">
                 <section className="px-5">
                   {/* Time of day filter */}
                   <div className="scrollbar-none mb-3.5 flex gap-1.5 overflow-x-auto">
@@ -1590,7 +1590,7 @@ function Grain({ user }: { user?: any }) {
 
             {/* TAB 4: WALLPAPER */}
             {activeTab === "wallpaper" && (
-              <div className="animate-fade-in pt-3">
+              <div className="animate-fade-in pt-12">
                 <section className="px-5">
                   <div className="card-invert overflow-hidden">
                     <div className="flex items-center justify-between px-4 pt-4">
