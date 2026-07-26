@@ -1243,21 +1243,22 @@ function Grain({ user }: { user?: any }) {
                     }, 2000);
                   }
                 }}
-                className={`pointer-events-auto flex items-center rounded-full border border-[color:var(--hairline-mid)] bg-canvas/85 p-1 text-xs font-semibold text-ink backdrop-blur-xl shadow-lg transition-all duration-500 ease-out active:scale-95 ${
-                  showTitlePill ? "gap-2 pr-3" : "gap-0"
-                }`}
+                className="pointer-events-auto flex items-center gap-2 rounded-full border border-[color:var(--hairline-mid)] bg-canvas/85 p-1.5 text-xs font-semibold text-ink backdrop-blur-xl shadow-lg transition-all duration-500 ease-out active:scale-95 pr-3"
                 aria-label="App logo and section title"
               >
-                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full overflow-hidden">
+                <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full overflow-hidden">
                   <img
                     src="/icon.png"
-                    alt="App icon"
+                    alt="Grain logo"
                     className="h-full w-full object-contain object-center filter drop-shadow-sm scale-105"
                   />
                 </div>
+                <span className="font-display font-bold text-xs tracking-wide text-ink shrink-0">
+                  Grain
+                </span>
                 <span
-                  className={`overflow-hidden whitespace-nowrap transition-all duration-500 ease-out ${
-                    showTitlePill ? "max-w-[220px] opacity-100" : "max-w-0 opacity-0"
+                  className={`overflow-hidden whitespace-nowrap transition-all duration-500 ease-out text-mute font-medium text-[11px] ${
+                    showTitlePill ? "max-w-[220px] opacity-100 pl-1.5 border-l border-[color:var(--hairline-mid)]" : "max-w-0 opacity-0 border-none"
                   }`}
                 >
                   {activeTab === "today"
