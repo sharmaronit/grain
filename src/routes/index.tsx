@@ -50,6 +50,7 @@ import {
   resetPassword,
   friendlyError,
 } from "../lib/auth";
+import { scheduleDailyReminder } from "../lib/reminders";
 import { useHabits } from "../hooks/useHabits";
 import { useCompletions } from "../hooks/useCompletions";
 import { useHeatmap } from "../hooks/useHeatmap";
@@ -1030,15 +1031,25 @@ function Grain({ user }: { user?: any }) {
     });
   };
 
-  const applyWallpaper = () => {
+  const applyWallpaper = async () => {
     if (wallpaperState !== "idle") return;
     setWallpaperState("applying");
-    window.setTimeout(() => {
+    try {
+      const cap = await capturePreview();
+      if (cap) {
+        const a = document.createElement("a");
+        a.href = cap.dataUrl;
+        a.download = `grain-lockscreen-${wallpaperTheme}-${Date.now()}.png`;
+        a.click();
+      }
       setWallpaperState("applied");
       setWallpaperSnapshot(heatmap.map((c) => c.slice()));
-      showToast("Wallpaper applied");
-      window.setTimeout(() => setWallpaperState("idle"), 1800);
-    }, 900);
+      showToast("Wallpaper saved — select Set as Lock Screen in Gallery", undefined, 4000);
+    } catch {
+      showToast("Could not generate wallpaper image");
+    } finally {
+      window.setTimeout(() => setWallpaperState("idle"), 2500);
+    }
   };
 
   const displayedHeatmap = wallpaperSync ? heatmap : (wallpaperSnapshot ?? heatmap);
@@ -2137,9 +2148,18 @@ function Grain({ user }: { user?: any }) {
                   action={
                     <Toggle
                       checked={remindersOn}
-                      onChange={() => {
-                        setRemindersOn((v) => !v);
-                        showToast(remindersOn ? "Reminders off" : "Reminders on");
+                      onChange={async () => {
+                        const next = !remindersOn;
+                        setRemindersOn(next);
+                        if (userId) {
+                          updateUserProfile(userId, { remindersOn: next });
+                        }
+                        const ok = await scheduleDailyReminder(next);
+                        if (next) {
+                          showToast(ok ? "Reminders scheduled for 8:00 PM" : "Permission needed for reminders");
+                        } else {
+                          showToast("Reminders turned off");
+                        }
                       }}
                       ariaLabel="Toggle reminders"
                     />

@@ -1,0 +1,35 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // User profile and private data
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+
+      // Habits subcollection
+      match /habits/{habitId} {
+        allow read, write: if isOwner(userId);
+      }
+
+      // Daily completions subcollection
+      match /completions/{dateKey} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // Public read-only streak sharing (for social accountability feature)
+    match /public_streaks/{streakId} {
+      allow read: if true;
+      allow write: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+    }
+  }
+}
