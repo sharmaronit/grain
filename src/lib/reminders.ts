@@ -10,7 +10,7 @@ export async function requestNotificationPermission(): Promise<boolean> {
 
   if (Capacitor.isNativePlatform()) {
     try {
-      const { LocalNotifications } = await import("@capacitor/local-notifications");
+      const { LocalNotifications } = await import(/* @vite-ignore */ "@capacitor/local-notifications" as any);
       const status = await LocalNotifications.requestPermissions();
       return status.display === "granted";
     } catch {
@@ -30,7 +30,7 @@ export async function scheduleDailyReminder(enabled: boolean): Promise<boolean> 
   if (!enabled) {
     if (Capacitor.isNativePlatform()) {
       try {
-        const { LocalNotifications } = await import("@capacitor/local-notifications");
+        const { LocalNotifications } = await import(/* @vite-ignore */ "@capacitor/local-notifications" as any);
         await LocalNotifications.cancel({ notifications: [{ id: 1001 }] });
       } catch {}
     }
@@ -42,7 +42,7 @@ export async function scheduleDailyReminder(enabled: boolean): Promise<boolean> 
 
   if (Capacitor.isNativePlatform()) {
     try {
-      const { LocalNotifications } = await import("@capacitor/local-notifications");
+      const { LocalNotifications } = await import(/* @vite-ignore */ "@capacitor/local-notifications" as any);
       // Schedule daily reminder at 8:00 PM
       await LocalNotifications.schedule({
         notifications: [
