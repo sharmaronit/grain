@@ -33,13 +33,13 @@ export function TodayHero({
         <div className="relative flex items-center justify-between p-4 pb-0">
           <div>
             <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-mute">
-              <Flame className="h-3.5 w-3.5 text-accent" />
+              <Flame className="h-3.5 w-3.5 text-ink" />
               <span>Current streak</span>
             </div>
             <div className="mt-1 flex items-baseline gap-2">
               <span
                 key={streak}
-                className="font-display animate-pop-badge text-[48px] font-bold leading-none tracking-tight text-accent tabular-nums"
+                className="font-display animate-pop-badge text-[48px] font-bold leading-none tracking-tight text-ink tabular-nums"
               >
                 {streak}
               </span>
@@ -66,11 +66,12 @@ export function TodayHero({
                 cy="40"
                 r={R}
                 fill="none"
-                stroke="var(--accent)"
+                stroke="currentColor"
                 strokeWidth="6"
                 strokeLinecap="round"
                 strokeDasharray={C}
                 strokeDashoffset={offset}
+                className="text-ink"
                 style={{
                   transition:
                     "stroke-dashoffset 600ms cubic-bezier(0.22,1,0.36,1)",
@@ -106,7 +107,7 @@ export function TodayHero({
               <button
                 type="button"
                 onClick={() => onCompleteNext(nextHabit.q, nextHabit.i)}
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-accent text-[#000] shadow-md transition hover:scale-105 active:scale-95"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-ink text-on-ink shadow-md transition hover:scale-105 active:scale-95"
               >
                 <Check className="h-5 w-5" />
               </button>

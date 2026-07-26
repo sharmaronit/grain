@@ -46,8 +46,8 @@
   --primary: #ffffff;
   --on-primary: #000000;
   --backdrop: #0a0a0a;
-  --accent: #E5C07B;
-  --accent-soft: rgba(229, 192, 123, 0.15);
+  --accent: #ffffff;
+  --accent-soft: rgba(255, 255, 255, 0.12);
 }
 
 [data-theme="light"] {
@@ -64,8 +64,8 @@
   --primary: #000000;
   --on-primary: #ffffff;
   --backdrop: #efefef;
-  --accent: #B8860B;
-  --accent-soft: rgba(184, 134, 11, 0.12);
+  --accent: #000000;
+  --accent-soft: rgba(0, 0, 0, 0.08);
 }
 
 @layer base {

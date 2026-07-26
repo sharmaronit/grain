@@ -1380,7 +1380,7 @@ function Grain({ user }: { user?: any }) {
                             }}
                             className={`flex h-10 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl transition ${
                               active
-                                ? "bg-accent text-[#000] shadow-sm"
+                                ? "bg-ink text-on-ink shadow-sm"
                                 : "bg-canvas-softer text-ink hover:bg-[color:var(--surface-pressed)]"
                             }`}
                           >
@@ -1403,11 +1403,11 @@ function Grain({ user }: { user?: any }) {
                     <div className="flex flex-col items-center gap-4 py-8">
                       {/* Ghost habit card */}
                       <div
-                        className="animate-breathe w-full rounded-2xl border-2 border-dashed border-accent-soft bg-accent-soft/30 p-4 flex items-center gap-3 cursor-pointer transition hover:bg-accent-soft/50"
+                        className="animate-breathe w-full rounded-2xl border-2 border-dashed border-[color:var(--hairline-mid)] bg-canvas-soft p-4 flex items-center gap-3 cursor-pointer transition hover:bg-canvas-softer"
                         onClick={() => setModalOpen(true)}
                       >
-                        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full border-2 border-dashed border-accent/40">
-                          <Plus className="h-4 w-4 text-accent" strokeWidth={2.5} />
+                        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full border-2 border-dashed border-[color:var(--hairline-mid)]">
+                          <Plus className="h-4 w-4 text-ink" strokeWidth={2.5} />
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold text-ink">Tap to add your first habit</p>
@@ -1436,8 +1436,8 @@ function Grain({ user }: { user?: any }) {
                                 }}
                                 className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border-2 transition ${
                                   h.done
-                                    ? "bg-accent border-accent text-[#000]"
-                                    : "border-[color:var(--hairline-mid)] text-transparent hover:border-accent"
+                                    ? "bg-ink border-ink text-on-ink"
+                                    : "border-[color:var(--hairline-mid)] text-transparent hover:border-ink"
                                 }`}
                               >
                                 <Check className="h-4 w-4" strokeWidth={3} />
@@ -1924,10 +1924,10 @@ function Grain({ user }: { user?: any }) {
           {/* FAB */}
           <button
             onClick={() => setModalOpen(true)}
-            className="absolute bottom-20 right-5 z-30 mb-safe grid h-14 w-14 place-items-center rounded-full bg-accent text-[#000] shadow-[0_10px_30px_-5px_var(--accent-soft)] transition active:scale-95 hover:scale-105"
+            className="absolute bottom-20 right-5 z-30 mb-safe grid h-14 w-14 place-items-center rounded-full bg-ink text-on-ink shadow-[0_10px_30px_-5px_rgba(0,0,0,0.4)] transition active:scale-95 hover:scale-105"
             aria-label="Add habit"
           >
-            <Plus className="h-6 w-6" strokeWidth={2.5} />
+            <Plus className="h-6 w-6" strokeWidth={2.25} />
           </button>
 
           {/* Toast */}
