@@ -2741,6 +2741,9 @@ function Grain({ user }: { user?: any }) {
                   </div>
                 </div>
               </SheetShell>
+            );
+          })()}
+
           {/* Podium Feature Modals */}
           {aiCoachOpen && (
             <AICoachModal
