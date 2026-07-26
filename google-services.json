@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "1000875759360",
+    "project_id": "grain-f210a",
+    "storage_bucket": "grain-f210a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1000875759360:android:7be8ba3692f6038eeec5e5",
+        "android_client_info": {
+          "package_name": "com.dailyclone.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1000875759360-c24q5s0q46lsuv0tlkhq2updf5hdkrv8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBDSX5E29iL6jpYwDq_3rZ-Fbl5jVhn8is"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1000875759360-c24q5s0q46lsuv0tlkhq2updf5hdkrv8.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

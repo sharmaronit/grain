@@ -1,0 +1,14 @@
+{
+  "appId": "com.dailyclone.app",
+  "appName": "DailyClone",
+  "webDir": "dist-spa",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": false,
+      "providers": ["google.com"]
+    }
+  }
+}

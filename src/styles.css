@@ -1,0 +1,531 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@theme inline {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 20px;
+  --radius-pill-tab: 36px;
+  --radius-pill: 999px;
+  --color-canvas: var(--canvas);
+  --color-canvas-soft: var(--canvas-soft);
+  --color-canvas-softer: var(--canvas-softer);
+  --color-surface-pressed: var(--surface-pressed);
+  --color-ink: var(--ink);
+  --color-on-ink: var(--on-ink);
+  --color-body: var(--body);
+  --color-mute: var(--mute);
+  --color-hairline-mid: var(--hairline-mid);
+  --color-hairline: var(--hairline);
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-background: var(--canvas);
+  --color-foreground: var(--ink);
+  --color-muted-foreground: var(--body);
+  --color-border: var(--hairline);
+}
+
+/* Dark = default */
+:root {
+  --canvas: #000000;
+  --canvas-soft: #141414;
+  --canvas-softer: #1c1c1c;
+  --surface-pressed: #282828;
+  --ink: #ffffff;
+  --on-ink: #000000;
+  --body: #afafaf;
+  --mute: #6b6b6b;
+  --hairline-mid: #4b4b4b;
+  --hairline: rgba(255, 255, 255, 0.10);
+  --primary: #ffffff;
+  --on-primary: #000000;
+  --backdrop: #0a0a0a;
+}
+
+[data-theme="light"] {
+  --canvas: #ffffff;
+  --canvas-soft: #efefef;
+  --canvas-softer: #f3f3f3;
+  --surface-pressed: #e2e2e2;
+  --ink: #000000;
+  --on-ink: #ffffff;
+  --body: #5e5e5e;
+  --mute: #afafaf;
+  --hairline-mid: #4b4b4b;
+  --hairline: rgba(0, 0, 0, 0.10);
+  --primary: #000000;
+  --on-primary: #ffffff;
+  --backdrop: #efefef;
+}
+
+@layer base {
+  html, body, #root {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+    background: var(--backdrop);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  * { border-color: var(--hairline); }
+
+  /* Smooth crossfade when [data-theme] flips between dark and light.
+     Scope to elements that actually re-token to avoid a universal `*`
+     transition (which forces style recalcs on every scroll/hover). */
+  html, body,
+  [class*="card-"], [class*="btn-"], [class*="chip-"],
+  .liquid-glass, .liquid-blob,
+  header, section, article, aside, nav, main,
+  button, a, input, textarea, select, [role="button"] {
+    transition: background-color 320ms ease, background 320ms ease,
+      color 320ms ease, border-color 320ms ease, fill 320ms ease,
+      stroke 320ms ease, box-shadow 320ms ease, filter 320ms ease;
+  }
+  button, a, [role="button"] { transition-property: background-color, background, color, border-color, box-shadow, transform; transition-duration: 320ms, 320ms, 320ms, 320ms, 320ms, 120ms; }
+  @media (prefers-reduced-motion: reduce) {
+    html, body, *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
+}
+
+/* Crossfade the ambient liquid glass layer on theme flip.
+   Keep them on their own compositor layer so animation stays on the GPU. */
+[data-theme] .liquid-blob {
+  transition: background 320ms ease, background-color 320ms ease,
+    filter 320ms ease, opacity 320ms ease;
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  contain: layout paint style;
+}
+
+
+@utility font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+@utility pill {
+  border-radius: var(--radius-pill);
+}
+
+@utility card-uber {
+  background: color-mix(in oklab, var(--ink) 2%, transparent);
+  color: var(--ink);
+  border-radius: var(--radius-xl);
+  border: 1px solid color-mix(in oklab, var(--ink) 7%, transparent);
+  backdrop-filter: blur(28px) saturate(180%);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--on-ink) 28%, transparent),
+    inset 0 -1px 0 color-mix(in oklab, var(--ink) 8%, transparent),
+    0 20px 60px -30px color-mix(in oklab, var(--on-ink) 25%, transparent);
+  position: relative;
+  overflow: hidden;
+  contain: layout paint;
+}
+@utility card-uber {
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 45%;
+    background: linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--on-ink) 14%, transparent) 0%,
+      color-mix(in oklab, var(--on-ink) 4%, transparent) 40%,
+      transparent 100%
+    );
+    pointer-events: none;
+    border-radius: inherit;
+    mask: linear-gradient(to bottom, #000, transparent);
+  }
+}
+
+@utility card-soft {
+  background: color-mix(in oklab, var(--ink) 2.5%, transparent);
+  color: var(--ink);
+  border-radius: var(--radius-xl);
+  border: 1px solid color-mix(in oklab, var(--ink) 6%, transparent);
+  backdrop-filter: blur(24px) saturate(170%);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--on-ink) 28%, transparent),
+    0 10px 40px -20px color-mix(in oklab, var(--on-ink) 18%, transparent);
+  position: relative;
+  overflow: hidden;
+  contain: layout paint;
+}
+@utility card-soft {
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 45%;
+    background: linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--on-ink) 14%, transparent) 0%,
+      color-mix(in oklab, var(--on-ink) 4%, transparent) 40%,
+      transparent 100%
+    );
+    pointer-events: none;
+    border-radius: inherit;
+    mask: linear-gradient(to bottom, #000, transparent);
+  }
+}
+
+@utility card-invert {
+  background: var(--ink);
+  color: var(--on-ink);
+  border-radius: var(--radius-xl);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--on-ink) 22%, transparent),
+    0 20px 60px -20px color-mix(in oklab, var(--ink) 60%, transparent);
+  contain: layout paint;
+}
+
+@utility liquid-glass {
+  position: relative;
+  background: color-mix(in oklab, var(--ink) 3%, transparent);
+  border: 1px solid color-mix(in oklab, var(--ink) 8%, transparent);
+  backdrop-filter: blur(30px) saturate(190%);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--on-ink) 30%, transparent),
+    inset 0 -1px 0 color-mix(in oklab, var(--ink) 10%, transparent),
+    0 16px 50px -24px color-mix(in oklab, var(--on-ink) 30%, transparent);
+  overflow: hidden;
+  contain: layout paint;
+}
+@utility liquid-glass {
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 45%;
+    background: linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--on-ink) 16%, transparent) 0%,
+      color-mix(in oklab, var(--on-ink) 5%, transparent) 40%,
+      transparent 100%
+    );
+    pointer-events: none;
+    border-radius: inherit;
+    mask: linear-gradient(to bottom, #000, transparent);
+  }
+}
+
+
+@utility specular {
+  position: relative;
+  overflow: hidden;
+}
+@utility specular {
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      115deg,
+      transparent 30%,
+      color-mix(in oklab, var(--ink) 18%, transparent) 48%,
+      transparent 66%
+    );
+    transform: translateX(-120%);
+    transition: transform 0.9s ease;
+    pointer-events: none;
+  }
+  &:hover::before { transform: translateX(120%); }
+}
+
+
+@utility btn-primary-uber {
+  background: color-mix(in oklab, var(--primary) 78%, transparent);
+  color: var(--on-primary);
+  border-radius: var(--radius-pill);
+  font-weight: 500;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--on-primary) 18%, transparent);
+  backdrop-filter: blur(20px) saturate(180%);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--on-primary) 35%, transparent),
+    inset 0 -1px 0 color-mix(in oklab, var(--primary) 40%, transparent),
+    0 10px 30px -14px color-mix(in oklab, var(--primary) 70%, transparent);
+  transition: transform 0.12s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+@utility btn-primary-uber {
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 55%;
+    background: linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--on-primary) 22%, transparent) 0%,
+      transparent 100%
+    );
+    pointer-events: none;
+    border-radius: inherit;
+    mask: linear-gradient(to bottom, #000, transparent);
+  }
+  &:hover { background: color-mix(in oklab, var(--primary) 88%, transparent); }
+  &:active { transform: scale(0.97); }
+}
+
+@utility btn-subtle-uber {
+  background: color-mix(in oklab, var(--ink) 4%, transparent);
+  color: var(--ink);
+  border-radius: var(--radius-pill);
+  font-weight: 500;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--ink) 8%, transparent);
+  backdrop-filter: blur(18px) saturate(170%);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--on-ink) 26%, transparent),
+    0 6px 20px -12px color-mix(in oklab, var(--on-ink) 20%, transparent);
+}
+@utility btn-subtle-uber {
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 55%;
+    background: linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--on-ink) 14%, transparent) 0%,
+      transparent 100%
+    );
+    pointer-events: none;
+    border-radius: inherit;
+    mask: linear-gradient(to bottom, #000, transparent);
+  }
+  &:hover { background: color-mix(in oklab, var(--ink) 8%, transparent); }
+  &:active { transform: scale(0.97); }
+}
+
+@utility chip-uber {
+  background: color-mix(in oklab, var(--ink) 3.5%, transparent);
+  color: var(--ink);
+  border-radius: var(--radius-pill);
+  font-weight: 500;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--ink) 7%, transparent);
+  backdrop-filter: blur(16px) saturate(170%);
+  box-shadow:
+    inset 0 1px 0 color-mix(in oklab, var(--on-ink) 24%, transparent);
+}
+@utility chip-uber {
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 55%;
+    background: linear-gradient(
+      to bottom,
+      color-mix(in oklab, var(--on-ink) 12%, transparent) 0%,
+      transparent 100%
+    );
+    pointer-events: none;
+    border-radius: inherit;
+    mask: linear-gradient(to bottom, #000, transparent);
+  }
+}
+
+
+@keyframes pop-badge {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.35); }
+  100% { transform: scale(1); }
+}
+@keyframes cell-flash {
+  0% { transform: scale(0.6); filter: brightness(2); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+@keyframes sync-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.0); }
+  50% { box-shadow: 0 0 0 6px rgba(255,255,255,0.15); }
+}
+@utility animate-pop-badge { animation: pop-badge 0.45s ease-out; }
+@utility animate-cell-flash { animation: cell-flash 0.5s ease-out; }
+@utility animate-sync-pulse { animation: sync-pulse 1.2s ease-in-out; }
+
+@keyframes liquid-drift {
+  0%   { transform: translate(0, 0) scale(1); }
+  33%  { transform: translate(30px, -50px) scale(1.1); }
+  66%  { transform: translate(-20px, 20px) scale(0.9); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+@keyframes liquid-shimmer {
+  0%   { transform: translateX(-120%); opacity: 0; }
+  50%  { opacity: 1; }
+  100% { transform: translateX(120%); opacity: 0; }
+}
+@utility liquid-blob {
+  filter: blur(40px);
+  animation: liquid-drift 18s ease-in-out infinite alternate;
+  pointer-events: none;
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  .liquid-blob { animation: none; }
+}
+
+/* Auto-throttle: pause ambient animations while user scrolls
+   or when the heatmap grid is in view, to keep frames smooth. */
+[data-throttle="1"] .liquid-blob {
+  animation-play-state: paused;
+  filter: blur(24px);
+}
+[data-throttle="1"] .animate-shimmer::after {
+  animation-play-state: paused;
+  opacity: 0;
+}
+
+@utility animate-shimmer {
+  position: relative;
+  overflow: hidden;
+}
+@utility animate-shimmer {
+  &::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      115deg,
+      transparent 30%,
+      color-mix(in oklab, var(--ink) 12%, transparent) 50%,
+      transparent 70%
+    );
+    animation: liquid-shimmer 6s ease-in-out infinite;
+    pointer-events: none;
+  }
+}
+
+/* ============ Unified press + ripple for liquid glass ============ */
+@keyframes lg-ripple {
+  0%   { transform: translate(-50%, -50%) scale(0);   opacity: 0.45; }
+  60%  { opacity: 0.25; }
+  100% { transform: translate(-50%, -50%) scale(1);   opacity: 0; }
+}
+
+/* Consistent press feedback across all glass buttons/chips */
+[class*="btn-"],
+[class*="chip-"],
+[data-lg-press] {
+  transform: translateZ(0);
+  transition:
+    transform 140ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    box-shadow 200ms ease,
+    background 200ms ease;
+}
+[class*="btn-"]:active,
+[class*="chip-"]:active,
+[data-lg-press]:active {
+  transform: scale(0.96) translateZ(0);
+  box-shadow:
+    inset 0 2px 6px color-mix(in oklab, var(--ink) 22%, transparent),
+    inset 0 1px 0 color-mix(in oklab, var(--on-ink) 18%, transparent);
+}
+
+/* Ripple span injected on pointerdown by useLiquidRipple() */
+.lg-ripple {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  pointer-events: none;
+  background: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--on-ink) 55%, transparent) 0%,
+    color-mix(in oklab, var(--on-ink) 20%, transparent) 45%,
+    transparent 70%
+  );
+  mix-blend-mode: overlay;
+  transform: translate(-50%, -50%) scale(0);
+  animation: lg-ripple 620ms cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+  will-change: transform, opacity;
+}
+/* On dark (inverted) surfaces the ripple should read as light */
+.card-invert .lg-ripple {
+  background: radial-gradient(
+    circle,
+    rgba(255,255,255,0.55) 0%,
+    rgba(255,255,255,0.22) 45%,
+    transparent 70%
+  );
+  mix-blend-mode: screen;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [class*="btn-"]:active,
+  [class*="chip-"]:active,
+  [data-lg-press]:active { transform: none; }
+  .lg-ripple { animation-duration: 1ms; }
+}
+
+/* ============ Wallpaper theme scene transitions ============
+   Crossfade themed surfaces without repainting every descendant.
+   We only transition cheap, compositor-friendly properties
+   (background-color, color, border-color) and cap the duration
+   so slower Android GPUs don't drop frames. The old universal
+   `.wp-scene *` selector forced a style recalc on hundreds of
+   nodes per theme swap — descendants now opt in via
+   `data-wp-tint` / `data-wp-cell`. */
+.wp-scene {
+  transition: background-color 260ms ease, color 260ms ease,
+    border-color 260ms ease;
+}
+.wp-scene [data-wp-tint] {
+  transition: background-color 260ms ease, color 260ms ease,
+    border-color 260ms ease, fill 260ms ease, stroke 260ms ease,
+    -webkit-text-stroke-color 260ms ease, opacity 260ms ease;
+}
+/* Heatmap cells crossfade in bulk; skip box-shadow/filter which
+   are the expensive properties on low-end GPUs. */
+.wp-scene [data-wp-cell] {
+  transition: background-color 260ms ease;
+  transform: translateZ(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .wp-scene,
+  .wp-scene [data-wp-tint],
+  .wp-scene [data-wp-cell] { transition: none !important; }
+}
+/* While the user is actively scrolling or the heatmap is on
+   screen, skip the crossfade so theme swaps mid-scroll don't
+   compound with scroll repaints. */
+[data-throttle="1"] .wp-scene,
+[data-throttle="1"] .wp-scene [data-wp-tint],
+[data-throttle="1"] .wp-scene [data-wp-cell] {
+  transition-duration: 0ms;
+}
+
+/* Safe area padding utilities for native mobile (Capacitor / Android) */
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+@utility mt-safe {
+  margin-top: env(safe-area-inset-top, 0px);
+}
+@utility mb-safe {
+  margin-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+
+
+
