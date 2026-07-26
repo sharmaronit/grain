@@ -197,8 +197,8 @@ export function AuthGate() {
 
 function PhoneShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="absolute inset-0 flex justify-center bg-canvas overflow-hidden">
-      <div className="relative flex h-full w-full max-w-md flex-col overflow-hidden bg-canvas pt-safe pb-safe">
+    <div className="fixed inset-0 flex h-[100dvh] w-full justify-center bg-canvas overflow-hidden">
+      <div className="relative flex h-full w-full flex-col overflow-hidden bg-canvas pt-safe pb-safe">
         {children}
       </div>
     </div>
@@ -1247,10 +1247,10 @@ function Grain({ user }: { user?: any }) {
   return (
     <main
       data-theme={theme}
-      className="absolute inset-0 flex justify-center bg-[var(--backdrop)] overflow-hidden"
+      className="fixed inset-0 flex h-[100dvh] w-full justify-center bg-[var(--backdrop)] overflow-hidden"
     >
-      {/* Main app container */}
-      <div className="relative flex h-full w-full max-w-lg flex-col bg-canvas pt-safe pb-safe shadow-2xl">
+      {/* Main app container - 100% Full Edge-to-Edge Responsive */}
+      <div className="relative flex h-full w-full flex-col bg-canvas pt-safe pb-safe overflow-hidden">
         <div
           data-throttle={throttled ? "1" : "0"}
           className="relative flex h-full w-full flex-1 flex-col overflow-hidden bg-canvas"

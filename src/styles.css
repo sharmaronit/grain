@@ -514,16 +514,16 @@
 
 /* Safe area padding utilities for native mobile (Capacitor / Android) */
 @utility pt-safe {
-  padding-top: env(safe-area-inset-top, 0px);
+  padding-top: max(env(safe-area-inset-top, 0px), 8px);
 }
 @utility pb-safe {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
 }
 @utility mt-safe {
-  margin-top: env(safe-area-inset-top, 0px);
+  margin-top: max(env(safe-area-inset-top, 0px), 8px);
 }
 @utility mb-safe {
-  margin-bottom: env(safe-area-inset-bottom, 0px);
+  margin-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
 }
 
 
