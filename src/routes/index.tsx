@@ -1350,7 +1350,7 @@ function Grain({ user }: { user?: any }) {
 
             {/* TAB 1: TODAY */}
             {activeTab === "today" && (
-              <div className="space-y-4 animate-fade-in pt-12">
+              <div className="space-y-4 animate-tab-fade pt-12">
                 {/* Unified Hero: streak + ring + date selector */}
                 <TodayHero
                   streak={totalStreak}
@@ -1436,7 +1436,7 @@ function Grain({ user }: { user?: any }) {
                                 }}
                                 className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border-2 transition ${
                                   h.done
-                                    ? "bg-ink border-ink text-on-ink"
+                                    ? "bg-ink border-ink text-on-ink animate-check-pop"
                                     : "border-[color:var(--hairline-mid)] text-transparent hover:border-ink"
                                 }`}
                               >
@@ -1462,7 +1462,7 @@ function Grain({ user }: { user?: any }) {
 
             {/* TAB 2: CONSISTENCY */}
             {activeTab === "consistency" && (
-              <div className="animate-fade-in pt-12">
+              <div className="animate-tab-fade pt-12">
                 <section ref={heatmapRef} className="px-5">
                   <div className="card-soft p-4">
                     <div className="mb-3 flex items-center justify-between">
@@ -1576,7 +1576,7 @@ function Grain({ user }: { user?: any }) {
 
             {/* TAB 3: MATRIX */}
             {activeTab === "matrix" && (
-              <div className="animate-fade-in pt-12">
+              <div className="animate-tab-fade pt-12">
                 <section className="px-5">
                   {/* Time of day filter */}
                   <div className="scrollbar-none mb-3.5 flex gap-1.5 overflow-x-auto">
@@ -1648,7 +1648,7 @@ function Grain({ user }: { user?: any }) {
 
             {/* TAB 4: WALLPAPER */}
             {activeTab === "wallpaper" && (
-              <div className="animate-fade-in pt-12">
+              <div className="animate-tab-fade pt-12">
                 <section className="px-5">
                   <div className="card-invert overflow-hidden">
                     <div className="flex items-center justify-between px-4 pt-4">
@@ -1932,7 +1932,7 @@ function Grain({ user }: { user?: any }) {
 
           {/* Toast */}
           {toast && (
-            <div className="pointer-events-auto absolute left-1/2 top-20 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full bg-ink pl-4 pr-1 py-1 text-[11px] font-semibold text-on-ink shadow-lg animate-fade-in">
+            <div className="pointer-events-auto absolute left-1/2 top-20 z-50 flex -translate-x-1/2 items-center gap-3 rounded-full bg-ink pl-4 pr-1 py-1 text-[11px] font-semibold text-on-ink shadow-lg animate-toast-slide">
               <span className="py-1">{toast.msg}</span>
               {toast.action && (
                 <button
@@ -2118,14 +2118,14 @@ function Grain({ user }: { user?: any }) {
           {settingsOpen && (
             <SheetShell onClose={() => setSettingsOpen(false)} title="Settings" subtitle="Preferences & data">
               <div className="space-y-3">
-                {/* Profile */}
-                <div className="card-soft relative overflow-hidden p-4">
+                {/* Profile Section with opening animation */}
+                <div className="card-soft relative overflow-hidden p-4 animate-profile-card">
                   <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <div className="grid h-14 w-14 place-items-center rounded-full bg-ink text-on-ink font-display text-lg font-bold">
+                    <div className="relative animate-profile-avatar">
+                      <div className="grid h-14 w-14 place-items-center rounded-full bg-ink text-on-ink font-display text-lg font-bold shadow-md">
                         {profile.initials}
                       </div>
-                      <span className="absolute -bottom-0.5 -right-0.5 grid h-5 w-5 place-items-center rounded-full bg-emerald-500 text-[10px] font-bold text-white ring-2 ring-[color:var(--surface)]">
+                      <span className="absolute -bottom-0.5 -right-0.5 grid h-5 w-5 place-items-center rounded-full bg-emerald-500 text-[10px] font-bold text-white ring-2 ring-[color:var(--surface)] animate-pulse">
                         <Flame className="h-3 w-3" />
                       </span>
                     </div>
@@ -2147,17 +2147,17 @@ function Grain({ user }: { user?: any }) {
                     </button>
                   </div>
                   <div className="mt-4 grid grid-cols-3 gap-2">
-                    <div className="rounded-2xl bg-canvas-soft p-2.5 text-center">
+                    <div className="rounded-2xl bg-canvas-soft p-2.5 text-center animate-profile-stat" style={{ animationDelay: "100ms" }}>
                       <p className="font-display text-lg font-bold leading-none text-ink tabular-nums">{totalStreak}</p>
                       <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-body">Streak</p>
                     </div>
-                    <div className="rounded-2xl bg-canvas-soft p-2.5 text-center">
+                    <div className="rounded-2xl bg-canvas-soft p-2.5 text-center animate-profile-stat" style={{ animationDelay: "160ms" }}>
                       <p className="font-display text-lg font-bold leading-none text-ink tabular-nums">
                         {doneCount}<span className="text-body">/{totalCount}</span>
                       </p>
                       <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-body">Today</p>
                     </div>
-                    <div className="rounded-2xl bg-canvas-soft p-2.5 text-center">
+                    <div className="rounded-2xl bg-canvas-soft p-2.5 text-center animate-profile-stat" style={{ animationDelay: "220ms" }}>
                       <p className="font-display text-lg font-bold leading-none text-ink tabular-nums">{rate}%</p>
                       <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-body">Rate</p>
                     </div>
@@ -2166,14 +2166,14 @@ function Grain({ user }: { user?: any }) {
 
 
                 {/* Quick Actions (relocated from Today tab) */}
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-2 animate-fade-in-up" style={{ animationDelay: "250ms" }}>
                   <button
                     type="button"
                     onClick={() => { setSettingsOpen(false); setAiCoachOpen(true); }}
                     className="pill flex items-center justify-center gap-1.5 border border-[color:var(--hairline)] bg-canvas-soft py-2.5 text-[11px] font-semibold text-ink transition hover:bg-[color:var(--surface-pressed)] active:scale-95"
                     data-lg-press
                   >
-                    <Sparkles className="h-3.5 w-3.5 text-accent" /> AI Coach
+                    <Sparkles className="h-3.5 w-3.5 text-ink" /> AI Coach
                   </button>
                   <button
                     type="button"
@@ -2181,7 +2181,7 @@ function Grain({ user }: { user?: any }) {
                     className="pill flex items-center justify-center gap-1.5 border border-[color:var(--hairline)] bg-canvas-soft py-2.5 text-[11px] font-semibold text-ink transition hover:bg-[color:var(--surface-pressed)] active:scale-95"
                     data-lg-press
                   >
-                    <Shield className="h-3.5 w-3.5 text-accent" /> Milestones
+                    <Shield className="h-3.5 w-3.5 text-ink" /> Milestones
                   </button>
                   <button
                     type="button"
@@ -2189,7 +2189,7 @@ function Grain({ user }: { user?: any }) {
                     className="pill flex items-center justify-center gap-1.5 border border-[color:var(--hairline)] bg-canvas-soft py-2.5 text-[11px] font-semibold text-ink transition hover:bg-[color:var(--surface-pressed)] active:scale-95"
                     data-lg-press
                   >
-                    <Share2 className="h-3.5 w-3.5 text-accent" /> Share
+                    <Share2 className="h-3.5 w-3.5 text-ink" /> Share
                   </button>
                 </div>
 
@@ -2849,7 +2849,7 @@ function SheetShell({
           transform: `translate3d(0, ${Math.max(0, dragY)}px, 0)`,
           transition: isDragging ? "none" : "transform 250ms cubic-bezier(0.2, 0.9, 0.3, 1)",
         }}
-        className="w-full max-h-[85vh] overflow-y-auto rounded-t-[24px] bg-canvas p-5 select-none"
+        className="w-full max-h-[85vh] overflow-y-auto rounded-t-[24px] bg-canvas p-5 select-none animate-sheet-slide-up"
       >
         {/* Drag Handle & Header Drag Area */}
         <div
@@ -2970,7 +2970,7 @@ function ConfirmDialog({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="liquid-glass specular relative w-full max-w-[320px] overflow-hidden rounded-3xl p-6 text-center"
+        className="liquid-glass specular relative w-full max-w-[320px] overflow-hidden rounded-3xl p-6 text-center animate-modal-scale-enter"
       >
         {icon && (
           <div

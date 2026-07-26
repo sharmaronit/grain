@@ -81,7 +81,7 @@ export function SheetShell({
             ? "none"
             : "transform 250ms cubic-bezier(0.2, 0.9, 0.3, 1)",
         }}
-        className="w-full max-h-[85vh] overflow-y-auto rounded-t-[24px] bg-canvas p-5 select-none"
+        className="w-full max-h-[85vh] overflow-y-auto rounded-t-[24px] bg-canvas p-5 select-none animate-sheet-slide-up"
       >
         {/* Drag Handle & Header Drag Area */}
         <div

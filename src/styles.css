@@ -532,20 +532,91 @@
   margin-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
 }
 
-/* ============ Empty state breathing ghost card ============ */
+/* ============ App-wide Smooth Animations & Profile Opening Effects ============ */
 @keyframes breathe {
-  0%, 100% { border-color: var(--accent-soft); box-shadow: 0 0 0 0 var(--accent-soft); }
-  50% { border-color: var(--accent); box-shadow: 0 0 16px 2px var(--accent-soft); }
+  0%, 100% { border-color: var(--hairline-mid); box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.05); }
+  50% { border-color: var(--ink); box-shadow: 0 0 16px 2px rgba(255, 255, 255, 0.1); }
 }
 @utility animate-breathe {
   animation: breathe 3s ease-in-out infinite;
 }
 
 @keyframes fade-in-up {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 @utility animate-fade-in-up {
-  animation: fade-in-up 0.4s ease-out both;
+  animation: fade-in-up 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
+/* Bottom Sheet Spring Slide Up */
+@keyframes sheet-slide-up {
+  0% { transform: translate3d(0, 100%, 0); }
+  100% { transform: translate3d(0, 0, 0); }
+}
+@utility animate-sheet-slide-up {
+  animation: sheet-slide-up 0.38s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Modal Scale & Pop Enter */
+@keyframes modal-scale-enter {
+  0% { opacity: 0; transform: scale(0.92) translateY(8px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+@utility animate-modal-scale-enter {
+  animation: modal-scale-enter 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Profile Section Opening Animations */
+@keyframes profile-avatar-pop {
+  0% { opacity: 0; transform: scale(0.5) rotate(-12deg); }
+  65% { opacity: 1; transform: scale(1.1) rotate(3deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0); }
+}
+@utility animate-profile-avatar {
+  animation: profile-avatar-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes profile-card-slide {
+  0% { opacity: 0; transform: translateY(20px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@utility animate-profile-card {
+  animation: profile-card-slide 0.42s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes profile-stat-stagger {
+  0% { opacity: 0; transform: translateY(12px) scale(0.9); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@utility animate-profile-stat {
+  animation: profile-stat-stagger 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Habit Checkmark Pop / Bounce */
+@keyframes check-pop {
+  0% { transform: scale(0.6); }
+  50% { transform: scale(1.28); }
+  100% { transform: scale(1); }
+}
+@utility animate-check-pop {
+  animation: check-pop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* Tab Screen Crossfade & Slide */
+@keyframes tab-fade-enter {
+  0% { opacity: 0; transform: translateY(6px) scale(0.99); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@utility animate-tab-fade {
+  animation: tab-fade-enter 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Toast Top Slide Down */
+@keyframes toast-slide-down {
+  0% { opacity: 0; transform: translate(-50%, -16px) scale(0.95); }
+  100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+@utility animate-toast-slide {
+  animation: toast-slide-down 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
