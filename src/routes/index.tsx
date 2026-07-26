@@ -75,6 +75,15 @@ import {
   type CompletionsMap,
 } from "../lib/streaks";
 
+// ── Podium Features Modules ─────────────────────────────
+import { HABIT_PACKS, type HabitPack } from "../lib/templates";
+import { computeWeeklyInsights } from "../lib/insights";
+import { computeMilestones } from "../lib/badges";
+import { InsightsCard } from "../components/InsightsCard";
+import { BadgesModal } from "../components/BadgesModal";
+import { AICoachModal } from "../components/AICoachModal";
+import { ShareStreakModal } from "../components/ShareStreakModal";
+
 const catClass = (_c: string) =>
   "bg-canvas-soft text-body border border-[color:var(--hairline)]";
 
@@ -533,9 +542,11 @@ function GoogleGlyph() {
   );
 }
 
-function OnboardingScreen({ defaultName, onDone }: { defaultName: string; onDone: (name: string) => void }) {
+function OnboardingScreen({ defaultName, onDone }: { defaultName: string; onDone: (name: string, selectedPackId?: string) => void }) {
   const [step, setStep] = useState(0);
   const [name, setName] = useState(defaultName);
+  const [selectedPack, setSelectedPack] = useState<string>("mindfulness");
+
   return (
     <PhoneShell>
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -543,9 +554,9 @@ function OnboardingScreen({ defaultName, onDone }: { defaultName: string; onDone
         <div className="lg-blob absolute -right-20 bottom-32 h-64 w-64 rounded-full" style={{ animationDelay: "-8s" }} />
       </div>
 
-      <div className="relative flex h-full flex-col px-6 sm:px-7 pb-6 sm:pb-8 pt-10 sm:pt-16">
+      <div className="relative flex h-full flex-col px-6 sm:px-7 pb-6 sm:pb-8 pt-10 sm:pt-14">
         <div className="flex items-center gap-1.5">
-          {[0, 1].map((i) => (
+          {[0, 1, 2].map((i) => (
             <div
               key={i}
               className="h-1 flex-1 rounded-full transition-all"
@@ -555,40 +566,39 @@ function OnboardingScreen({ defaultName, onDone }: { defaultName: string; onDone
         </div>
 
         {step === 0 ? (
-          <div className="mt-10 sm:mt-14">
-            <div className="grid h-12 w-12 sm:h-14 sm:w-14 place-items-center rounded-2xl bg-canvas-soft">
-              <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-ink" />
+          <div className="mt-8">
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-canvas-soft">
+              <Sparkles className="h-6 w-6 text-ink" />
             </div>
-            <h1 className="mt-5 sm:mt-6 font-display text-[28px] sm:text-[32px] font-bold leading-[1.1] tracking-tight text-ink">
+            <h1 className="mt-5 font-display text-[28px] font-bold leading-[1.1] text-ink">
               Welcome to Grain
             </h1>
-            <p className="mt-2.5 sm:mt-3 text-[12px] sm:text-[13px] text-body leading-relaxed">
-              A quiet, monochrome habit tracker. Swipe to complete, watch your heatmap fill, and glance at your streak on the lock screen.
+            <p className="mt-2.5 text-[12px] text-body leading-relaxed">
+              A quiet, monochrome habit tracker with Eisenhower priorities and lockscreen heatmaps.
             </p>
-
-            <ul className="mt-6 sm:mt-8 space-y-3 sm:space-y-4 text-[12px] sm:text-[13px] text-ink">
+            <ul className="mt-6 space-y-3 text-[12px] text-ink">
               <li className="flex items-start gap-3">
-                <Flame className="mt-0.5 h-4 w-4" /> Daily streaks with rest days
+                <Flame className="mt-0.5 h-4 w-4" /> Daily streaks & rest days
               </li>
               <li className="flex items-start gap-3">
                 <CalendarDays className="mt-0.5 h-4 w-4" /> 52-week consistency heatmap
               </li>
               <li className="flex items-start gap-3">
-                <Wallpaper className="mt-0.5 h-4 w-4" /> Live wallpaper preview
+                <Wallpaper className="mt-0.5 h-4 w-4" /> Lockscreen wallpaper preview
               </li>
             </ul>
           </div>
-        ) : (
-          <div className="mt-10 sm:mt-14">
-            <div className="grid h-12 w-12 sm:h-14 sm:w-14 place-items-center rounded-2xl bg-canvas-soft">
-              <span className="font-display text-base sm:text-lg font-bold text-ink">
+        ) : step === 1 ? (
+          <div className="mt-8">
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-canvas-soft">
+              <span className="font-display text-lg font-bold text-ink">
                 {(name || "?").slice(0, 1).toUpperCase()}
               </span>
             </div>
-            <h1 className="mt-5 sm:mt-6 font-display text-[28px] sm:text-[32px] font-bold leading-[1.1] tracking-tight text-ink">
+            <h1 className="mt-5 font-display text-[28px] font-bold leading-[1.1] text-ink">
               What should we call you?
             </h1>
-            <p className="mt-2.5 sm:mt-3 text-[12px] sm:text-[13px] text-body leading-relaxed">
+            <p className="mt-2 text-[12px] text-body leading-relaxed">
               This shows up in your profile. You can change it later.
             </p>
             <input
@@ -596,8 +606,45 @@ function OnboardingScreen({ defaultName, onDone }: { defaultName: string; onDone
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Your name"
-              className="mt-5 sm:mt-6 w-full rounded-2xl border border-[color:var(--hairline)] bg-canvas-soft px-4 py-2.5 sm:py-3 text-[14px] sm:text-[15px] text-ink placeholder:text-body focus:outline-none focus:ring-2 focus:ring-ink/30"
+              className="mt-5 w-full rounded-2xl border border-[color:var(--hairline)] bg-canvas-soft px-4 py-3 text-[14px] text-ink outline-none focus:ring-2 focus:ring-ink/30"
             />
+          </div>
+        ) : (
+          <div className="mt-8 space-y-4">
+            <div>
+              <h1 className="font-display text-[24px] font-bold leading-[1.1] text-ink">
+                Choose your starter pack
+              </h1>
+              <p className="mt-1 text-[12px] text-body">
+                Pick a 1-click habit template to jumpstart your streak.
+              </p>
+            </div>
+
+            <div className="space-y-2.5">
+              {HABIT_PACKS.map((pack) => {
+                const active = selectedPack === pack.id;
+                return (
+                  <button
+                    key={pack.id}
+                    type="button"
+                    onClick={() => setSelectedPack(pack.id)}
+                    className={`flex w-full items-start gap-3.5 rounded-2xl border p-3.5 text-left transition ${
+                      active
+                        ? "border-ink bg-ink text-on-ink"
+                        : "border-[color:var(--hairline)] bg-canvas-soft text-ink hover:bg-[color:var(--surface-pressed)]"
+                    }`}
+                  >
+                    <span className="text-2xl">{pack.icon}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-display text-sm font-bold">{pack.name}</div>
+                      <div className={`mt-0.5 text-[11px] ${active ? "opacity-80" : "text-body"}`}>
+                        {pack.description}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         )}
 
@@ -606,7 +653,7 @@ function OnboardingScreen({ defaultName, onDone }: { defaultName: string; onDone
             <button
               onClick={() => setStep(step - 1)}
               data-lg-press
-              className="pill border border-[color:var(--hairline)] bg-canvas-soft px-4 sm:px-5 py-2.5 sm:py-3 text-[12px] sm:text-[13px] font-semibold text-ink"
+              className="pill border border-[color:var(--hairline)] bg-canvas-soft px-5 py-3 text-[13px] font-semibold text-ink"
             >
               Back
             </button>
@@ -614,13 +661,13 @@ function OnboardingScreen({ defaultName, onDone }: { defaultName: string; onDone
           <button
             onClick={() => {
               try { navigator.vibrate?.(12); } catch {}
-              if (step === 0) setStep(1);
-              else onDone(name.trim() || "You");
+              if (step < 2) setStep(step + 1);
+              else onDone(name.trim() || "You", selectedPack);
             }}
             data-lg-press
-            className="pill flex flex-1 items-center justify-center gap-2 bg-ink py-2.5 sm:py-3 text-[13px] sm:text-[14px] font-semibold text-on-ink"
+            className="pill flex flex-1 items-center justify-center gap-2 bg-ink py-3 text-[14px] font-semibold text-on-ink"
           >
-            {step === 0 ? "Get started" : "Enter Grain"} <ArrowRight className="h-4 w-4" />
+            {step < 2 ? "Continue" : "Start Grain"} <ArrowRight className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -746,6 +793,17 @@ function Grain({ user }: { user?: any }) {
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
   const [streakOpen, setStreakOpen] = useState(false);
   const [editHabitTarget, setEditHabitTarget] = useState<{ q: Quadrant; i: number } | null>(null);
+
+  // ── Podium Feature Modal States ───────────────────────
+  const [aiCoachOpen, setAiCoachOpen] = useState(false);
+  const [badgesOpen, setBadgesOpen] = useState(false);
+  const [shareStreakOpen, setShareStreakOpen] = useState(false);
+
+  // Compute 28-day weekly insights
+  const weeklyInsights = useMemo(
+    () => computeWeeklyInsights(rawHabits, completionsMap, habitStreaks),
+    [rawHabits, completionsMap, habitStreaks]
+  );
 
   // Floating page title pill state & 2-second auto-fade timer
   const [showTitlePill, setShowTitlePill] = useState(true);
@@ -1337,6 +1395,38 @@ function Grain({ user }: { user?: any }) {
                       );
                     })}
                   </div>
+                </div>
+
+                {/* Podium Feature Quick Actions: AI Coach, Milestones, Share */}
+                <div className="px-5">
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAiCoachOpen(true)}
+                      className="pill flex items-center justify-center gap-1.5 border border-[color:var(--hairline)] bg-canvas-soft py-2.5 text-[11px] font-semibold text-ink transition hover:bg-[color:var(--surface-pressed)]"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" /> AI Coach
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setBadgesOpen(true)}
+                      className="pill flex items-center justify-center gap-1.5 border border-[color:var(--hairline)] bg-canvas-soft py-2.5 text-[11px] font-semibold text-ink transition hover:bg-[color:var(--surface-pressed)]"
+                    >
+                      <Shield className="h-3.5 w-3.5" /> Milestones
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShareStreakOpen(true)}
+                      className="pill flex items-center justify-center gap-1.5 border border-[color:var(--hairline)] bg-canvas-soft py-2.5 text-[11px] font-semibold text-ink transition hover:bg-[color:var(--surface-pressed)]"
+                    >
+                      <Share2 className="h-3.5 w-3.5" /> Share Streak
+                    </button>
+                  </div>
+                </div>
+
+                {/* Weekly Insights Engine Card */}
+                <div className="px-5">
+                  <InsightsCard insights={weeklyInsights} />
                 </div>
 
                 {/* Today Habits Checklist */}
@@ -2651,8 +2741,36 @@ function Grain({ user }: { user?: any }) {
                   </div>
                 </div>
               </SheetShell>
-            );
-          })()}
+          {/* Podium Feature Modals */}
+          {aiCoachOpen && (
+            <AICoachModal
+              onClose={() => setAiCoachOpen(false)}
+              insights={weeklyInsights}
+              currentStreak={totalStreak}
+              doneCount={doneCount}
+              totalCount={totalCount}
+            />
+          )}
+
+          {badgesOpen && (
+            <BadgesModal
+              onClose={() => setBadgesOpen(false)}
+              currentStreak={totalStreak}
+              bestStreak={bestStreak}
+            />
+          )}
+
+          {shareStreakOpen && (
+            <ShareStreakModal
+              onClose={() => setShareStreakOpen(false)}
+              userName={profile.name}
+              currentStreak={totalStreak}
+              bestStreak={bestStreak}
+              totalCompletions={heatmapStats.totalCompletions}
+              rate={rate}
+              onShowToast={showToast}
+            />
+          )}
         </div>
       </div>
     </main>
