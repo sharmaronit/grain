@@ -83,6 +83,7 @@ import { InsightsCard } from "../components/InsightsCard";
 import { BadgesModal } from "../components/BadgesModal";
 import { AICoachModal } from "../components/AICoachModal";
 import { ShareStreakModal } from "../components/ShareStreakModal";
+import { TodayHero } from "../components/TodayHero";
 
 const catClass = (_c: string) =>
   "bg-canvas-soft text-body border border-[color:var(--hairline)]";
@@ -1349,8 +1350,8 @@ function Grain({ user }: { user?: any }) {
 
             {/* TAB 1: TODAY */}
             {activeTab === "today" && (
-              <div className="space-y-5 animate-fade-in pt-12">
-                {/* Today Hero */}
+              <div className="space-y-4 animate-fade-in pt-12">
+                {/* Unified Hero: streak + ring + date selector */}
                 <TodayHero
                   streak={totalStreak}
                   rate={rate}
@@ -1364,98 +1365,55 @@ function Grain({ user }: { user?: any }) {
                     return null;
                   })()}
                   onCompleteNext={(q: Quadrant, i: number) => toggleDone(q, i)}
+                  dateSelectorSlot={
+                    <div className="flex items-center justify-between gap-1.5">
+                      {getWeekDates(new Date()).map((date) => {
+                        const active = isSameDay(date, selectedDate);
+                        const isTodayDate = isSameDay(date, new Date());
+                        const isPast = date < new Date() && !isTodayDate;
+                        return (
+                          <button
+                            key={date.toISOString()}
+                            onClick={() => {
+                              setSelectedDate(date);
+                              if (!isTodayDate) showToast(`Viewing ${shortDay(date)}, ${date.getDate()}`);
+                            }}
+                            className={`flex h-10 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl transition ${
+                              active
+                                ? "bg-accent text-[#000] shadow-sm"
+                                : "bg-canvas-softer text-ink hover:bg-[color:var(--surface-pressed)]"
+                            }`}
+                          >
+                            <span className={`text-[9px] font-bold uppercase tracking-wider ${active ? "opacity-80" : "text-body"}`}>
+                              {shortDay(date)}
+                            </span>
+                            <span className="font-display text-xs font-bold tabular-nums">{date.getDate()}</span>
+                            {isPast && !active && <span className="h-1 w-1 rounded-full bg-ink/40" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  }
                 />
 
-                {/* Date selector */}
-                <div className="px-5 pt-1">
-                  <div className="flex items-center justify-between gap-1.5">
-                    {getWeekDates(new Date()).map((date) => {
-                      const active = isSameDay(date, selectedDate);
-                      const isTodayDate = isSameDay(date, new Date());
-                      const isPast = date < new Date() && !isTodayDate;
-                      return (
-                        <button
-                          key={date.toISOString()}
-                          onClick={() => {
-                            setSelectedDate(date);
-                            if (!isTodayDate) showToast(`Viewing ${shortDay(date)}, ${date.getDate()}`);
-                          }}
-                          className={`flex h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl transition ${
-                            active
-                              ? "bg-ink text-on-ink shadow-sm"
-                              : "bg-canvas-soft text-ink hover:bg-[color:var(--surface-pressed)]"
-                          }`}
-                        >
-                          <span className={`text-[9px] font-bold uppercase tracking-wider ${active ? "opacity-80" : "text-body"}`}>
-                            {shortDay(date)}
-                          </span>
-                          <span className="font-display text-xs font-bold tabular-nums">{date.getDate()}</span>
-                          {isPast && !active && <span className="h-1 w-1 rounded-full bg-ink/40" />}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Podium Feature Quick Actions: AI Coach, Milestones, Share */}
-                <div className="px-5">
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setAiCoachOpen(true)}
-                      className="pill flex items-center justify-center gap-1.5 border border-[color:var(--hairline)] bg-canvas-soft py-2.5 text-[11px] font-semibold text-ink transition hover:bg-[color:var(--surface-pressed)] active:scale-95"
-                    >
-                      <Sparkles className="h-3.5 w-3.5" /> AI Coach
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setBadgesOpen(true)}
-                      className="pill flex items-center justify-center gap-1.5 border border-[color:var(--hairline)] bg-canvas-soft py-2.5 text-[11px] font-semibold text-ink transition hover:bg-[color:var(--surface-pressed)] active:scale-95"
-                    >
-                      <Shield className="h-3.5 w-3.5" /> Milestones
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShareStreakOpen(true)}
-                      className="pill flex items-center justify-center gap-1.5 border border-[color:var(--hairline)] bg-canvas-soft py-2.5 text-[11px] font-semibold text-ink transition hover:bg-[color:var(--surface-pressed)] active:scale-95"
-                    >
-                      <Share2 className="h-3.5 w-3.5" /> Share Streak
-                    </button>
-                  </div>
-                </div>
-
-                {/* Weekly Insights Engine Card */}
-                <div className="px-5">
-                  <InsightsCard insights={weeklyInsights} />
-                </div>
-
-                {/* Today Habits Checklist */}
-                <section className="px-5">
-                  <div className="mb-3 flex items-center justify-between">
-                    <h2 className="font-display text-base font-bold text-ink">Today's habits</h2>
-                    <span className="text-[10px] uppercase tracking-wider text-body">
-                      {doneCount}/{totalCount} Done
-                    </span>
-                  </div>
-
+                {/* Habits checklist — no section header (info is in the Hero) */}
+                <section className="px-4">
                   {totalCount === 0 ? (
-                    <div className="card-soft flex flex-col items-center justify-center gap-3 px-5 py-8 text-center">
-                      <div className="grid h-12 w-12 place-items-center rounded-full bg-canvas-soft">
-                        <Sparkles className="h-5 w-5 text-ink" />
-                      </div>
-                      <div>
-                        <p className="font-display text-base font-bold text-ink">No habits created yet</p>
-                        <p className="mt-1 max-w-[240px] text-[12px] text-body">
-                          Create your first habit to start tracking your daily progress.
-                        </p>
-                      </div>
-                      <button
+                    /* ── Empty state: invitation + ghost card ── */
+                    <div className="flex flex-col items-center gap-4 py-8">
+                      {/* Ghost habit card */}
+                      <div
+                        className="animate-breathe w-full rounded-2xl border-2 border-dashed border-accent-soft bg-accent-soft/30 p-4 flex items-center gap-3 cursor-pointer transition hover:bg-accent-soft/50"
                         onClick={() => setModalOpen(true)}
-                        className="pill mt-1 flex items-center gap-1.5 bg-ink px-4 py-2 text-[12px] font-semibold text-on-ink"
-                        data-lg-press
                       >
-                        <Plus className="h-3.5 w-3.5" strokeWidth={3} /> Add habit
-                      </button>
+                        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full border-2 border-dashed border-accent/40">
+                          <Plus className="h-4 w-4 text-accent" strokeWidth={2.5} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-ink">Tap to add your first habit</p>
+                          <p className="text-[11px] text-body mt-0.5">Your streak starts with one check ✓</p>
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -1463,7 +1421,8 @@ function Grain({ user }: { user?: any }) {
                         habits[q].map((h, i) => (
                           <div
                             key={`${q}-${i}-${h.name}`}
-                            className="card-soft flex items-center justify-between p-3.5 group cursor-pointer hover:border-[color:var(--hairline-mid)] transition"
+                            className="animate-fade-in-up card-soft flex items-center p-3 group cursor-pointer hover:border-[color:var(--hairline-mid)] transition"
+                            style={{ animationDelay: `${(i) * 40}ms` }}
                             onClick={() => {
                               setDetail({ q, i });
                               setNoteDraft("");
@@ -1475,30 +1434,23 @@ function Grain({ user }: { user?: any }) {
                                   e.stopPropagation();
                                   toggleDone(q, i);
                                 }}
-                                className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border transition ${
+                                className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border-2 transition ${
                                   h.done
-                                    ? "bg-ink border-ink text-on-ink"
-                                    : "border-[color:var(--hairline-mid)] text-transparent hover:border-ink"
+                                    ? "bg-accent border-accent text-[#000]"
+                                    : "border-[color:var(--hairline-mid)] text-transparent hover:border-accent"
                                 }`}
                               >
                                 <Check className="h-4 w-4" strokeWidth={3} />
                               </button>
                               <div className="min-w-0 flex-1">
-                                <p className={`text-sm font-semibold truncate ${h.done ? "line-through opacity-60 text-body" : "text-ink"}`}>
+                                <p className={`text-sm font-semibold truncate ${h.done ? "line-through opacity-50 text-body" : "text-ink"}`}>
                                   {h.name}
                                 </p>
                                 <p className="text-[10px] text-body">{QUADRANTS[q].title} · {h.streak}d streak</p>
                               </div>
                             </div>
-                            <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
-                              <button
-                                onClick={() => deleteHabit(q, i)}
-                                aria-label={`Delete ${h.name}`}
-                                className="grid h-8 w-8 place-items-center rounded-full text-mute transition hover:bg-rose-500/10 hover:text-rose-500 focus:text-rose-500 active:scale-90"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
+                            {/* Chevron hint — no trash icon */}
+                            <ArrowRight className="h-3.5 w-3.5 text-mute opacity-0 group-hover:opacity-100 transition shrink-0" />
                           </div>
                         ))
                       )}
@@ -1611,6 +1563,13 @@ function Grain({ user }: { user?: any }) {
                       <Stat label="Rate" value={`${rate}%`} pulseKey={rate} />
                     </div>
                   </div>
+
+                  {/* Weekly Insights Engine Card (Relocated from Today tab; hidden if < 3 days data) */}
+                  {totalStreak >= 3 && (
+                    <div className="mt-4">
+                      <InsightsCard insights={weeklyInsights} />
+                    </div>
+                  )}
                 </section>
               </div>
             )}
@@ -1965,10 +1924,10 @@ function Grain({ user }: { user?: any }) {
           {/* FAB */}
           <button
             onClick={() => setModalOpen(true)}
-            className="absolute bottom-20 right-5 z-30 mb-safe grid h-14 w-14 place-items-center rounded-full bg-ink text-on-ink shadow-[0_10px_30px_-5px_rgba(0,0,0,0.4)] transition active:scale-95"
+            className="absolute bottom-20 right-5 z-30 mb-safe grid h-14 w-14 place-items-center rounded-full bg-accent text-[#000] shadow-[0_10px_30px_-5px_var(--accent-soft)] transition active:scale-95 hover:scale-105"
             aria-label="Add habit"
           >
-            <Plus className="h-6 w-6" strokeWidth={2.25} />
+            <Plus className="h-6 w-6" strokeWidth={2.5} />
           </button>
 
           {/* Toast */}
@@ -2205,6 +2164,34 @@ function Grain({ user }: { user?: any }) {
                   </div>
                 </div>
 
+
+                {/* Quick Actions (relocated from Today tab) */}
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setSettingsOpen(false); setAiCoachOpen(true); }}
+                    className="pill flex items-center justify-center gap-1.5 border border-[color:var(--hairline)] bg-canvas-soft py-2.5 text-[11px] font-semibold text-ink transition hover:bg-[color:var(--surface-pressed)] active:scale-95"
+                    data-lg-press
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-accent" /> AI Coach
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setSettingsOpen(false); setBadgesOpen(true); }}
+                    className="pill flex items-center justify-center gap-1.5 border border-[color:var(--hairline)] bg-canvas-soft py-2.5 text-[11px] font-semibold text-ink transition hover:bg-[color:var(--surface-pressed)] active:scale-95"
+                    data-lg-press
+                  >
+                    <Shield className="h-3.5 w-3.5 text-accent" /> Milestones
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setSettingsOpen(false); setShareStreakOpen(true); }}
+                    className="pill flex items-center justify-center gap-1.5 border border-[color:var(--hairline)] bg-canvas-soft py-2.5 text-[11px] font-semibold text-ink transition hover:bg-[color:var(--surface-pressed)] active:scale-95"
+                    data-lg-press
+                  >
+                    <Share2 className="h-3.5 w-3.5 text-accent" /> Share
+                  </button>
+                </div>
 
                 <Row
                   label="Theme"
@@ -2737,6 +2724,16 @@ function Grain({ user }: { user?: any }) {
                       Save
                     </button>
                   </div>
+
+                  <button
+                    onClick={() => {
+                      deleteHabit(detail.q, detail.i);
+                      setDetail(null);
+                    }}
+                    className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-rose-500/20 bg-rose-500/10 py-2.5 text-xs font-semibold text-rose-400 transition hover:bg-rose-500/20 active:scale-98 mt-1"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Delete habit
+                  </button>
                 </div>
               </SheetShell>
             );
@@ -3462,108 +3459,6 @@ function HabitRow({
     </div>
   );
 }
-
-
-// ---------------- Today Hero ----------------
-interface TodayHeroProps {
-  streak: number;
-  rate: number;
-  done: number;
-  total: number;
-  nextHabit: { q: Quadrant; i: number; habit: Habit } | null;
-  onCompleteNext: (q: Quadrant, i: number) => void;
-}
-
-function TodayHero({ streak, rate, done, total, nextHabit, onCompleteNext }: TodayHeroProps) {
-  const pct = total === 0 ? 0 : Math.round((done / total) * 100);
-  const R = 32;
-  const C = 2 * Math.PI * R;
-  const offset = C - (C * pct) / 100;
-
-  return (
-    <section className="relative px-5 pt-4">
-      <div className="card-invert relative overflow-hidden rounded-[28px]">
-        {/* Specular top edge already provided by card-invert::before */}
-        <div className="relative flex items-start justify-between px-6 pt-6">
-          <div>
-            <span className="text-[10px] font-bold uppercase tracking-[0.18em] opacity-50">
-              Current streak
-            </span>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span
-                key={streak}
-                className="font-display animate-pop-badge text-[64px] font-bold leading-none tracking-tight tabular-nums"
-              >
-                {streak}
-              </span>
-              <span className="font-display text-xl font-medium opacity-40">
-                {streak === 1 ? "day" : "days"}
-              </span>
-            </div>
-          </div>
-
-          {/* Progress ring */}
-          <div className="relative h-20 w-20 shrink-0">
-            <svg viewBox="0 0 80 80" className="h-full w-full -rotate-90">
-              <circle
-                cx="40"
-                cy="40"
-                r={R}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="6"
-                className="opacity-10"
-              />
-              <circle
-                cx="40"
-                cy="40"
-                r={R}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="7"
-                strokeLinecap="round"
-                strokeDasharray={C}
-                strokeDashoffset={offset}
-                style={{ transition: "stroke-dashoffset 600ms cubic-bezier(0.22,1,0.36,1)" }}
-              />
-            </svg>
-            <div className="absolute inset-0 grid place-items-center">
-              <span className="font-display text-sm font-bold tabular-nums">{pct}%</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="mx-6 mt-5 h-px bg-[color:var(--on-ink)]/10" />
-
-        {/* Next action row */}
-        <div className="flex items-center justify-between gap-3 px-6 py-4">
-          <div className="min-w-0">
-            <span className="text-[10px] font-bold uppercase tracking-wider opacity-50">
-              {total === 0 ? "Ready when you are" : nextHabit ? "Up next" : "All done"}
-            </span>
-            <p className="font-display truncate text-base font-semibold">
-              {total === 0 ? "Add your first habit" : nextHabit ? nextHabit.habit.name : "You cleared today"}
-            </p>
-            <p className="mt-0.5 text-[11px] tabular-nums opacity-60">
-              {total === 0 ? "No habits tracked yet" : `${done}/${total} completed · ${rate}%`}
-            </p>
-          </div>
-          {nextHabit && (
-            <button
-              onClick={() => onCompleteNext(nextHabit.q, nextHabit.i)}
-              className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[color:var(--on-ink)] text-ink shadow-[0_6px_16px_-4px_rgba(0,0,0,0.35)] transition active:scale-95"
-              aria-label={`Complete ${nextHabit.habit.name}`}
-              data-lg-press
-            >
-              <Check className="h-5 w-5" strokeWidth={3} />
-            </button>
-          )}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 
 // ---------------- Profile Edit Sheet ----------------
 function ProfileEditSheet({

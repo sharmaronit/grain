@@ -27,6 +27,8 @@
   --color-foreground: var(--ink);
   --color-muted-foreground: var(--body);
   --color-border: var(--hairline);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
 }
 
 /* Dark = default */
@@ -44,6 +46,8 @@
   --primary: #ffffff;
   --on-primary: #000000;
   --backdrop: #0a0a0a;
+  --accent: #E5C07B;
+  --accent-soft: rgba(229, 192, 123, 0.15);
 }
 
 [data-theme="light"] {
@@ -60,6 +64,8 @@
   --primary: #000000;
   --on-primary: #ffffff;
   --backdrop: #efefef;
+  --accent: #B8860B;
+  --accent-soft: rgba(184, 134, 11, 0.12);
 }
 
 @layer base {
@@ -526,6 +532,20 @@
   margin-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
 }
 
+/* ============ Empty state breathing ghost card ============ */
+@keyframes breathe {
+  0%, 100% { border-color: var(--accent-soft); box-shadow: 0 0 0 0 var(--accent-soft); }
+  50% { border-color: var(--accent); box-shadow: 0 0 16px 2px var(--accent-soft); }
+}
+@utility animate-breathe {
+  animation: breathe 3s ease-in-out infinite;
+}
 
-
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@utility animate-fade-in-up {
+  animation: fade-in-up 0.4s ease-out both;
+}
 
