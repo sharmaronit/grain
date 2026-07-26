@@ -1,5 +1,5 @@
 import React from "react";
-import { ArrowRight, Check } from "lucide-react";
+import { Check, Flame } from "lucide-react";
 import type { Quadrant, Habit } from "./types";
 
 export interface TodayHeroProps {
@@ -25,21 +25,21 @@ export function TodayHero({
 
   return (
     <section className="relative px-5 pt-4">
-      <div className="card-invert relative overflow-hidden rounded-[28px]">
-        {/* Specular top edge already provided by card-invert::before */}
-        <div className="relative flex items-start justify-between px-6 pt-6">
+      <div className="card-soft relative overflow-hidden rounded-[28px] border border-[color:var(--hairline)] bg-canvas-soft p-5 text-ink shadow-lg">
+        <div className="relative flex items-center justify-between">
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-[0.18em] opacity-50">
-              Current streak
-            </span>
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-mute">
+              <Flame className="h-3.5 w-3.5 text-amber-500" />
+              <span>Current streak</span>
+            </div>
             <div className="mt-1 flex items-baseline gap-2">
               <span
                 key={streak}
-                className="font-display animate-pop-badge text-[64px] font-bold leading-none tracking-tight tabular-nums"
+                className="font-display animate-pop-badge text-[56px] font-bold leading-none tracking-tight text-ink tabular-nums"
               >
                 {streak}
               </span>
-              <span className="font-display text-xl font-medium opacity-40">
+              <span className="font-display text-lg font-medium text-body">
                 {streak === 1 ? "day" : "days"}
               </span>
             </div>
@@ -54,8 +54,8 @@ export function TodayHero({
                 r={R}
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="6"
-                className="opacity-10"
+                strokeWidth="5"
+                className="text-[color:var(--hairline)]"
               />
               <circle
                 cx="40"
@@ -63,10 +63,11 @@ export function TodayHero({
                 r={R}
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="7"
+                strokeWidth="6"
                 strokeLinecap="round"
                 strokeDasharray={C}
                 strokeDashoffset={offset}
+                className="text-ink"
                 style={{
                   transition:
                     "stroke-dashoffset 600ms cubic-bezier(0.22,1,0.36,1)",
@@ -74,49 +75,37 @@ export function TodayHero({
               />
             </svg>
             <div className="absolute inset-0 grid place-items-center">
-              <span className="font-display text-sm font-bold tabular-nums">
+              <span className="font-display text-sm font-bold text-ink tabular-nums">
                 {pct}%
               </span>
             </div>
           </div>
         </div>
 
-        <div className="mx-6 mt-5 h-px bg-[color:var(--on-ink)]/10" />
+        {nextHabit && (
+          <>
+            <div className="my-4 h-px bg-[color:var(--hairline)]" />
 
-        {/* Next action row */}
-        <div className="flex items-center justify-between gap-3 px-6 py-4">
-          {nextHabit ? (
-            <>
+            {/* Next action row */}
+            <div className="flex items-center justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <span className="text-[9px] font-semibold uppercase tracking-widest opacity-40">
+                <span className="text-[9px] font-semibold uppercase tracking-widest text-mute">
                   Up next
                 </span>
-                <p className="font-display truncate text-sm font-bold">
+                <p className="font-display truncate text-sm font-bold text-ink">
                   {nextHabit.habit.name}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => onCompleteNext(nextHabit.q, nextHabit.i)}
-                className="pill flex shrink-0 items-center gap-1.5 bg-[color:var(--on-ink)] px-4 py-2 text-[12px] font-semibold text-ink transition active:scale-95"
-                data-lg-press
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-ink text-on-ink shadow-md transition hover:scale-105 active:scale-95"
               >
-                Done <Check className="h-3.5 w-3.5" strokeWidth={3} />
+                <Check className="h-5 w-5" />
               </button>
-            </>
-          ) : (
-            <div className="flex w-full items-center justify-between">
-              <span className="text-xs font-medium opacity-60">
-                {total > 0 && done === total
-                  ? "🎉 All habits complete today!"
-                  : "No pending habits"}
-              </span>
-              <span className="text-[11px] font-semibold opacity-40 tabular-nums">
-                {done}/{total} done
-              </span>
             </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
     </section>
   );

@@ -1368,7 +1368,7 @@ function Grain({ user }: { user?: any }) {
 
                 {/* Date selector */}
                 <div className="px-5 pt-1">
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center justify-between gap-1.5">
                     {getWeekDates(new Date()).map((date) => {
                       const active = isSameDay(date, selectedDate);
                       const isTodayDate = isSameDay(date, new Date());
@@ -1380,17 +1380,17 @@ function Grain({ user }: { user?: any }) {
                             setSelectedDate(date);
                             if (!isTodayDate) showToast(`Viewing ${shortDay(date)}, ${date.getDate()}`);
                           }}
-                          className={`flex h-14 flex-1 flex-col items-center justify-center gap-1 rounded-2xl transition ${
+                          className={`flex h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl transition ${
                             active
-                              ? "bg-ink text-on-ink"
+                              ? "bg-ink text-on-ink shadow-sm"
                               : "bg-canvas-soft text-ink hover:bg-[color:var(--surface-pressed)]"
                           }`}
                         >
-                          <span className={`text-[10px] font-medium ${active ? "opacity-70" : "text-body"}`}>
+                          <span className={`text-[9px] font-bold uppercase tracking-wider ${active ? "opacity-80" : "text-body"}`}>
                             {shortDay(date)}
                           </span>
-                          <span className="font-display text-sm font-bold tabular-nums">{date.getDate()}</span>
-                          {isPast && !active && <span className="h-1 w-1 rounded-full bg-ink" />}
+                          <span className="font-display text-xs font-bold tabular-nums">{date.getDate()}</span>
+                          {isPast && !active && <span className="h-1 w-1 rounded-full bg-ink/40" />}
                         </button>
                       );
                     })}
@@ -1403,21 +1403,21 @@ function Grain({ user }: { user?: any }) {
                     <button
                       type="button"
                       onClick={() => setAiCoachOpen(true)}
-                      className="pill flex items-center justify-center gap-1.5 border border-[color:var(--hairline)] bg-canvas-soft py-2.5 text-[11px] font-semibold text-ink transition hover:bg-[color:var(--surface-pressed)]"
+                      className="pill flex items-center justify-center gap-1.5 border border-[color:var(--hairline)] bg-canvas-soft py-2.5 text-[11px] font-semibold text-ink transition hover:bg-[color:var(--surface-pressed)] active:scale-95"
                     >
                       <Sparkles className="h-3.5 w-3.5" /> AI Coach
                     </button>
                     <button
                       type="button"
                       onClick={() => setBadgesOpen(true)}
-                      className="pill flex items-center justify-center gap-1.5 border border-[color:var(--hairline)] bg-canvas-soft py-2.5 text-[11px] font-semibold text-ink transition hover:bg-[color:var(--surface-pressed)]"
+                      className="pill flex items-center justify-center gap-1.5 border border-[color:var(--hairline)] bg-canvas-soft py-2.5 text-[11px] font-semibold text-ink transition hover:bg-[color:var(--surface-pressed)] active:scale-95"
                     >
                       <Shield className="h-3.5 w-3.5" /> Milestones
                     </button>
                     <button
                       type="button"
                       onClick={() => setShareStreakOpen(true)}
-                      className="pill flex items-center justify-center gap-1.5 border border-[color:var(--hairline)] bg-canvas-soft py-2.5 text-[11px] font-semibold text-ink transition hover:bg-[color:var(--surface-pressed)]"
+                      className="pill flex items-center justify-center gap-1.5 border border-[color:var(--hairline)] bg-canvas-soft py-2.5 text-[11px] font-semibold text-ink transition hover:bg-[color:var(--surface-pressed)] active:scale-95"
                     >
                       <Share2 className="h-3.5 w-3.5" /> Share Streak
                     </button>
@@ -1463,11 +1463,18 @@ function Grain({ user }: { user?: any }) {
                         habits[q].map((h, i) => (
                           <div
                             key={`${q}-${i}-${h.name}`}
-                            className="card-soft flex items-center justify-between p-3.5 group"
+                            className="card-soft flex items-center justify-between p-3.5 group cursor-pointer hover:border-[color:var(--hairline-mid)] transition"
+                            onClick={() => {
+                              setDetail({ q, i });
+                              setNoteDraft("");
+                            }}
                           >
                             <div className="flex items-center gap-3 min-w-0 flex-1">
                               <button
-                                onClick={() => toggleDone(q, i)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleDone(q, i);
+                                }}
                                 className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border transition ${
                                   h.done
                                     ? "bg-ink border-ink text-on-ink"
@@ -1476,27 +1483,18 @@ function Grain({ user }: { user?: any }) {
                               >
                                 <Check className="h-4 w-4" strokeWidth={3} />
                               </button>
-                              <div className="min-w-0">
+                              <div className="min-w-0 flex-1">
                                 <p className={`text-sm font-semibold truncate ${h.done ? "line-through opacity-60 text-body" : "text-ink"}`}>
                                   {h.name}
                                 </p>
                                 <p className="text-[10px] text-body">{QUADRANTS[q].title} · {h.streak}d streak</p>
                               </div>
                             </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <button
-                                onClick={() => {
-                                  setDetail({ q, i });
-                                  setNoteDraft("");
-                                }}
-                                className="chip-uber px-2.5 py-1 text-[11px]"
-                              >
-                                Details
-                              </button>
+                            <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
                               <button
                                 onClick={() => deleteHabit(q, i)}
                                 aria-label={`Delete ${h.name}`}
-                                className="grid h-7 w-7 place-items-center rounded-full text-rose-500/40 transition hover:bg-rose-500/10 hover:text-rose-500 focus:text-rose-500 active:scale-90"
+                                className="grid h-8 w-8 place-items-center rounded-full text-mute transition hover:bg-rose-500/10 hover:text-rose-500 focus:text-rose-500 active:scale-90"
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>

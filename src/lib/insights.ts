@@ -104,7 +104,9 @@ export function computeWeeklyInsights(
   }
 
   let insightSummary = "";
-  if (Math.abs(weekdayDiff) >= 10) {
+  if (weekdayDone + weekendDone === 0) {
+    insightSummary = "Complete your daily habits to unlock personalized 28-day trends.";
+  } else if (Math.abs(weekdayDiff) >= 10) {
     if (weekdayDiff > 0) {
       insightSummary = `You're ${weekdayDiff}% more consistent on weekdays than weekends.`;
     } else {
