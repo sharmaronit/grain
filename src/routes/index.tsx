@@ -1243,7 +1243,9 @@ function Grain({ user }: { user?: any }) {
                     }, 2000);
                   }
                 }}
-                className="pointer-events-auto flex items-center gap-2 rounded-full border border-[color:var(--hairline-mid)] bg-canvas/85 p-1.5 text-xs font-semibold text-ink backdrop-blur-xl shadow-lg transition-all duration-500 ease-out active:scale-95 pr-3"
+                className={`pointer-events-auto flex items-center justify-center rounded-full border border-[color:var(--hairline-mid)] bg-canvas/85 p-1 text-xs font-semibold text-ink backdrop-blur-xl shadow-lg transition-all duration-500 ease-out active:scale-95 ${
+                  showTitlePill ? "gap-2 pr-3.5 pl-1" : "gap-2 pr-3 pl-1"
+                }`}
                 aria-label="App logo and section title"
               >
                 <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full overflow-hidden">
@@ -1253,22 +1255,26 @@ function Grain({ user }: { user?: any }) {
                     className="h-full w-full object-contain object-center filter drop-shadow-sm scale-105"
                   />
                 </div>
-                <span className="font-display font-bold text-xs tracking-wide text-ink shrink-0">
+                <span className="font-display font-bold text-xs tracking-wide text-ink shrink-0 leading-none flex items-center">
                   Grain
                 </span>
-                <span
-                  className={`overflow-hidden whitespace-nowrap transition-all duration-500 ease-out text-mute font-medium text-[11px] ${
-                    showTitlePill ? "max-w-[220px] opacity-100 pl-1.5 border-l border-[color:var(--hairline-mid)]" : "max-w-0 opacity-0 border-none"
+
+                <div
+                  className={`overflow-hidden transition-all duration-500 ease-out flex items-center gap-2 ${
+                    showTitlePill ? "max-w-[240px] opacity-100" : "max-w-0 opacity-0"
                   }`}
                 >
-                  {activeTab === "today"
-                    ? `Daily habits · ${totalStreak}d streak`
-                    : activeTab === "consistency"
-                    ? `Consistency · ${totalStreak}d streak`
-                    : activeTab === "matrix"
-                    ? "Priority matrix"
-                    : "Live wallpaper"}
-                </span>
+                  <span className="h-3.5 w-px bg-[color:var(--hairline-mid)] shrink-0 opacity-70" />
+                  <span className="text-mute font-medium text-[11px] leading-none shrink-0 whitespace-nowrap flex items-center">
+                    {activeTab === "today"
+                      ? `Daily habits · ${totalStreak}d streak`
+                      : activeTab === "consistency"
+                      ? `Consistency · ${totalStreak}d streak`
+                      : activeTab === "matrix"
+                      ? "Priority matrix"
+                      : "Live wallpaper"}
+                  </span>
+                </div>
               </button>
             </div>
 
