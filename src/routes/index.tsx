@@ -1,9 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
-import { Capacitor, registerPlugin } from "@capacitor/core";
-
-const Wallpaper = registerPlugin<any>("Wallpaper");
 import {
   Flame,
   Settings,
@@ -1099,7 +1096,10 @@ function Grain({ user }: { user?: any }) {
     try {
       const cap = await capturePreview();
       if (cap) {
-        if (Capacitor.isNativePlatform()) {
+        // Dynamically import Capacitor to prevent SSR crashes on the web
+        if (typeof window !== "undefined" && (window as any).Capacitor?.isNativePlatform()) {
+          const { Capacitor, registerPlugin } = await import("@capacitor/core");
+          const Wallpaper = registerPlugin<any>("Wallpaper");
           await Wallpaper.setWallpaper({ base64: cap.dataUrl, screenType: 3 }); // 1=SYSTEM, 2=LOCK
           showToast("Wallpaper applied to your device!", undefined, 4000);
         } else {
