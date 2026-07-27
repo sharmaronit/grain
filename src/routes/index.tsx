@@ -1,6 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
+import { Capacitor, registerPlugin } from "@capacitor/core";
+
+const Wallpaper = registerPlugin<any>("Wallpaper");
 import {
   Flame,
   Settings,
@@ -1096,14 +1099,19 @@ function Grain({ user }: { user?: any }) {
     try {
       const cap = await capturePreview();
       if (cap) {
-        const a = document.createElement("a");
-        a.href = cap.dataUrl;
-        a.download = `grain-lockscreen-${wallpaperTheme}-${Date.now()}.png`;
-        a.click();
+        if (Capacitor.isNativePlatform()) {
+          await Wallpaper.setWallpaper({ base64: cap.dataUrl, screenType: 3 }); // 1=SYSTEM, 2=LOCK
+          showToast("Wallpaper applied to your device!", undefined, 4000);
+        } else {
+          const a = document.createElement("a");
+          a.href = cap.dataUrl;
+          a.download = `grain-lockscreen-${wallpaperTheme}-${Date.now()}.png`;
+          a.click();
+          showToast("Wallpaper saved — select Set as Lock Screen in Gallery", undefined, 4000);
+        }
       }
       setWallpaperState("applied");
       setWallpaperSnapshot(heatmap.map((c) => c.slice()));
-      showToast("Wallpaper saved — select Set as Lock Screen in Gallery", undefined, 4000);
     } catch {
       showToast("Could not generate wallpaper image");
     } finally {

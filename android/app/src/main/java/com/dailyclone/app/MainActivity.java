@@ -11,6 +11,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         registerPlugin(FirebaseAuthenticationPlugin.class);
+        registerPlugin(WallpaperPlugin.class);
 
         // Force WebView to clear cache on launch so fresh Vite JS/CSS bundles are loaded
         if (this.bridge != null && this.bridge.getWebView() != null) {
