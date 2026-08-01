@@ -1,0 +1,54 @@
+import { Capacitor, registerPlugin } from '@capacitor/core';
+
+export interface WallpaperData {
+  heatmap: number[][];
+  theme: string;
+  previewWeeks: number;
+  currentStreak: number;
+  completionRate: number;
+}
+
+export interface WallpaperPluginDef {
+  syncWallpaperData(opts: WallpaperData): Promise<{ success: boolean }>;
+  setWallpaper(opts: WallpaperData): Promise<{ success: boolean }>;
+  setStaticWallpaper(opts: WallpaperData): Promise<{ success: boolean }>;
+  isLiveWallpaperSupported(): Promise<{ supported: boolean }>;
+}
+
+// Bug 12 fix: Lazy-initialize the plugin to avoid crashing during SSR or
+// Vite module graph analysis when Capacitor isn't available yet.
+const webStub: WallpaperPluginDef = {
+  syncWallpaperData: async () => ({ success: false }),
+  setWallpaper: async () => ({ success: false }),
+  setStaticWallpaper: async () => ({ success: false }),
+  isLiveWallpaperSupported: async () => ({ supported: false }),
+};
+
+let _instance: WallpaperPluginDef | null = null;
+
+/**
+ * Get the Wallpaper plugin instance. Uses lazy initialization so the
+ * module can be safely imported during SSR without crashing.
+ */
+export function getWallpaperPlugin(): WallpaperPluginDef {
+  if (_instance) return _instance;
+  try {
+    if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
+      _instance = registerPlugin<WallpaperPluginDef>('Wallpaper');
+    } else {
+      _instance = webStub;
+    }
+  } catch {
+    _instance = webStub;
+  }
+  return _instance;
+}
+
+// Also export a convenience alias that matches the old import pattern.
+// Bug 9 fix: Named "WallpaperNative" to avoid collision with lucide-react's
+// Wallpaper icon.
+export const WallpaperNative = new Proxy({} as WallpaperPluginDef, {
+  get(_target, prop) {
+    return (getWallpaperPlugin() as any)[prop];
+  },
+});

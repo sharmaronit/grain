@@ -25,7 +25,7 @@ import {
   isScheduledDay,
   isSameDay,
 } from "../lib/dates";
-import type { CompletionEntry } from "../lib/streaks";
+import { calculateStreak, calculateBestStreak, type CompletionEntry } from "../lib/streaks";
 import type { HabitDoc } from "../lib/firestore";
 
 export interface HeatmapStats {
@@ -64,11 +64,16 @@ export function useHeatmap(
   >({});
   const [loading, setLoading] = useState(true);
 
-  const today = new Date();
-  const startDate = heatmapStartDate(today);
-  const startKey = formatDateKey(startDate);
-  const endKey = formatDateKey(today);
-
+  const { today, startDate, startKey, endKey } = useMemo(() => {
+    const t = new Date();
+    const sd = heatmapStartDate(t);
+    return {
+      today: t,
+      startDate: sd,
+      startKey: formatDateKey(sd),
+      endKey: formatDateKey(t),
+    };
+  }, []);
   // Subscribe to completions range
   useEffect(() => {
     if (!userId) {
@@ -220,52 +225,9 @@ export function useHeatmap(
     // Compute individual per-habit streaks (using all habits passed to hook)
     const habitStreaks: Record<string, { currentStreak: number; bestStreak: number }> = {};
     for (const habit of habits) {
-      let hCurrentStreak = 0;
-      let hBestStreak = 0;
-      let hStreakBroken = false;
-      let hRunning = 0;
-
-      // Backward pass for current streak
-      for (let i = dayEntries.length - 1; i >= 0; i--) {
-        const e = dayEntries[i];
-        const scheduled = isScheduledDay(habit.frequency, habit.customDays, e.date);
-        if (!scheduled) continue;
-
-        const key = formatDateKey(e.date);
-        const entry = completionsMap[key]?.[habit.id];
-        const isDone = Boolean(entry && (entry.done || entry.restDay || entry.frozenStreak));
-
-        if (isDone) {
-          if (!hStreakBroken) hCurrentStreak++;
-        } else {
-          if (isSameDay(e.date, today)) continue;
-          hStreakBroken = true;
-        }
-      }
-
-      // Forward pass for best streak
-      for (let i = 0; i < dayEntries.length; i++) {
-        const e = dayEntries[i];
-        const scheduled = isScheduledDay(habit.frequency, habit.customDays, e.date);
-        if (!scheduled) continue;
-
-        const key = formatDateKey(e.date);
-        const entry = completionsMap[key]?.[habit.id];
-        const isDone = Boolean(entry && (entry.done || entry.restDay || entry.frozenStreak));
-
-        if (isDone) {
-          hRunning++;
-          hBestStreak = Math.max(hBestStreak, hRunning);
-        } else {
-          if (!isSameDay(e.date, today)) {
-            hRunning = 0;
-          }
-        }
-      }
-
       habitStreaks[habit.id] = {
-        currentStreak: hCurrentStreak,
-        bestStreak: Math.max(hBestStreak, hCurrentStreak, habit.bestStreak ?? 0),
+        currentStreak: calculateStreak(habit.id, completionsMap, habit.frequency, habit.customDays, today),
+        bestStreak: calculateBestStreak(habit.id, completionsMap, habit.frequency, habit.customDays)
       };
     }
 

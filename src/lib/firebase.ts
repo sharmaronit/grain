@@ -1,7 +1,8 @@
 import { initializeApp, type FirebaseApp } from "firebase/app";
 import {
-  getFirestore,
-  enableIndexedDbPersistence,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   type Firestore,
 } from "firebase/firestore";
 import { getAuth, type Auth } from "firebase/auth";
@@ -34,26 +35,11 @@ let _auth: Auth | null = null;
 export function getFirebaseServices() {
   if (!_app) {
     _app = initializeApp(firebaseConfig);
-    _db = getFirestore(_app);
-    _auth = getAuth(_app);
-
-    // Enable Firestore offline persistence (IndexedDB cache).
-    // Silently swallow errors in multi-tab or SSR contexts.
-    enableIndexedDbPersistence(_db).catch((err) => {
-      if (err.code === "failed-precondition") {
-        // Multiple tabs open — persistence only works in one.
-        console.warn(
-          "[Firestore] Persistence failed: multiple tabs open.",
-          err,
-        );
-      } else if (err.code === "unimplemented") {
-        // Browser doesn't support IndexedDB persistence.
-        console.warn(
-          "[Firestore] Persistence not available in this browser.",
-          err,
-        );
-      }
+    // Enable Firestore offline persistence (IndexedDB cache) with multi-tab support.
+    _db = initializeFirestore(_app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
     });
+    _auth = getAuth(_app);
   }
 
   return { app: _app, db: _db!, auth: _auth! };

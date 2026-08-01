@@ -81,9 +81,11 @@ import { computeWeeklyInsights } from "../lib/insights";
 import { computeMilestones } from "../lib/badges";
 import { InsightsCard } from "../components/InsightsCard";
 import { BadgesModal } from "../components/BadgesModal";
-import { AICoachModal } from "../components/AICoachModal";
+import { InsightsCoachModal } from "../components/InsightsCoachModal";
 import { ShareStreakModal } from "../components/ShareStreakModal";
 import { TodayHero } from "../components/TodayHero";
+import { WallpaperNative } from "../lib/wallpaper-bridge";
+import { useWallpaperSync } from "../hooks/useWallpaperSync";
 
 const catClass = (_c: string) =>
   "bg-canvas-soft text-body border border-[color:var(--hairline)]";
@@ -1090,24 +1092,49 @@ function Grain({ user }: { user?: any }) {
     });
   };
 
+  // ── Sync to Live Wallpaper ────────────────────────────
+  useWallpaperSync({
+    heatmap,
+    totalStreak: heatmapStats.currentStreak,
+    completionRate: rate,
+    wallpaperTheme,
+    previewWeeks,
+    wallpaperSync,
+  });
+
   const applyWallpaper = async () => {
     if (wallpaperState !== "idle") return;
     setWallpaperState("applying");
     try {
-      const cap = await capturePreview();
-      if (cap) {
-        // Dynamically import Capacitor to prevent SSR crashes on the web
-        if (typeof window !== "undefined" && (window as any).Capacitor?.isNativePlatform()) {
-          const { Capacitor, registerPlugin } = await import("@capacitor/core");
-          const Wallpaper = registerPlugin<any>("Wallpaper");
-          await Wallpaper.setWallpaper({ base64: cap.dataUrl, screenType: 3 }); // 1=SYSTEM, 2=LOCK
-          showToast("Wallpaper applied to your device!", undefined, 4000);
+      if (typeof window !== "undefined" && (window as any).Capacitor?.isNativePlatform()) {
+        const { supported } = await WallpaperNative.isLiveWallpaperSupported();
+        if (supported) {
+          await WallpaperNative.setWallpaper({
+            heatmap,
+            theme: wallpaperTheme,
+            previewWeeks,
+            currentStreak: heatmapStats.currentStreak,
+            completionRate: rate,
+          });
+          showToast("Wallpaper picker opened \u2014 confirm to apply", undefined, 4000);
         } else {
+          await WallpaperNative.setStaticWallpaper({
+            heatmap,
+            theme: wallpaperTheme,
+            previewWeeks,
+            currentStreak: heatmapStats.currentStreak,
+            completionRate: rate,
+          });
+          showToast("Static wallpaper applied!", undefined, 4000);
+        }
+      } else {
+        const cap = await capturePreview();
+        if (cap) {
           const a = document.createElement("a");
           a.href = cap.dataUrl;
           a.download = `grain-lockscreen-${wallpaperTheme}-${Date.now()}.png`;
           a.click();
-          showToast("Wallpaper saved — select Set as Lock Screen in Gallery", undefined, 4000);
+          showToast("Wallpaper saved \u2014 select Set as Lock Screen in Gallery", undefined, 4000);
         }
       }
       setWallpaperState("applied");
@@ -1368,7 +1395,7 @@ function Grain({ user }: { user?: any }) {
                   nextHabit={(() => {
                     for (const q of QUADRANT_ORDER) {
                       const idx = habits[q].findIndex((h) => !h.done);
-                      if (idx !== -1) return { q, i: idx, habit: habits[q][idx] };
+                      if (idx !== -1) return { q, i: idx, habit: habits[q][idx] as any };
                     }
                     return null;
                   })()}
@@ -2749,7 +2776,7 @@ function Grain({ user }: { user?: any }) {
 
           {/* Podium Feature Modals */}
           {aiCoachOpen && (
-            <AICoachModal
+            <InsightsCoachModal
               onClose={() => setAiCoachOpen(false)}
               insights={weeklyInsights}
               currentStreak={totalStreak}

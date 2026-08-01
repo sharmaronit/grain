@@ -1,6 +1,6 @@
 {
   "appId": "com.dailyclone.app",
-  "appName": "DailyClone",
+  "appName": "Grain",
   "webDir": "dist-spa",
   "server": {
     "androidScheme": "https"

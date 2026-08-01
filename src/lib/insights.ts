@@ -1,6 +1,6 @@
 import type { HabitDoc } from "./firestore";
 import type { CompletionEntry } from "./streaks";
-import { formatDateKey, isoDow } from "./dates";
+import { formatDateKey, isoDow, isScheduledDay } from "./dates";
 
 export interface InsightsResult {
   weekdayRate: number;
@@ -52,6 +52,10 @@ export function computeWeeklyInsights(
     const isWeekend = dow >= 5;
 
     for (const h of habits) {
+      if (!isScheduledDay(h.frequency, h.customDays, cur)) {
+        continue;
+      }
+
       const entry = dayEntries[h.id];
       const isDone = Boolean(entry && (entry.done || entry.restDay || entry.frozenStreak));
 

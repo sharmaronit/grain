@@ -1,23 +1,14 @@
-import type { Quadrant } from "../lib/firestore";
+import type { Quadrant, HabitDoc } from "../lib/firestore";
 
 export type { Quadrant };
 
-export interface Habit {
-  id: string;
-  name: string;
-  category: string;
-  quadrant: Quadrant;
+export interface Habit extends HabitDoc {
   streak: number;
-  pinned: boolean;
   done?: boolean;
-  best?: number;
-  time?: "morning" | "afternoon" | "evening" | null;
-  target?: number | null;
   value?: number;
-  unit?: string | null;
-  step?: number | null;
-  frequency?: "daily" | "weekdays" | "custom";
-  customDays?: number[];
-  icon?: number;
-  shade?: number;
+  best?: number;
 }
+
+export type AppTab = "today" | "consistency" | "matrix" | "wallpaper";
+export type Theme = "dark" | "light";
+export type WallpaperState = "idle" | "applying" | "applied";

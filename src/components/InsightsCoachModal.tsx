@@ -3,7 +3,7 @@ import { SheetShell } from "./SheetShell";
 import { Sparkles, Bot, Loader2, RefreshCw } from "lucide-react";
 import type { InsightsResult } from "../lib/insights";
 
-export function AICoachModal({
+export function InsightsCoachModal({
   onClose,
   insights,
   currentStreak,
@@ -51,6 +51,7 @@ export function AICoachModal({
   const refreshAdvice = () => {
     setLoading(true);
     setTimeout(() => {
+      setAdvice((prev) => prev ? [...prev].sort(() => Math.random() - 0.5) : prev);
       setLoading(false);
     }, 600);
   };
@@ -58,8 +59,8 @@ export function AICoachModal({
   return (
     <SheetShell
       onClose={onClose}
-      title="AI Habit Coach"
-      subtitle="Personalized recommendations powered by your consistency data."
+      title="Insights & Coaching"
+      subtitle="Data-driven recommendations based on your consistency patterns."
     >
       <div className="mt-4 space-y-4">
         <div className="liquid-glass specular flex items-center justify-between rounded-2xl p-4">
@@ -69,7 +70,7 @@ export function AICoachModal({
             </div>
             <div>
               <div className="font-display text-sm font-bold text-ink">
-                Grain Coach AI
+                Grain Insights
               </div>
               <div className="text-[11px] text-body">
                 {currentStreak}-day streak · {doneCount}/{totalCount} today
