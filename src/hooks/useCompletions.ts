@@ -91,6 +91,7 @@ export function useCompletions(
     const current = getEntry(habitId);
     const nowDone = !current.done;
     await setCompletionEntry(userId, dateKey, habitId, {
+      ...current,
       done: nowDone,
       completedAt: nowDone ? new Date() : null,
     });
@@ -98,12 +99,14 @@ export function useCompletions(
 
   const setValue = async (habitId: string, val: number, target: number) => {
     if (!userId) return;
+    const current = getEntry(habitId);
     const newVal = Math.max(0, Math.min(target, val));
     const done = newVal >= target;
     await setCompletionEntry(userId, dateKey, habitId, {
+      ...current,
       done,
       value: newVal,
-      completedAt: done ? new Date() : null,
+      completedAt: done && !current.done ? new Date() : current.completedAt,
     });
   };
 
@@ -119,15 +122,18 @@ export function useCompletions(
     const newVal = Math.max(0, Math.min(target, currentVal + dir * step));
     const done = newVal >= target;
     await setCompletionEntry(userId, dateKey, habitId, {
+      ...current,
       value: newVal,
       done,
-      completedAt: done ? new Date() : null,
+      completedAt: done && !current.done ? new Date() : current.completedAt,
     });
   };
 
   const setRestDay = async (habitId: string) => {
     if (!userId) return;
+    const current = getEntry(habitId);
     await setCompletionEntry(userId, dateKey, habitId, {
+      ...current,
       restDay: true,
       done: true, // counts as "done" in UI to grey it out
     });
@@ -135,14 +141,17 @@ export function useCompletions(
 
   const freezeStreak = async (habitId: string) => {
     if (!userId) return;
+    const current = getEntry(habitId);
     await setCompletionEntry(userId, dateKey, habitId, {
+      ...current,
       frozenStreak: true,
     });
   };
 
   const saveNote = async (habitId: string, note: string) => {
     if (!userId) return;
-    await setCompletionEntry(userId, dateKey, habitId, { note });
+    const current = getEntry(habitId);
+    await setCompletionEntry(userId, dateKey, habitId, { ...current, note });
   };
 
   return {

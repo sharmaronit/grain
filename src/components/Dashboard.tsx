@@ -1,6 +1,6 @@
 import { ConsistencyTab } from "../components/tabs/ConsistencyTab";
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState, startTransition } from "react";
+import { useEffect, useMemo, useRef, useState, startTransition, memo } from "react";
 import { toPng } from "html-to-image";
 import { DndContext, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors, DragOverlay, useDroppable, defaultDropAnimationSideEffects } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -308,6 +308,14 @@ export function Dashboard({ user }: { user?: any }) {
   const [remindersOn, setRemindersOn] = useState(true);
   const [detail, setDetail] = useState<{ q: Quadrant; i: number } | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
+
+  useEffect(() => {
+    if (detail) {
+      const h = habits[detail.q]?.[detail.i];
+      if (h) setNoteDraft((h as any).note || "");
+    }
+  }, [detail?.q, detail?.i]);
+
   const [wallpaperPreview, setWallpaperPreview] = useState(false);
   const [captureBusy, setCaptureBusy] = useState<null | "share" | "save">(null);
   const [previewWeeks, setPreviewWeeks] = useState(26);
@@ -508,6 +516,7 @@ export function Dashboard({ user }: { user?: any }) {
           ...h,
           done: entry?.done ?? false,
           value: entry?.value ?? 0,
+          note: entry?.note ?? "",
           streak: hStats?.currentStreak ?? 0,
           best: Math.max(h.bestStreak ?? 0, hStats?.bestStreak ?? 0),
         };
@@ -586,12 +595,15 @@ export function Dashboard({ user }: { user?: any }) {
     await adjustHabitValue(targetHabit.id, dir, step, targetHabit.target);
   };
 
-  const freezeStreak = async (q: Quadrant, i: number) => {
-    const targetHabit = habits[q][i];
-    if (!targetHabit) return;
-    await freezeHabitStreak(targetHabit.id);
-    showToast(`Streak frozen for "${targetHabit.name}"`);
-    setDetail(null);
+  const freezeStreak = (q: Quadrant, i: number) => {
+    try {
+      const targetHabit = habits[q][i];
+      if (!targetHabit) return;
+      freezeHabitStreak(targetHabit.id).catch(err => console.error("Freeze error:", err));
+      showToast(`Streak frozen for "${targetHabit.name}"`);
+    } finally {
+      setDetail(null);
+    }
   };
 
   const togglePin = async (q: Quadrant, i: number) => {
@@ -2263,11 +2275,16 @@ export function Dashboard({ user }: { user?: any }) {
                         };
                         
                         return (
-                          <div key={timeKey} className="flex flex-col gap-3">
-                            <h3 className="font-display text-sm font-bold text-ink tracking-tight pl-1">
-                              {timeTitles[timeKey]}
-                            </h3>
-                            <div className="flex flex-col gap-2">
+                          <div key={timeKey} className="card-soft relative flex w-full flex-col overflow-hidden border border-[color:var(--hairline)] transition-all">
+                            <div className="flex items-center justify-between px-4 py-3 text-left">
+                              <h3 className="font-display text-sm font-bold text-ink">
+                                {timeTitles[timeKey]}
+                              </h3>
+                              <span className="text-[11px] font-medium tabular-nums text-mute">
+                                {timeHabits.filter(h => h.done).length}/{timeHabits.length}
+                              </span>
+                            </div>
+                            <div className="px-3 pb-3 pt-0 space-y-1.5">
                               {timeHabits.map((h, i) => (
                                 <HabitRow
                                   key={h.id}
@@ -2639,9 +2656,12 @@ export function Dashboard({ user }: { user?: any }) {
             <ProfileEditSheet
               profile={profile}
               onClose={() => setProfileEditOpen(false)}
-              onSave={(next) => {
-                saveProfile(next);
-                setProfileEditOpen(false);
+              onSave={async (next) => {
+                try {
+                  await saveProfile(next);
+                } finally {
+                  setProfileEditOpen(false);
+                }
               }}
             />
           )}
@@ -2730,11 +2750,16 @@ export function Dashboard({ user }: { user?: any }) {
                 quadrant={t.q}
                 onClose={() => setEditHabitTarget(null)}
                 onSave={async (patch, newQ) => {
-                  const updates: Partial<Omit<HabitDoc, "id" | "createdAt">> = { ...patch };
-                  if (newQ && newQ !== t.q) updates.quadrant = newQ;
-                  await updateHabitDoc(h.id, updates);
-                  showToast("Habit updated");
-                  setEditHabitTarget(null);
+                  try {
+                    const updates: Partial<Omit<HabitDoc, "id" | "createdAt">> = { ...patch };
+                    if (newQ && newQ !== t.q) updates.quadrant = newQ;
+                    await updateHabitDoc(h.id, updates);
+                    showToast("Habit updated");
+                  } catch (err) {
+                    console.error("Failed to update habit:", err);
+                  } finally {
+                    setEditHabitTarget(null);
+                  }
                 }}
                 onDelete={() => {
                   deleteHabit(t.q, t.i);
@@ -3030,14 +3055,19 @@ export function Dashboard({ user }: { user?: any }) {
                       <Snowflake className="h-3.5 w-3.5" /> Freeze today
                     </button>
                     <button
-                      onClick={async () => {
-                        // Persist note to Firestore first
-                        if (noteDraft.trim()) {
-                          await saveHabitNote(h.id, noteDraft.trim());
+                      onClick={() => {
+                        try {
+                          // Persist note to Firestore first (fire and forget)
+                          if (noteDraft.trim()) {
+                            saveHabitNote(h.id, noteDraft.trim()).catch(err => console.error(err));
+                          }
+                          if (!h.done) {
+                            toggleHabitDone(h.id).catch(err => console.error(err));
+                          }
+                          showToast(noteDraft.trim() ? "Note saved & marked done" : "Marked done");
+                        } finally {
+                          setDetail(null);
                         }
-                        if (!h.done) await toggleHabitDone(h.id);
-                        showToast(noteDraft.trim() ? "Note saved & marked done" : "Marked done");
-                        setDetail(null);
                       }}
                       className="btn-primary-uber py-3 text-xs"
                     >
@@ -3463,7 +3493,7 @@ function QuadrantCard({
 }
 
 // ---------------- Habit Row (swipe-to-complete / rest) ----------------
-function HabitRow({
+export const HabitRow = memo(function HabitRow({
   habit: h,
   justDone,
   menuOpen,
@@ -3497,7 +3527,14 @@ function HabitRow({
   const isNumeric = h.target !== undefined;
   const pct = isNumeric ? Math.min(100, ((h.value ?? 0) / (h.target ?? 1)) * 100) : 0;
 
-  const [dx, setDx] = useState(0);
+  const dxRef = useRef(0);
+  const rowRef = useRef<HTMLDivElement>(null);
+  const leftBgRef = useRef<HTMLDivElement>(null);
+  const leftIconRef = useRef<SVGSVGElement>(null);
+  const leftTextRef = useRef<HTMLSpanElement>(null);
+  const rightBgRef = useRef<HTMLDivElement>(null);
+  const rightIconRef = useRef<SVGSVGElement>(null);
+  const rightTextRef = useRef<HTMLSpanElement>(null);
   const [dragging, setDragging] = useState(false);
   const startX = useRef<number | null>(null);
   const startY = useRef<number | null>(null);
@@ -3533,7 +3570,27 @@ function HabitRow({
     if (axisLocked.current !== "x") return;
     if (!dragging) setDragging(true);
     const val = rubberband(rawX);
-    setDx(val);
+    dxRef.current = val;
+    
+    requestAnimationFrame(() => {
+      if (rowRef.current) {
+        rowRef.current.style.transform = `translate3d(${val}px,0,0)`;
+        rowRef.current.style.transition = 'none';
+      }
+      const swipeProgress = Math.min(1, Math.abs(val) / COMMIT);
+      if (val > 0 && leftBgRef.current && leftIconRef.current && leftTextRef.current) {
+        leftBgRef.current.style.opacity = val > 4 ? String(0.4 + swipeProgress * 0.6) : "0";
+        leftBgRef.current.style.width = `${val + 8}px`;
+        leftIconRef.current.style.transform = `scale(${0.85 + swipeProgress * 0.4})`;
+        leftTextRef.current.textContent = swipeProgress >= 1 ? "Release" : "Done";
+      } else if (val < 0 && rightBgRef.current && rightIconRef.current && rightTextRef.current) {
+        rightBgRef.current.style.opacity = val < -4 ? String(0.4 + swipeProgress * 0.6) : "0";
+        rightBgRef.current.style.width = `${-val + 8}px`;
+        rightIconRef.current.style.transform = `scale(${0.85 + swipeProgress * 0.4})`;
+        rightTextRef.current.textContent = swipeProgress >= 1 ? "Release" : "Rest";
+      }
+    });
+
     if (!threshHit.current && Math.abs(val) >= HAPTIC_AT) {
       threshHit.current = true;
       try { navigator.vibrate?.(18); } catch { }
@@ -3545,13 +3602,23 @@ function HabitRow({
   const onUp = (e: React.PointerEvent) => {
     try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { }
     if (isNumeric) return;
-    const wasDrag = axisLocked.current === "x" && Math.abs(dx) > 6;
-    if (dx >= COMMIT) {
+    const wasDrag = axisLocked.current === "x" && Math.abs(dxRef.current) > 6;
+    if (dxRef.current >= COMMIT) {
       if (!h.done) onToggle();
-    } else if (dx <= -COMMIT) {
+    } else if (dxRef.current <= -COMMIT) {
       onRest();
     }
-    setDx(0);
+    dxRef.current = 0;
+    
+    requestAnimationFrame(() => {
+      if (rowRef.current) {
+        rowRef.current.style.transform = 'translate3d(0,0,0)';
+        rowRef.current.style.transition = 'transform 260ms cubic-bezier(.2,.9,.3,1.2)';
+      }
+      if (leftBgRef.current) { leftBgRef.current.style.opacity = "0"; leftBgRef.current.style.width = "8px"; }
+      if (rightBgRef.current) { rightBgRef.current.style.opacity = "0"; rightBgRef.current.style.width = "8px"; }
+    });
+    
     setDragging(false);
     startX.current = null;
     startY.current = null;
@@ -3563,43 +3630,132 @@ function HabitRow({
     }
   };
 
-  const swipeProgress = Math.min(1, Math.abs(dx) / COMMIT);
-  const rightRevealed = dx > 4;
-  const leftRevealed = dx < -4;
+  if (isNumeric) {
+    const pct = Math.min(100, (h.value / (h.target || 1)) * 100);
+    return (
+      <div 
+        className="relative w-full rounded-[24px] liquid-glass overflow-hidden flex flex-col p-5 mb-2 cursor-pointer transition hover:bg-white/10"
+        onClick={onOpenDetail}
+      >
+        <div className="absolute inset-x-0 bottom-0 h-[60%] bg-gradient-to-t from-white/10 to-transparent pointer-events-none" />
+        
+        <div className="relative flex items-center gap-4 z-10">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white/5 shadow-[inset_0_0_20px_rgba(255,255,255,0.05)]">
+            <Droplets className="h-6 w-6 text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]" />
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <h3 className="truncate text-sm font-bold tracking-widest text-white uppercase">
+              {h.name}
+            </h3>
+            <p className="truncate text-[11px] font-medium text-mute mt-0.5">
+              {h.category}
+            </p>
+            {h.note && (
+              <p className="mt-1 truncate text-[10px] italic text-mute/70">
+                "{h.note}"
+              </p>
+            )}
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1 self-start pt-1">
+            <button onClick={(e) => { e.stopPropagation(); onPin(); }} className={`grid h-7 w-7 place-items-center rounded-full transition ${h.pinned ? 'text-white' : 'text-white/40 hover:bg-white/10'}`}>
+               <Pin className="h-3.5 w-3.5" fill={h.pinned ? "currentColor" : "none"} />
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); onMenuToggle(); }} className="grid h-7 w-7 place-items-center rounded-full text-white/40 hover:bg-white/10">
+               <MoreVertical className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="relative flex flex-col items-center mt-6 z-10">
+          <div className="flex items-baseline gap-1 text-white">
+            <input
+              type="number"
+              value={h.value === 0 ? "" : h.value}
+              placeholder="0"
+              min={0}
+              step={h.step ?? 0.25}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                if (!isNaN(val)) onSetValue?.(val);
+              }}
+              onBlur={(e) => {
+                if (e.target.value === "") onSetValue?.(0);
+              }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-transparent text-right font-bold text-xl w-16 outline-none appearance-none"
+            />
+            <span className="text-base font-semibold text-white/50">/ {(h.target ?? 0).toFixed(1)} {h.unit}</span>
+          </div>
+          <span className="text-[10px] font-bold tracking-widest text-white/40 uppercase mt-0.5 mb-4">
+            Progress
+          </span>
+
+          <div className="w-full h-2.5 rounded-full bg-black/60 shadow-inner relative overflow-hidden">
+             <div 
+               className="absolute inset-y-0 left-0 rounded-full bg-white shadow-[0_0_12px_rgba(255,255,255,0.4)] transition-all duration-500 ease-out"
+               style={{ width: `${pct}%` }}
+             />
+          </div>
+        </div>
+
+        {menuOpen && (
+          <div className="absolute right-4 top-12 z-20 w-32 overflow-hidden rounded-xl border border-[color:var(--hairline)] bg-canvas shadow-xl animate-fade-in">
+            <button onClick={(e) => { e.stopPropagation(); onEdit(); onMenuClose(); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-ink hover:bg-canvas-soft">
+              <Settings className="h-3 w-3" /> Edit
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); onRest(); onMenuClose(); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-ink hover:bg-canvas-soft">
+              <Shield className="h-3 w-3" /> Rest day
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); onDelete(); onMenuClose(); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-red-500 hover:bg-red-500/10">
+              <Trash2 className="h-3 w-3" /> Delete
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div
-      className={`group relative rounded-xl bg-canvas ${h.done ? "opacity-70" : ""
+      className={`group relative rounded-xl bg-transparent ${h.done ? "opacity-70" : ""
         } ${justDone ? "animate-sync-pulse" : ""}`}
     >
       {/* Swipe reveal backgrounds */}
       <div
+        ref={leftBgRef}
         className="pointer-events-none absolute inset-y-0 left-0 flex items-center gap-1 rounded-l-xl pl-2 pr-2 text-[10px] font-semibold text-emerald-300 transition-opacity"
         style={{
           background: "color-mix(in oklab, oklch(0.72 0.15 155) 22%, transparent)",
-          opacity: rightRevealed ? 0.4 + swipeProgress * 0.6 : 0,
-          width: Math.max(0, dx) + 8,
+          opacity: 0,
+          width: 8,
+          willChange: "width, opacity"
         }}
       >
         <Check
+          ref={leftIconRef}
           className="h-3.5 w-3.5"
           strokeWidth={3}
-          style={{ transform: `scale(${0.85 + swipeProgress * 0.4})` }}
+          style={{ transform: "scale(0.85)" }}
         />
-        <span>{swipeProgress >= 1 ? "Release" : "Done"}</span>
+        <span ref={leftTextRef}>Done</span>
       </div>
       <div
+        ref={rightBgRef}
         className="pointer-events-none absolute inset-y-0 right-0 flex items-center justify-end gap-1 rounded-r-xl pl-2 pr-2 text-[10px] font-semibold text-sky-300 transition-opacity"
         style={{
           background: "color-mix(in oklab, oklch(0.72 0.13 235) 22%, transparent)",
-          opacity: leftRevealed ? 0.4 + swipeProgress * 0.6 : 0,
-          width: Math.max(0, -dx) + 8,
+          opacity: 0,
+          width: 8,
+          willChange: "width, opacity"
         }}
       >
-        <span>{swipeProgress >= 1 ? "Release" : "Rest"}</span>
+        <span ref={rightTextRef}>Rest</span>
         <Shield
+          ref={rightIconRef}
           className="h-3.5 w-3.5"
-          style={{ transform: `scale(${0.85 + swipeProgress * 0.4})` }}
+          style={{ transform: "scale(0.85)" }}
         />
       </div>
 
@@ -3618,12 +3774,13 @@ function HabitRow({
       )}
 
       <div
+        ref={rowRef}
         onPointerDown={onDown}
         onPointerMove={onMoveP}
         onPointerUp={onUp}
         onPointerCancel={onUp}
         onClick={(e) => {
-          if (Math.abs(dx) > 6) {
+          if (Math.abs(dxRef.current) > 6) {
             e.preventDefault();
             e.stopPropagation();
             return;
@@ -3631,11 +3788,12 @@ function HabitRow({
           onOpenDetail();
         }}
         style={{
-          transform: `translate3d(${dx}px,0,0)`,
+          transform: 'translate3d(0,0,0)',
           transition: dragging ? "none" : "transform 260ms cubic-bezier(.2,.9,.3,1.2)",
           touchAction: "pan-y",
+          willChange: "transform"
         }}
-        className="relative flex cursor-pointer items-center gap-2 bg-canvas p-2 transition-[background] hover:bg-[color:var(--canvas-softer)]"
+        className="relative flex cursor-pointer items-center gap-2 liquid-glass p-2 transition-[background] hover:bg-[color:var(--canvas-softer)] rounded-xl"
       >
         {isNumeric ? (
           <div className="grid h-5 w-5 shrink-0 place-items-center rounded-full border border-[color:var(--hairline-mid)] text-ink">
@@ -3677,6 +3835,11 @@ function HabitRow({
               </span>
             )}
           </div>
+          {h.note && (
+            <p className="mt-1 truncate text-[10px] italic text-mute/70">
+              "{h.note}"
+            </p>
+          )}
         </div>
 
         <div className="flex shrink-0 items-center gap-0.5">
@@ -3704,39 +3867,7 @@ function HabitRow({
         </div>
       </div>
 
-      {isNumeric && (
-          <div
-            className="relative bg-canvas px-2 pb-2 pt-1"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-1.5 flex items-center justify-between text-[10px] font-medium text-body">
-              <div className="flex items-baseline gap-1">
-                <input
-                  type="number"
-                  value={h.value === 0 ? "" : h.value}
-                  placeholder="0"
-                  min={0}
-                  step={h.step ?? 0.25}
-                  onChange={(e) => {
-                    const val = Number(e.target.value);
-                    if (!isNaN(val)) onSetValue?.(val);
-                  }}
-                  onBlur={(e) => {
-                    if (e.target.value === "") onSetValue?.(0);
-                  }}
-                  className="w-12 rounded-md bg-canvas-soft px-1.5 py-0.5 text-center text-ink font-bold tabular-nums outline-none border border-[color:var(--hairline-mid)] focus:bg-[color:var(--canvas-softer)] transition-colors"
-                />
-                <span>/ {(h.target ?? 0).toFixed(1)} {h.unit}</span>
-              </div>
-            </div>
-            <div className="h-1 w-full overflow-hidden rounded-full bg-canvas-soft">
-              <div
-                className="h-full rounded-full bg-emerald-400/80 transition-all"
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-          </div>
-        )}
+
 
       {menuOpen && (
         <div className="absolute right-1 top-8 z-10 w-28 overflow-hidden rounded-lg border border-[color:var(--hairline)] bg-canvas shadow-xl animate-fade-in">
@@ -3768,7 +3899,14 @@ function HabitRow({
       )}
     </div>
   );
-}
+}, (prev, next) => {
+  return (
+    prev.habit === next.habit &&
+    prev.justDone === next.justDone &&
+    prev.menuOpen === next.menuOpen &&
+    prev.onSetValue === next.onSetValue // This might change if the parent changes it inline, but usually safe.
+  );
+});
 
 // ---------------- Profile Edit Sheet ----------------
 function ProfileEditSheet({

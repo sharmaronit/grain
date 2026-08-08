@@ -15,6 +15,7 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
   query,
   where,
   orderBy,
@@ -158,7 +159,13 @@ export async function updateHabitDoc(
   habitId: string,
   patch: Partial<Omit<HabitDoc, "id" | "createdAt">>,
 ): Promise<void> {
-  await updateDoc(doc(db(), "users", userId, "habits", habitId), patch);
+  const safePatch = { ...patch } as any;
+  for (const key in safePatch) {
+    if (safePatch[key] === undefined) {
+      safePatch[key] = deleteField();
+    }
+  }
+  await updateDoc(doc(db(), "users", userId, "habits", habitId), safePatch);
 }
 
 /** Delete a habit permanently. */
@@ -241,12 +248,16 @@ export async function setCompletionEntry(
   habitId: string,
   entry: Partial<CompletionEntry>,
 ): Promise<void> {
+  const cleanEntry = Object.fromEntries(
+    Object.entries(entry).filter(([_, v]) => v !== undefined)
+  );
+
   const ref = doc(db(), "users", userId, "completions", dateKey);
   await setDoc(
     ref,
     {
       date: dateKey,
-      entries: { [habitId]: entry },
+      entries: { [habitId]: cleanEntry },
     },
     { merge: true },
   );
