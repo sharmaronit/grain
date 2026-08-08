@@ -74,7 +74,7 @@ export function AddGoalSheet({ onClose }: { onClose: () => void }) {
         
         {/* Name Input */}
         <div>
-          <label className="text-[10px] font-bold uppercase tracking-widest text-mute">Goal Name</label>
+          <label className="text-[10px] font-bold uppercase tracking-widest text-mute block mb-1.5">Goal Name</label>
           <input
             type="text"
             value={name}
@@ -83,7 +83,7 @@ export function AddGoalSheet({ onClose }: { onClose: () => void }) {
               if (error) setError("");
             }}
             placeholder="e.g. Launch startup, Run marathon..."
-            className="mt-1.5 w-full rounded-xl bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] px-4 py-3 font-medium text-ink placeholder:text-mute outline-none focus:ring-2 focus:ring-ink"
+            className="w-full rounded-2xl liquid-input px-4 py-3 text-sm text-ink placeholder:text-mute outline-none focus:bg-[color:var(--canvas-softer)]"
             autoFocus
           />
         </div>
@@ -115,7 +115,7 @@ export function AddGoalSheet({ onClose }: { onClose: () => void }) {
                 key={e}
                 onClick={() => setEmoji(e)}
                 className={`flex h-10 items-center justify-center rounded-xl text-xl transition grayscale ${
-                  emoji === e ? "bg-[color:var(--surface-pressed)] ring-1 ring-ink" : "bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] opacity-60 hover:opacity-100"
+                  emoji === e ? "bg-ink ring-1 ring-ink" : "liquid-input opacity-60 hover:opacity-100 hover:bg-[color:var(--surface-pressed)]"
                 }`}
               >
                 {e}
@@ -154,7 +154,7 @@ export function AddGoalSheet({ onClose }: { onClose: () => void }) {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="mt-4 flex w-full items-center justify-center rounded-xl bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] py-3.5 text-[14px] font-bold text-on-ink shadow-lg active:scale-[0.98] disabled:opacity-50 transition"
+          className="mt-2 flex w-full items-center justify-center rounded-xl bg-ink/10 backdrop-blur-[40px] border border-ink/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] py-3 text-[14px] font-bold text-ink shadow-lg active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isSubmitting ? "Saving..." : "Create Goal"}
         </button>

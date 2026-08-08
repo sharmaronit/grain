@@ -5,6 +5,7 @@ export type { Quadrant };
 export interface Habit extends HabitDoc {
   streak: number;
   done?: boolean;
+  skipped?: boolean;
   value?: number;
   best?: number;
 }

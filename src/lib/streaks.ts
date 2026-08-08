@@ -10,6 +10,7 @@ export interface CompletionEntry {
   note: string;
   restDay: boolean;
   frozenStreak: boolean;
+  skipped?: boolean;
   completedAt: Date | null;
 }
 

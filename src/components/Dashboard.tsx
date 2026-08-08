@@ -1,4 +1,5 @@
 import { ConsistencyTab } from "../components/tabs/ConsistencyTab";
+import { SwipeModeView } from "./SwipeModeView";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, startTransition, memo } from "react";
 import { toPng } from "html-to-image";
@@ -6,6 +7,7 @@ import { DndContext, closestCorners, KeyboardSensor, PointerSensor, useSensor, u
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
+  Layers,
   Flame,
   Settings,
   Plus,
@@ -46,7 +48,8 @@ import {
   Hexagon,
   ArrowUpRight,
   Eye,
-  ImagePlus
+  ImagePlus,
+  Infinity
 } from "lucide-react";
 import { App as CapacitorApp } from "@capacitor/app";
 import { StatusBar, Style } from "@capacitor/status-bar";
@@ -199,6 +202,7 @@ export function Dashboard({ user }: { user?: any }) {
   const [dateDropdownOpen, setDateDropdownOpen] = useState(false);
 
   const [activeTab, setActiveTab] = useState<AppTab>("today");
+  const [swipeMode, setSwipeMode] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
@@ -254,6 +258,7 @@ export function Dashboard({ user }: { user?: any }) {
     setValue: setHabitValue,
     adjustValue: adjustHabitValue,
     setRestDay: setHabitRestDay,
+    markSkipped: markHabitSkipped,
     freezeStreak: freezeHabitStreak,
     saveNote: saveHabitNote,
   } = useCompletions(userId, selectedDate);
@@ -515,6 +520,7 @@ export function Dashboard({ user }: { user?: any }) {
         return {
           ...h,
           done: entry?.done ?? false,
+          skipped: entry?.skipped ?? false,
           value: entry?.value ?? 0,
           note: entry?.note ?? "",
           streak: hStats?.currentStreak ?? 0,
@@ -668,7 +674,7 @@ export function Dashboard({ user }: { user?: any }) {
       icon: newIcon,
       shade: newShade,
       bestStreak: 0,
-      order: flatHabits.length,
+      order: flatHabits.length > 0 ? Math.min(...flatHabits.map(h => h.order)) - 1 : 0,
     };
 
     // Reset ALL form fields so next open is a clean slate
@@ -1444,6 +1450,71 @@ export function Dashboard({ user }: { user?: any }) {
           <div className="absolute top-4 left-0 right-0 z-40 flex items-center justify-between px-4 pointer-events-none">
             {/* Spacer to maintain true center */}
             <div className="w-9" />
+            
+            {/* Themes Window (Only visible in wallpaper tab, positioned at the top) */}
+            {activeTab === "wallpaper" && (
+              <div className="absolute top-[60px] left-0 right-0 flex justify-center z-30 pointer-events-none px-4">
+                {(() => {
+                  const wt = wallpaperThemeOf(wallpaperTheme, theme);
+                  const isBrightTheme = wt.bg === "#f5f5f5" || (wt.bg as string) === "#ffffff";
+                  return (
+                    <div
+                      className={`w-full max-w-[500px] pointer-events-auto liquid-glass rounded-[32px] shadow-2xl transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] flex flex-col items-center overflow-hidden ${
+                        drawerOpen ? "max-h-[240px]" : "max-h-[48px]"
+                      }`}
+                    >
+                      {/* Content (First, so it expands downwards from the top) */}
+                      <div className={`w-full overflow-x-auto hide-scrollbar snap-x transition-opacity duration-300 ${drawerOpen ? "opacity-100 p-4 pt-6" : "opacity-0 h-0"}`}>
+                        <div className={`flex min-w-max gap-6 items-start px-2 ${
+                          isBrightTheme 
+                            ? "[&_*]:!text-black [&_[role=slider]]:!border-black/30" 
+                            : "[&_*]:!text-white [&_[role=slider]]:!border-white/30"
+                        }`}>
+                          {renderSettingsMenu()}
+                        </div>
+                      </div>
+
+                      {/* Handle (At the bottom of the drawer) */}
+                      <div 
+                        className={`w-full flex justify-center items-center shrink-0 transition-all duration-500 cursor-pointer ${
+                          drawerOpen ? "h-6 pb-3" : (isBrightTheme ? "h-12 hover:bg-white/70" : "h-12 hover:bg-black/70")
+                        }`}
+                        onPointerDown={(e) => {
+                          toolbarDragStartY.current = e.clientY;
+                          try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { }
+                        }}
+                        onPointerMove={(e) => {
+                          if (toolbarDragStartY.current === null) return;
+                          const dy = e.clientY - toolbarDragStartY.current;
+                          // Inverted drag logic: drag DOWN to open, drag UP to close
+                          if (drawerOpen && dy < -40) {
+                            setDrawerOpen(false);
+                            toolbarDragStartY.current = null;
+                          } else if (!drawerOpen && dy > 40) {
+                            setDrawerOpen(true);
+                            toolbarDragStartY.current = null;
+                          }
+                        }}
+                        onPointerUp={(e) => {
+                          if (toolbarDragStartY.current !== null) {
+                            const dy = e.clientY - toolbarDragStartY.current;
+                            if (Math.abs(dy) < 10 && !drawerOpen) {
+                              setDrawerOpen(true);
+                            } else if (Math.abs(dy) < 10 && drawerOpen) {
+                              setDrawerOpen(false);
+                            }
+                            toolbarDragStartY.current = null;
+                          }
+                          try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { }
+                        }}
+                      >
+                        <div className={`w-14 h-1.5 rounded-full ${isBrightTheme ? "bg-black/30" : "bg-white/30"}`} />
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
 
             <button
               type="button"
@@ -1958,86 +2029,22 @@ export function Dashboard({ user }: { user?: any }) {
 
               {/* Controls overlay at bottom of Full Screen Preview */}
               <div className="absolute bottom-28 left-0 right-0 flex flex-col items-center justify-end z-50 animate-fade-in-up px-4 pointer-events-none">
-                {(() => {
-                  const wt = wallpaperThemeOf(wallpaperTheme, theme);
-                  const isBrightTheme = wt.bg === "#f5f5f5" || (wt.bg as string) === "#ffffff";
-                  return (
-                    <>
-                      {/* Option D: Floating Toolbar with Expandable Drawer Handle */}
-                      <div
-                        className={`mb-4 w-full max-w-[500px] pointer-events-auto backdrop-blur-3xl rounded-[32px] border shadow-2xl transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] flex flex-col items-center overflow-hidden ${
-                          isBrightTheme ? "bg-white/60 border-black/10" : "bg-black/60 border-white/10"
-                        } ${drawerOpen ? "max-h-[240px]" : "max-h-[48px]"}`}
-                      >
-                  <div 
-                    className={`w-full flex justify-center items-center shrink-0 transition-all duration-500 cursor-pointer ${
-                      drawerOpen ? "h-6 pt-3" : (isBrightTheme ? "h-12 hover:bg-white/70" : "h-12 hover:bg-black/70")
-                    }`}
-                    onPointerDown={(e) => {
-                      toolbarDragStartY.current = e.clientY;
-                      try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { }
-                    }}
-                    onPointerMove={(e) => {
-                      if (toolbarDragStartY.current === null) return;
-                      const dy = e.clientY - toolbarDragStartY.current;
-                      if (drawerOpen && dy > 40) {
-                        setDrawerOpen(false);
-                        toolbarDragStartY.current = null;
-                      } else if (!drawerOpen && dy < -40) {
-                        setDrawerOpen(true);
-                        toolbarDragStartY.current = null;
-                      }
-                    }}
-                    onPointerUp={(e) => {
-                      if (toolbarDragStartY.current !== null) {
-                        const dy = e.clientY - toolbarDragStartY.current;
-                        if (Math.abs(dy) < 10 && !drawerOpen) {
-                          setDrawerOpen(true);
-                        } else if (Math.abs(dy) < 10 && drawerOpen) {
-                          setDrawerOpen(false); // Also allow tapping handle to close it when open
-                        }
-                        toolbarDragStartY.current = null;
-                      }
-                      try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { }
-                    }}
-                  >
-                    <div className={`w-14 h-1.5 rounded-full ${isBrightTheme ? "bg-black/30" : "bg-white/30"}`} />
-                  </div>
-
-                  <div className={`w-full overflow-x-auto hide-scrollbar snap-x transition-opacity duration-300 ${drawerOpen ? "opacity-100 p-4 pb-6" : "opacity-0 h-0"}`}>
-                    <div className={`flex min-w-max gap-6 items-start px-2 ${
-                      isBrightTheme 
-                        ? "[&_*]:!text-black [&_[role=slider]]:!border-black/30" 
-                        : "[&_*]:!text-white [&_[role=slider]]:!border-white/30"
-                    }`}>
-                      {renderSettingsMenu()}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-center gap-3 w-full max-w-[500px] pointer-events-auto relative">
+                {/* Live/Static Toggle moved to bottom */}
+                <div className="flex items-center rounded-full border border-[color:var(--hairline-mid)] p-1 bg-canvas/85 backdrop-blur-xl shadow-lg pointer-events-auto">
                   <button 
                     onClick={() => applyWallpaper(false)}
-                    className={`flex-1 backdrop-blur-[40px] border shadow-md text-[13px] font-bold py-3.5 px-4 rounded-[20px] active:scale-95 transition-all flex items-center justify-center gap-2 ${
-                      isBrightTheme ? "bg-black/5 hover:bg-black/10 border-black/10 text-black" : "bg-ink/5 hover:bg-ink/10 border-ink/10 text-ink"
-                    }`}
+                    className={`flex items-center gap-1.5 px-4 h-9 rounded-full text-[12px] font-bold transition-all ${!wallpaperSync ? "text-mute hover:text-ink" : "bg-ink text-on-ink shadow-sm"}`}
                   >
-                    <div className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.6)]" /> Live 
+                    <div className={`w-2.5 h-2.5 rounded-full ${wallpaperSync ? "bg-green-400 animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.6)]" : "bg-[color:var(--hairline-mid)]"}`} /> Live
                   </button>
-
                   <button 
                     onClick={() => applyWallpaper(true)}
-                    className={`flex-1 backdrop-blur-[40px] border shadow-md text-[13px] font-bold py-3.5 px-4 rounded-[20px] active:scale-95 transition-all flex items-center justify-center gap-2 ${
-                      isBrightTheme ? "bg-black/5 hover:bg-black/10 border-black/10 text-black" : "bg-ink/5 hover:bg-ink/10 border-ink/10 text-ink"
-                    }`}
+                    className={`flex items-center gap-1.5 px-4 h-9 rounded-full text-[12px] font-bold transition-all ${wallpaperSync ? "text-mute hover:text-ink" : "bg-ink text-on-ink shadow-sm"}`}
                   >
-                    <div className={`w-2.5 h-2.5 rounded-full ${isBrightTheme ? "bg-black/40" : "bg-ink/40"}`} /> Static 
+                    <div className={`w-2.5 h-2.5 rounded-full ${!wallpaperSync ? "bg-[color:var(--canvas-softer)]" : "bg-[color:var(--hairline-mid)]"}`} /> Static
                   </button>
                 </div>
-              </>
-            );
-          })()}
-          </div>
+              </div>
 
             </div>
           )}
@@ -2053,6 +2060,17 @@ export function Dashboard({ user }: { user?: any }) {
             {/* TAB 1: TODAY */}
             {activeTab === "today" && (
               <div className="space-y-4 animate-tab-fade pt-16">
+                
+                <div className="flex justify-end px-5">
+                  <button 
+                    onClick={() => setSwipeMode(true)}
+                    className="flex items-center gap-1.5 rounded-full card-soft bg-[color:var(--canvas-soft)] px-3 py-1.5 text-xs font-bold text-ink shadow-sm transition hover:bg-ink/5"
+                  >
+                    <Layers className="h-3.5 w-3.5" />
+                    Focus Mode
+                  </button>
+                </div>
+
                 {/* Unified Hero: streak + ring + date selector */}
                 <TodayHero
                   streak={totalStreak}
@@ -2267,17 +2285,25 @@ export function Dashboard({ user }: { user?: any }) {
                         
                         if (timeHabits.length === 0) return null;
                         
+                        const timeIcons = {
+                          morning: <Sunrise className="w-[18px] h-[18px] text-[color:var(--brand)]" />,
+                          afternoon: <Sun className="w-[18px] h-[18px] text-[color:var(--brand)]" />,
+                          evening: <Moon className="w-[18px] h-[18px] text-[color:var(--brand)]" />,
+                          any: <Infinity className="w-[18px] h-[18px] text-[#3b82f6]" />
+                        };
+
                         const timeTitles = {
-                          morning: "🌅 Morning",
-                          afternoon: "☀️ Afternoon",
-                          evening: "🌙 Evening",
-                          any: "♾️ Anytime"
+                          morning: "Morning",
+                          afternoon: "Afternoon",
+                          evening: "Evening",
+                          any: "Anytime"
                         };
                         
                         return (
                           <div key={timeKey} className="card-soft relative flex w-full flex-col overflow-hidden border border-[color:var(--hairline)] transition-all">
                             <div className="flex items-center justify-between px-4 py-3 text-left">
-                              <h3 className="font-display text-sm font-bold text-ink">
+                              <h3 className="font-display text-sm font-bold text-ink flex items-center gap-2">
+                                {timeIcons[timeKey]}
                                 {timeTitles[timeKey]}
                               </h3>
                               <span className="text-[11px] font-medium tabular-nums text-mute">
@@ -2396,6 +2422,26 @@ export function Dashboard({ user }: { user?: any }) {
           {/* Fullscreen wallpaper lock-screen preview removed */}
 
 
+
+          {/* Swipe Mode Full Screen */}
+          {swipeMode && (
+            <SwipeModeView
+              habits={habits}
+              onClose={() => setSwipeMode(false)}
+              onToggleDone={(habitId) => {
+                for (const q of QUADRANT_ORDER) {
+                  const i = habits[q].findIndex(h => h.id === habitId);
+                  if (i !== -1) {
+                    toggleDone(q, i);
+                    break;
+                  }
+                }
+              }}
+              onMarkSkipped={(habitId) => {
+                markHabitSkipped(habitId);
+              }}
+            />
+          )}
 
           {/* Settings Full Screen */}
           {settingsOpen && (
@@ -3199,7 +3245,7 @@ function SheetShell({
           transform: `translate3d(0, ${Math.max(0, dragY)}px, 0)`,
           transition: isDragging ? "none" : "transform 250ms cubic-bezier(0.2, 0.9, 0.3, 1)",
         }}
-        className="w-full max-h-[85vh] overflow-y-auto rounded-t-[24px] bg-canvas p-5 select-none animate-sheet-slide-up"
+        className="w-full max-h-[85vh] overflow-y-auto rounded-t-[24px] liquid-glass p-5 select-none animate-sheet-slide-up"
       >
         {/* Drag Handle & Header Drag Area */}
         <div
@@ -3634,18 +3680,18 @@ export const HabitRow = memo(function HabitRow({
     const pct = Math.min(100, (h.value / (h.target || 1)) * 100);
     return (
       <div 
-        className="relative w-full rounded-[24px] liquid-glass overflow-hidden flex flex-col p-5 mb-2 cursor-pointer transition hover:bg-white/10"
+        className="relative w-full rounded-[24px] liquid-glass overflow-hidden flex flex-col p-5 mb-2 cursor-pointer transition hover:bg-[color:var(--canvas-soft)]"
         onClick={onOpenDetail}
       >
-        <div className="absolute inset-x-0 bottom-0 h-[60%] bg-gradient-to-t from-white/10 to-transparent pointer-events-none" />
+        <div className="absolute inset-x-0 bottom-0 h-[60%] bg-gradient-to-t from-ink/5 to-transparent pointer-events-none" />
         
         <div className="relative flex items-center gap-4 z-10">
-          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white/5 shadow-[inset_0_0_20px_rgba(255,255,255,0.05)]">
-            <Droplets className="h-6 w-6 text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]" />
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-ink/5 shadow-[inset_0_0_20px_color-mix(in_srgb,var(--ink)_5%,transparent)]">
+            <Droplets className="h-6 w-6 text-ink drop-shadow-[0_0_8px_color-mix(in_srgb,var(--ink)_40%,transparent)]" />
           </div>
 
           <div className="flex-1 min-w-0">
-            <h3 className="truncate text-sm font-bold tracking-widest text-white uppercase">
+            <h3 className="truncate text-sm font-bold tracking-widest text-ink uppercase">
               {h.name}
             </h3>
             <p className="truncate text-[11px] font-medium text-mute mt-0.5">
@@ -3659,17 +3705,17 @@ export const HabitRow = memo(function HabitRow({
           </div>
 
           <div className="flex shrink-0 items-center gap-1 self-start pt-1">
-            <button onClick={(e) => { e.stopPropagation(); onPin(); }} className={`grid h-7 w-7 place-items-center rounded-full transition ${h.pinned ? 'text-white' : 'text-white/40 hover:bg-white/10'}`}>
+            <button onClick={(e) => { e.stopPropagation(); onPin(); }} className={`grid h-7 w-7 place-items-center rounded-full transition ${h.pinned ? 'text-ink' : 'text-mute hover:bg-ink/10'}`}>
                <Pin className="h-3.5 w-3.5" fill={h.pinned ? "currentColor" : "none"} />
             </button>
-            <button onClick={(e) => { e.stopPropagation(); onMenuToggle(); }} className="grid h-7 w-7 place-items-center rounded-full text-white/40 hover:bg-white/10">
+            <button onClick={(e) => { e.stopPropagation(); onMenuToggle(); }} className="grid h-7 w-7 place-items-center rounded-full text-mute hover:bg-ink/10">
                <MoreVertical className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
 
         <div className="relative flex flex-col items-center mt-6 z-10">
-          <div className="flex items-baseline gap-1 text-white">
+          <div className="flex items-baseline gap-1 text-ink">
             <input
               type="number"
               value={h.value === 0 ? "" : h.value}
@@ -3686,15 +3732,15 @@ export const HabitRow = memo(function HabitRow({
               onClick={(e) => e.stopPropagation()}
               className="bg-transparent text-right font-bold text-xl w-16 outline-none appearance-none"
             />
-            <span className="text-base font-semibold text-white/50">/ {(h.target ?? 0).toFixed(1)} {h.unit}</span>
+            <span className="text-base font-semibold text-mute">/ {(h.target ?? 0).toFixed(1)} {h.unit}</span>
           </div>
-          <span className="text-[10px] font-bold tracking-widest text-white/40 uppercase mt-0.5 mb-4">
+          <span className="text-[10px] font-bold tracking-widest text-mute uppercase mt-0.5 mb-4">
             Progress
           </span>
 
-          <div className="w-full h-2.5 rounded-full bg-black/60 shadow-inner relative overflow-hidden">
+          <div className="w-full h-2.5 rounded-full bg-ink/10 shadow-inner relative overflow-hidden">
              <div 
-               className="absolute inset-y-0 left-0 rounded-full bg-white shadow-[0_0_12px_rgba(255,255,255,0.4)] transition-all duration-500 ease-out"
+               className="absolute inset-y-0 left-0 rounded-full bg-ink shadow-[0_0_12px_color-mix(in_srgb,var(--ink)_40%,transparent)] transition-all duration-500 ease-out"
                style={{ width: `${pct}%` }}
              />
           </div>

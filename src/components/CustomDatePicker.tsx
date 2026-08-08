@@ -89,9 +89,9 @@ export function CustomDatePicker({ label, value, onChange }: CustomDatePickerPro
         onClick={() => handleSelectDate(day)}
         className={`w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-medium transition ${
           isSelected
-            ? "bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.25)] text-white shadow-md"
+            ? "bg-ink text-on-ink shadow-md"
             : isToday
-            ? "bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] text-ink ring-1 ring-ink"
+            ? "liquid-input text-ink ring-1 ring-ink"
             : "text-body hover:bg-[color:var(--surface-pressed)] hover:text-ink"
         }`}
       >
@@ -110,7 +110,7 @@ export function CustomDatePicker({ label, value, onChange }: CustomDatePickerPro
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between rounded-xl bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] px-3 py-3 text-[13px] font-medium text-ink outline-none focus:ring-2 focus:ring-ink transition hover:bg-[color:var(--surface-pressed)]"
+        className="w-full flex items-center justify-between rounded-2xl liquid-input px-4 py-3 text-[13px] font-medium text-ink outline-none focus:bg-[color:var(--canvas-softer)] transition hover:bg-[color:var(--surface-pressed)]"
       >
         <span>{displayDateStr}</span>
         <CalendarIcon className="w-4 h-4 text-mute" />
@@ -118,7 +118,7 @@ export function CustomDatePicker({ label, value, onChange }: CustomDatePickerPro
 
       {isOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in px-4">
-          <div className="p-5 bg-white/5 backdrop-blur-[40px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] text-white border border-[color:var(--hairline-strong)] rounded-[24px] shadow-2xl w-full max-w-[320px] animate-scale-in" onClick={(e) => e.stopPropagation()}>
+          <div className="p-5 liquid-glass rounded-[24px] shadow-2xl w-full max-w-[320px] animate-scale-in" onClick={(e) => e.stopPropagation()}>
           {/* Header */}
           <div className="flex items-center justify-between mb-4">
             <span className="font-display font-bold text-ink pl-1">
@@ -128,14 +128,14 @@ export function CustomDatePicker({ label, value, onChange }: CustomDatePickerPro
               <button 
                 type="button" 
                 onClick={handlePrevMonth}
-                className="grid w-8 h-8 place-items-center rounded-full text-mute hover:text-ink hover:bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] transition"
+                className="grid w-8 h-8 place-items-center rounded-full text-mute hover:text-ink hover:liquid-input transition"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
               <button 
                 type="button" 
                 onClick={handleNextMonth}
-                className="grid w-8 h-8 place-items-center rounded-full text-mute hover:text-ink hover:bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] transition"
+                className="grid w-8 h-8 place-items-center rounded-full text-mute hover:text-ink hover:liquid-input transition"
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
@@ -159,7 +159,7 @@ export function CustomDatePicker({ label, value, onChange }: CustomDatePickerPro
           
           <button 
             type="button"
-            className="w-full mt-4 py-3 rounded-xl bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] text-ink font-bold text-[13px] hover:bg-[color:var(--surface-pressed)] transition"
+            className="w-full mt-4 py-3 rounded-xl liquid-input text-ink font-bold text-[13px] hover:bg-[color:var(--surface-pressed)] transition"
             onClick={() => setIsOpen(false)}
           >
             Cancel

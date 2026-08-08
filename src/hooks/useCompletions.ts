@@ -139,6 +139,16 @@ export function useCompletions(
     });
   };
 
+  const markSkipped = async (habitId: string) => {
+    if (!userId) return;
+    const current = getEntry(habitId);
+    await setCompletionEntry(userId, dateKey, habitId, {
+      ...current,
+      skipped: true,
+      done: false, // ensure it's not marked as completed
+    });
+  };
+
   const freezeStreak = async (habitId: string) => {
     if (!userId) return;
     const current = getEntry(habitId);
@@ -162,6 +172,7 @@ export function useCompletions(
     setValue,
     adjustValue,
     setRestDay,
+    markSkipped,
     freezeStreak,
     saveNote,
   };
