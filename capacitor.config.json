@@ -9,6 +9,9 @@
     "FirebaseAuthentication": {
       "skipNativeAuth": false,
       "providers": ["google.com"]
+    },
+    "StatusBar": {
+      "overlaysWebView": true
     }
   }
 }

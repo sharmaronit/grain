@@ -73,7 +73,7 @@ export function ShareStreakModal({
           <button
             type="button"
             onClick={copyShareText}
-            className="flex flex-1 items-center justify-center gap-2 pill border border-[color:var(--hairline)] bg-canvas-soft py-3 text-xs font-semibold text-ink"
+            className="flex flex-1 items-center justify-center gap-2 pill border border-white/10 bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] py-3 text-xs font-semibold text-ink"
           >
             {copied ? <Check className="h-4 w-4 text-emerald-400" /> : <Copy className="h-4 w-4" />}
             {copied ? "Copied!" : "Copy Summary"}
@@ -92,7 +92,7 @@ export function ShareStreakModal({
                 copyShareText();
               }
             }}
-            className="flex flex-1 items-center justify-center gap-2 pill bg-ink py-3 text-xs font-semibold text-on-ink"
+            className="flex flex-1 items-center justify-center gap-2 pill bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] py-3 text-xs font-semibold text-on-ink"
           >
             <Share2 className="h-4 w-4" /> Share Link
           </button>

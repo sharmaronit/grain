@@ -1,14 +1,35 @@
 import { useEffect, useRef } from "react";
 import { WallpaperNative } from "../lib/wallpaper-bridge";
 import { Capacitor } from "@capacitor/core";
+import equal from "fast-deep-equal";
 
-interface UseWallpaperSyncProps {
+export interface UseWallpaperSyncProps {
   heatmap: number[][];
   totalStreak: number;
   completionRate: number;
   wallpaperTheme: string;
   previewWeeks: number;
   wallpaperSync: boolean;
+  isGoalActive?: boolean;
+  accentColor?: string;
+  gridStyle?: "weeks" | "year" | "month" | "goals";
+  customPhotoBase64?: string | null;
+  photoOverlay?: number;
+  statsAlignment?: "left" | "center" | "right";
+  offsetY?: number;
+  offsetX?: number;
+  gridScale?: number;
+  gridColorTheme?: string;
+  photoOffsetX?: number;
+  photoOffsetY?: number;
+  photoScale?: number;
+  stackedGoals?: {
+    id: string;
+    title: string;
+    heatmap: number[][];
+    currentStreak: number;
+    completionRate: number;
+  }[];
 }
 
 /**
@@ -23,12 +44,48 @@ export function useWallpaperSync({
   wallpaperTheme,
   previewWeeks,
   wallpaperSync,
+  isGoalActive,
+  accentColor,
+  gridStyle,
+  customPhotoBase64,
+  photoOverlay,
+  statsAlignment,
+  offsetY,
+  offsetX,
+  gridScale,
+  gridColorTheme,
+  stackedGoals,
 }: UseWallpaperSyncProps) {
   const syncTimeout = useRef<number | null>(null);
+  const lastPayload = useRef<any>(null);
 
   useEffect(() => {
     // Only run on native Android and only if the user hasn't paused sync
     if (!Capacitor.isNativePlatform() || !wallpaperSync) return;
+
+    const payload = {
+      heatmap,
+      theme: wallpaperTheme,
+      previewWeeks,
+      currentStreak: totalStreak,
+      completionRate,
+      isGoalActive,
+      accentColor,
+      gridStyle,
+      customPhotoBase64,
+      photoOverlay,
+      statsAlignment,
+      offsetY,
+      offsetX,
+      gridScale,
+      gridColorTheme,
+      stackedGoals,
+    };
+
+    if (equal(payload, lastPayload.current)) {
+      return;
+    }
+    lastPayload.current = payload;
 
     if (syncTimeout.current !== null) {
       window.clearTimeout(syncTimeout.current);
@@ -36,15 +93,7 @@ export function useWallpaperSync({
 
     // Debounce to avoid flooding the bridge when multiple state updates happen
     syncTimeout.current = window.setTimeout(() => {
-      WallpaperNative.syncWallpaperData({
-        heatmap,
-        theme: wallpaperTheme,
-        previewWeeks,
-        currentStreak: totalStreak,
-        completionRate,
-      }).catch((err: unknown) => {
-        console.warn("Failed to sync wallpaper data", err);
-      });
+      WallpaperNative.syncWallpaperData(payload).catch((e) => console.warn("Live wallpaper sync error:", e));
     }, 500);
 
     return () => {
@@ -52,5 +101,5 @@ export function useWallpaperSync({
         window.clearTimeout(syncTimeout.current);
       }
     };
-  }, [heatmap, totalStreak, completionRate, wallpaperTheme, previewWeeks, wallpaperSync]);
+  }, [heatmap, totalStreak, completionRate, wallpaperTheme, previewWeeks, wallpaperSync, isGoalActive, gridStyle, customPhotoBase64, photoOverlay, statsAlignment, accentColor, offsetY, offsetX, gridScale, gridColorTheme, stackedGoals]);
 }

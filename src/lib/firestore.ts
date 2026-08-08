@@ -56,14 +56,32 @@ export interface UserProfile {
   initials: string;
   theme: "dark" | "light";
   wallpaperTheme: string;
+  gridColorTheme?: string;
+  wallpaperHabitSet?: string;
+  wallpaperGridStyle?: "weeks" | "year" | "month" | "goals";
+  wallpaperScale?: number;
+  wallpaperPhotoOverlay?: number;
+  wallpaperCustomPhoto?: string | null;
+  wallpaperOffset?: { x: number; y: number };
   wallpaperSync: boolean;
   remindersOn: boolean;
   previewWeeks: number;
+  activeGoalId?: string;
 }
 
 export interface CompletionDoc {
   date: string; // "YYYY-MM-DD"
   entries: Record<string, CompletionEntry>;
+}
+
+export interface GoalDoc {
+  id: string;
+  name: string;
+  emoji: string;
+  startDate: string; // "YYYY-MM-DD"
+  targetDate: string; // "YYYY-MM-DD"
+  color: string;
+  createdAt: Date;
 }
 
 // ── User Profile ─────────────────────────────────────────
@@ -126,10 +144,11 @@ export async function addHabit(
   userId: string,
   habit: Omit<HabitDoc, "id" | "createdAt">,
 ): Promise<string> {
-  const ref = await addDoc(collection(db(), "users", userId, "habits"), {
+  const ref = doc(collection(db(), "users", userId, "habits"));
+  setDoc(ref, {
     ...habit,
     createdAt: serverTimestamp(),
-  });
+  }).catch(console.error);
   return ref.id;
 }
 
@@ -148,6 +167,53 @@ export async function deleteHabitDoc(
   habitId: string,
 ): Promise<void> {
   await deleteDoc(doc(db(), "users", userId, "habits", habitId));
+}
+
+// ── Goals ────────────────────────────────────────────────
+
+export function goalFromDoc(d: DocumentData, id: string): GoalDoc {
+  return {
+    id,
+    name: d.name ?? "",
+    emoji: d.emoji ?? "🎯",
+    startDate: d.startDate ?? "",
+    targetDate: d.targetDate ?? "",
+    color: d.color ?? "#22c55e",
+    createdAt: d.createdAt?.toDate?.() ?? new Date(),
+  };
+}
+
+export async function addGoal(
+  userId: string,
+  goal: Omit<GoalDoc, "id" | "createdAt">,
+): Promise<string> {
+  console.log("[addGoal] starting...", { userId, goal });
+  const ref = doc(collection(db(), "users", userId, "goals"));
+  try {
+    const data = {
+      ...goal,
+      createdAt: new Date(),
+    };
+    console.log("[addGoal] triggering setDoc with:", data);
+    // Fire and forget so we don't block the UI waiting for server acknowledgment
+    setDoc(ref, data).then(() => {
+      console.log("[addGoal] setDoc resolved asynchronously for:", ref.id);
+    }).catch((e) => {
+      console.error("[addGoal] Async setDoc failed:", e);
+    });
+    console.log("[addGoal] returning ref.id synchronously:", ref.id);
+    return ref.id;
+  } catch (e) {
+    console.error("[addGoal] Sync setDoc failed:", e);
+    throw e;
+  }
+}
+
+export async function deleteGoal(
+  userId: string,
+  goalId: string,
+): Promise<void> {
+  await deleteDoc(doc(db(), "users", userId, "goals", goalId));
 }
 
 // ── Completions ──────────────────────────────────────────

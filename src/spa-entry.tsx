@@ -11,7 +11,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { AuthGate } from "./routes/index";
+import { AuthGate } from "./components/auth/AuthGate";
+import { Dashboard } from "./components/Dashboard";
 import "./styles.css";
 
 const queryClient = new QueryClient({
@@ -25,7 +26,9 @@ if (rootEl) {
   ReactDOM.createRoot(rootEl).render(
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
-        <AuthGate />
+        <AuthGate>
+          {(user) => <Dashboard user={user} />}
+        </AuthGate>
       </QueryClientProvider>
     </React.StrictMode>
   );

@@ -6,6 +6,26 @@ export interface WallpaperData {
   previewWeeks: number;
   currentStreak: number;
   completionRate: number;
+  isGoalActive?: boolean;
+  accentColor?: string;
+  gridStyle?: "weeks" | "year" | "month" | "goals";
+  customPhotoBase64?: string | null;
+  photoOverlay?: number;
+  statsAlignment?: "left" | "center" | "right";
+  offsetY?: number;
+  offsetX?: number;
+  gridScale?: number;
+  gridColorTheme?: string;
+  photoOffsetX?: number;
+  photoOffsetY?: number;
+  photoScale?: number;
+  stackedGoals?: {
+    id: string;
+    title: string;
+    heatmap: number[][];
+    currentStreak: number;
+    completionRate: number;
+  }[];
 }
 
 export interface WallpaperPluginDef {

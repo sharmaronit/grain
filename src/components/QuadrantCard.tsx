@@ -22,7 +22,7 @@ const QUADRANTS: Record<Quadrant, { title: string; sub: string }> = {
 };
 
 const catClass = (_c: string) =>
-  "bg-canvas-soft text-body border border-[color:var(--hairline)]";
+  "bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] text-body border border-white/10";
 
 export function QuadrantCard({
   q,
@@ -72,7 +72,7 @@ export function QuadrantCard({
   const doneCount = visible.filter(({ h }) => h.done).length;
 
   return (
-    <div className="card-soft relative flex w-full flex-col overflow-hidden border border-[color:var(--hairline)] transition-all">
+    <div className="card-soft relative flex w-full flex-col overflow-hidden border border-white/10 transition-all">
       {/* Header bar */}
       <button
         type="button"
@@ -93,9 +93,8 @@ export function QuadrantCard({
             {doneCount}/{visible.length}
           </span>
           <ChevronDown
-            className={`h-4 w-4 text-mute transition-transform duration-200 ${
-              collapsed ? "-rotate-90" : "rotate-0"
-            }`}
+            className={`h-4 w-4 text-mute transition-transform duration-200 ${collapsed ? "-rotate-90" : "rotate-0"
+              }`}
           />
         </div>
       </button>
@@ -209,7 +208,7 @@ function HabitRow({
       threshHit.current = true;
       try {
         navigator.vibrate?.(18);
-      } catch {}
+      } catch { }
     }
     if (threshHit.current && Math.abs(val) < HAPTIC_AT - 12) {
       threshHit.current = false;
@@ -219,7 +218,7 @@ function HabitRow({
   const onUp = (e: React.PointerEvent) => {
     try {
       (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-    } catch {}
+    } catch { }
     if (isNumeric) return;
     const wasDrag = axisLocked.current === "x" && Math.abs(dx) > 6;
     if (dx >= COMMIT) {
@@ -244,9 +243,8 @@ function HabitRow({
 
   return (
     <div
-      className={`group relative overflow-hidden rounded-xl bg-canvas ${
-        h.done ? "opacity-70" : ""
-      } ${justDone ? "animate-sync-pulse" : ""}`}
+      className={`group relative overflow-hidden rounded-xl bg-white/5 backdrop-blur-[40px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] text-white ${h.done ? "opacity-70" : ""
+        } ${justDone ? "animate-sync-pulse" : ""}`}
     >
       {/* Swipe reveal backgrounds */}
       <div
@@ -315,7 +313,7 @@ function HabitRow({
             : "transform 260ms cubic-bezier(.2,.9,.3,1.2)",
           touchAction: "pan-y",
         }}
-        className="relative flex cursor-pointer items-center gap-2 bg-canvas p-2 transition-[background] hover:bg-[color:var(--canvas-softer)]"
+        className="relative flex cursor-pointer items-center gap-2 bg-white/5 backdrop-blur-[40px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] text-white p-2 transition-[background] hover:bg-[color:var(--canvas-softer)]"
       >
         {isNumeric ? (
           <div className="grid h-5 w-5 shrink-0 place-items-center rounded-full border border-[color:var(--hairline-mid)] text-ink">
@@ -328,11 +326,10 @@ function HabitRow({
               e.stopPropagation();
               onToggle();
             }}
-            className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border transition ${
-              h.done
-                ? "border-ink bg-ink text-on-ink"
-                : "border-[color:var(--hairline-mid)] hover:border-ink"
-            }`}
+            className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border transition ${h.done
+                ? "border-primary bg-primary text-on-primary shadow-sm"
+                : "border-[color:var(--hairline-mid)] hover:border-primary"
+              }`}
             aria-label={h.done ? `Undo ${h.name}` : `Mark ${h.name} done`}
           >
             {h.done && (
@@ -343,9 +340,8 @@ function HabitRow({
 
         <div className="min-w-0 flex-1">
           <p
-            className={`truncate text-[11px] font-semibold leading-tight text-ink ${
-              h.done && !isNumeric ? "line-through" : ""
-            }`}
+            className={`truncate text-[11px] font-semibold leading-tight text-ink ${h.done && !isNumeric ? "line-through" : ""
+              }`}
           >
             {h.name}
           </p>
@@ -360,7 +356,7 @@ function HabitRow({
             {h.streak > 0 && (
               <span
                 key={h.streak}
-                className="flex items-center gap-0.5 rounded-full bg-ink px-1.5 py-px text-[8px] font-semibold text-on-ink animate-pop-badge"
+                className="flex items-center gap-0.5 rounded-full bg-accent px-1.5 py-px text-[8px] font-semibold text-black animate-pop-badge shadow-sm"
               >
                 {h.streak}d
               </span>
@@ -375,9 +371,8 @@ function HabitRow({
               e.stopPropagation();
               onPin();
             }}
-            className={`grid h-6 w-6 place-items-center rounded-md transition ${
-              h.pinned ? "text-ink" : "text-mute hover:text-ink"
-            }`}
+            className={`grid h-6 w-6 place-items-center rounded-md transition ${h.pinned ? "text-ink" : "text-mute hover:text-ink"
+              }`}
             aria-label="Pin to wallpaper"
           >
             <Pin
@@ -401,7 +396,7 @@ function HabitRow({
 
       {isNumeric && (
         <div
-          className="relative bg-canvas px-2 pb-2"
+          className="relative bg-white/5 backdrop-blur-[40px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] text-white px-2 pb-2"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="mb-1 flex items-center justify-between text-[9px] font-medium text-body">
@@ -416,7 +411,7 @@ function HabitRow({
               <button
                 type="button"
                 onClick={() => onAdjust(-1)}
-                className="grid h-5 w-5 place-items-center rounded-full bg-canvas-soft text-ink hover:bg-[color:var(--surface-pressed)]"
+                className="grid h-5 w-5 place-items-center rounded-full bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] text-ink hover:bg-[color:var(--surface-pressed)]"
                 aria-label="Decrease"
               >
                 <Minus className="h-2.5 w-2.5" strokeWidth={3} />
@@ -424,16 +419,16 @@ function HabitRow({
               <button
                 type="button"
                 onClick={() => onAdjust(1)}
-                className="grid h-5 w-5 place-items-center rounded-full bg-ink text-on-ink hover:opacity-90"
+                className="grid h-5 w-5 place-items-center rounded-full bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.25)] text-white hover:opacity-90"
                 aria-label="Increase"
               >
                 <Plus className="h-2.5 w-2.5" strokeWidth={3} />
               </button>
             </div>
           </div>
-          <div className="h-1 w-full overflow-hidden rounded-full bg-canvas-soft">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--hairline)]">
             <div
-              className="h-full rounded-full bg-emerald-400/80 transition-all"
+              className="h-full rounded-full bg-primary transition-all"
               style={{ width: `${pct}%` }}
             />
           </div>
@@ -441,7 +436,7 @@ function HabitRow({
       )}
 
       {menuOpen && (
-        <div className="absolute right-1 top-8 z-10 w-28 overflow-hidden rounded-lg border border-[color:var(--hairline)] bg-canvas shadow-xl animate-fade-in">
+        <div className="absolute right-1 top-8 z-10 w-28 overflow-hidden rounded-lg border border-white/10 bg-white/5 backdrop-blur-[40px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] text-white shadow-xl animate-fade-in">
           <button
             type="button"
             onClick={(e) => {
@@ -449,7 +444,7 @@ function HabitRow({
               onEdit();
               onMenuClose();
             }}
-            className="flex w-full items-center gap-2 px-2 py-1.5 text-[10px] text-ink hover:bg-canvas-soft"
+            className="flex w-full items-center gap-2 px-2 py-1.5 text-[10px] text-ink hover:bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)]"
           >
             <Settings className="h-3 w-3" /> Edit
           </button>
@@ -460,7 +455,7 @@ function HabitRow({
               onRest();
               onMenuClose();
             }}
-            className="flex w-full items-center gap-2 px-2 py-1.5 text-[10px] text-ink hover:bg-canvas-soft"
+            className="flex w-full items-center gap-2 px-2 py-1.5 text-[10px] text-ink hover:bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)]"
           >
             <Shield className="h-3 w-3" /> Rest day
           </button>
@@ -471,7 +466,7 @@ function HabitRow({
               onMove();
               onMenuClose();
             }}
-            className="flex w-full items-center gap-2 px-2 py-1.5 text-[10px] text-ink hover:bg-canvas-soft"
+            className="flex w-full items-center gap-2 px-2 py-1.5 text-[10px] text-ink hover:bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)]"
           >
             <Sparkles className="h-3 w-3" /> Move
           </button>
@@ -482,7 +477,7 @@ function HabitRow({
               onDelete();
               onMenuClose();
             }}
-            className="flex w-full items-center gap-2 px-2 py-1.5 text-[10px] text-red-500 hover:bg-canvas-soft"
+            className="flex w-full items-center gap-2 px-2 py-1.5 text-[10px] text-red-500 hover:bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)]"
           >
             <Trash2 className="h-3 w-3" /> Delete
           </button>

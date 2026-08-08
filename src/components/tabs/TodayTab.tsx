@@ -1,3 +1,4 @@
+import { useRef, useEffect, useMemo } from "react";
 import { useStore } from "../../store/useStore";
 import { TodayHero } from "../TodayHero";
 import { getWeekDates, isSameDay, shortDay } from "../../lib/dates";
@@ -36,8 +37,38 @@ export function TodayTab({
   const setModalOpen = useStore((s) => s.setModalOpen);
   const setDetailTarget = useStore((s) => s.setDetailTarget);
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+  
+  const isMouseDown = useRef(false);
+  const startX = useRef(0);
+  const scrollLeft = useRef(0);
+  const dragDistance = useRef(0);
+  
+  // Generate 30 days before and 30 days after today
+  const scrollableDates = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Array.from({ length: 61 }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(today.getDate() - 30 + i);
+      return d;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      const idx = scrollableDates.findIndex(d => isSameDay(d, selectedDate));
+      if (idx !== -1) {
+        scrollRef.current.scrollTo({
+          left: idx * 56, // 32px width + 24px gap
+          behavior: 'smooth'
+        });
+      }
+    }
+  }, [selectedDate, scrollableDates]);
+
   return (
-    <div className="space-y-4 animate-tab-fade pt-12">
+    <div className="space-y-4 animate-tab-fade pt-16">
       <TodayHero
         streak={totalStreak}
         rate={rate}
@@ -52,86 +83,125 @@ export function TodayTab({
         })()}
         onCompleteNext={(q: Quadrant, i: number) => toggleDone(q, i)}
         dateSelectorSlot={
-          <div className="flex items-center justify-between gap-1.5">
-            {getWeekDates(new Date()).map((date) => {
-              const active = isSameDay(date, selectedDate);
-              const isTodayDate = isSameDay(date, new Date());
-              const isPast = date < new Date() && !isTodayDate;
-              return (
-                <button
-                  key={date.toISOString()}
-                  onClick={() => {
-                    setSelectedDate(date);
-                    if (!isTodayDate) showToast(`Viewing ${shortDay(date)}, ${date.getDate()}`);
-                  }}
-                  className={`flex h-10 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl transition ${
-                    active
-                      ? "bg-ink text-on-ink shadow-sm"
-                      : "bg-canvas-softer text-ink hover:bg-[color:var(--surface-pressed)]"
-                  }`}
-                >
-                  <span className={`text-[9px] font-bold uppercase tracking-wider ${active ? "opacity-80" : "text-body"}`}>
-                    {shortDay(date)}
-                  </span>
-                  <span className="font-display text-xs font-bold tabular-nums">{date.getDate()}</span>
-                  {isPast && !active && <span className="h-1 w-1 rounded-full bg-ink/40" />}
-                </button>
-              );
-            })}
+          <div className="relative w-full border-y border-white/10 py-4 flex items-center before:absolute before:left-0 before:w-8 before:h-full before:bg-gradient-to-r before:from-[var(--canvas)] before:to-transparent before:pointer-events-none before:z-10 after:absolute after:right-0 after:w-8 after:h-full after:bg-gradient-to-l after:from-[var(--canvas)] after:to-transparent after:pointer-events-none after:z-10">
+            <div 
+              ref={scrollRef}
+              className="flex w-full items-center overflow-x-auto hide-scrollbar snap-x snap-mandatory px-[calc(50vw-16px)] gap-6 cursor-grab active:cursor-grabbing select-none"
+              onMouseDown={(e) => {
+                isMouseDown.current = true;
+                dragDistance.current = 0;
+                startX.current = e.pageX - (scrollRef.current?.offsetLeft || 0);
+                scrollLeft.current = scrollRef.current?.scrollLeft || 0;
+                if (scrollRef.current) {
+                  scrollRef.current.style.scrollSnapType = 'none';
+                  scrollRef.current.style.scrollBehavior = 'auto';
+                }
+              }}
+              onMouseMove={(e) => {
+                if (!isMouseDown.current || !scrollRef.current) return;
+                e.preventDefault();
+                const x = e.pageX - scrollRef.current.offsetLeft;
+                const walk = (x - startX.current);
+                dragDistance.current = Math.abs(walk);
+                scrollRef.current.scrollLeft = scrollLeft.current - walk;
+              }}
+              onMouseUp={() => {
+                isMouseDown.current = false;
+                if (scrollRef.current) {
+                  scrollRef.current.style.scrollSnapType = 'x mandatory';
+                  scrollRef.current.style.scrollBehavior = 'smooth';
+                }
+              }}
+              onMouseLeave={() => {
+                isMouseDown.current = false;
+                if (scrollRef.current) {
+                  scrollRef.current.style.scrollSnapType = 'x mandatory';
+                  scrollRef.current.style.scrollBehavior = 'smooth';
+                }
+              }}
+            >
+              {scrollableDates.map((date) => {
+                const active = isSameDay(date, selectedDate);
+                const isTodayDate = isSameDay(date, new Date());
+                return (
+                  <button
+                    key={date.toISOString()}
+                    onClick={(e) => {
+                      if (dragDistance.current > 5) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return;
+                      }
+                      setSelectedDate(date);
+                      if (!isTodayDate) showToast(`Viewing ${shortDay(date)}, ${date.getDate()}`);
+                    }}
+                    className={`flex flex-col items-center justify-center shrink-0 snap-center w-8 transition ${active ? "text-ink" : "text-body hover:text-ink"
+                      }`}
+                  >
+                    <span className={`text-[10px] font-black uppercase tracking-widest ${active ? "opacity-100" : "opacity-40"}`}>
+                      {shortDay(date)}
+                    </span>
+                    <span className={`font-display text-lg font-black tabular-nums ${active ? "underline decoration-2 underline-offset-4" : ""}`}>
+                      {date.getDate()}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         }
       />
 
-      <section className="px-4">
+      <section className="px-6 pb-12">
         {totalCount === 0 ? (
-          <div className="flex flex-col items-center gap-4 py-8">
+          <div className="flex flex-col items-start gap-4 py-16">
             <div
-              className="animate-breathe w-full rounded-2xl border-2 border-dashed border-[color:var(--hairline-mid)] bg-canvas-soft p-4 flex items-center gap-3 cursor-pointer transition hover:bg-canvas-softer"
+              className="group flex flex-col items-start gap-4 cursor-pointer"
               onClick={() => setModalOpen(true)}
             >
-              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full border-2 border-dashed border-[color:var(--hairline-mid)]">
-                <Plus className="h-4 w-4 text-ink" strokeWidth={2.5} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-ink">Tap to add your first habit</p>
-                <p className="text-[11px] text-body mt-0.5">Your streak starts with one check ✓</p>
-              </div>
+              <h2 className="font-display text-5xl font-black leading-none tracking-tighter text-ink group-hover:opacity-60 transition">
+                + ADD<br />FIRST<br />HABIT
+              </h2>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-mute mt-2">
+                Start your streak today
+              </p>
             </div>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="flex flex-col border-t border-white/10">
             {QUADRANT_ORDER.flatMap((q) =>
               habits[q].map((h, i) => (
                 <div
                   key={`${q}-${i}-${h.name}`}
-                  className="animate-fade-in-up card-soft flex items-center p-3 group cursor-pointer hover:border-[color:var(--hairline-mid)] transition"
+                  className="animate-fade-in-up flex items-center py-5 group cursor-pointer hover:bg-white/5 backdrop-blur-[32px] border border-white/10 rounded-2xl mb-2 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] transition px-4 -mx-2"
                   style={{ animationDelay: `${i * 40}ms` }}
                   onClick={() => {
                     setDetailTarget({ q, i });
                   }}
                 >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="flex items-center gap-5 min-w-0 flex-1">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         toggleDone(q, i);
                       }}
-                      className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border-2 transition ${
-                        h.done
-                          ? "bg-ink border-ink text-on-ink animate-check-pop"
-                          : "border-[color:var(--hairline-mid)] text-transparent hover:border-ink"
-                      }`}
+                      className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border-[3px] transition ${h.done
+                          ? "bg-white/10 backdrop-blur-[40px] border border-white/20 text-on-ink animate-check-pop"
+                          : "border-ink text-transparent hover:scale-105"
+                        }`}
                     >
-                      <Check className="h-4 w-4" strokeWidth={3} />
+                      <Check className="h-5 w-5" strokeWidth={4} />
                     </button>
                     <div className="min-w-0 flex-1">
-                      <p className={`text-sm font-semibold truncate ${h.done ? "line-through opacity-50 text-body" : "text-ink"}`}>
+                      <p className={`font-display text-2xl font-black tracking-tight truncate ${h.done ? "line-through opacity-40 text-body" : "text-ink"}`}>
                         {h.name}
                       </p>
-                      <p className="text-[10px] text-body">{QUADRANTS[q].title} · {h.streak}d streak</p>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-mute mt-1">
+                        {QUADRANTS[q].title} // {h.streak}D STREAK
+                      </p>
                     </div>
                   </div>
-                  <ArrowRight className="h-3.5 w-3.5 text-mute opacity-0 group-hover:opacity-100 transition shrink-0" />
+                  <ArrowRight className="h-5 w-5 text-mute opacity-0 group-hover:opacity-100 transition shrink-0" />
                 </div>
               ))
             )}

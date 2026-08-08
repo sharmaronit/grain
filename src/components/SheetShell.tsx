@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 export function SheetShell({
@@ -67,10 +68,10 @@ export function SheetShell({
 
   const backdropOpacity = Math.max(0.1, 1 - Math.min(0.75, dragY / 300));
 
-  return (
+  const content = (
     <div
       onClick={onClose}
-      className="absolute inset-0 z-40 flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in transition-opacity"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in transition-opacity"
       style={{ opacity: backdropOpacity }}
     >
       <div
@@ -81,7 +82,7 @@ export function SheetShell({
             ? "none"
             : "transform 250ms cubic-bezier(0.2, 0.9, 0.3, 1)",
         }}
-        className="w-full max-h-[85vh] overflow-y-auto rounded-t-[24px] bg-canvas p-5 select-none animate-sheet-slide-up"
+        className="w-full max-h-[85vh] overflow-y-auto rounded-t-[24px] bg-white/5 backdrop-blur-[40px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] text-white p-5 select-none animate-sheet-slide-up"
       >
         {/* Drag Handle & Header Drag Area */}
         <div
@@ -96,7 +97,7 @@ export function SheetShell({
               dragY >= DISMISS_THRESHOLD
                 ? "w-20 bg-rose-500"
                 : isDragging
-                ? "w-16 bg-ink"
+                ? "w-16 bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]"
                 : "w-12 bg-[color:var(--surface-pressed)] group-hover:bg-[color:var(--hairline-mid)]"
             }`}
           />
@@ -107,7 +108,7 @@ export function SheetShell({
             </div>
             <button
               onClick={onClose}
-              className="grid h-8 w-8 place-items-center rounded-full bg-canvas-soft text-ink hover:bg-[color:var(--surface-pressed)]"
+              className="grid h-8 w-8 place-items-center rounded-full bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] text-ink hover:bg-[color:var(--surface-pressed)]"
               aria-label="Close"
             >
               <X className="h-4 w-4" />
@@ -119,4 +120,10 @@ export function SheetShell({
       </div>
     </div>
   );
+
+  if (typeof document !== "undefined") {
+    return createPortal(content, document.body);
+  }
+  
+  return content;
 }

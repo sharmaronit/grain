@@ -27,97 +27,70 @@ export function TodayHero({
   const offset = C - (C * pct) / 100;
 
   return (
-    <section className="relative px-4 pt-4">
-      <div className="card-soft relative overflow-hidden rounded-[24px] border border-[color:var(--hairline)] bg-canvas-soft text-ink shadow-lg">
-        {/* Top row: Streak + Ring */}
-        <div className="relative flex items-center justify-between p-4 pb-0">
-          <div>
-            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-mute">
-              <Flame className="h-3.5 w-3.5 text-ink" />
-              <span>Current streak</span>
-            </div>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span
-                key={streak}
-                className="font-display animate-pop-badge text-[48px] font-bold leading-none tracking-tight text-ink tabular-nums"
-              >
-                {streak}
-              </span>
-              <span className="font-display text-base font-medium text-body">
-                {streak === 1 ? "day" : "days"}
-              </span>
-            </div>
-          </div>
+    <section className="relative px-6 pt-10 pb-4">
+      {/* Structural typography: Massive Streak */}
+      <div className="flex flex-col">
+        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-mute mb-2">
+          Current Streak
+        </span>
+        <div className="flex items-baseline gap-3">
+          <span
+            key={streak}
+            className="font-display animate-pop-badge text-[120px] font-black leading-[0.8] tracking-tighter text-ink tabular-nums"
+          >
+            {streak}
+          </span>
+          <span className="font-display text-2xl font-bold tracking-tight text-body">
+            {streak === 1 ? "DAY" : "DAYS"}
+          </span>
+        </div>
+      </div>
 
-          {/* Progress ring */}
-          <div className="relative h-16 w-16 shrink-0">
-            <svg viewBox="0 0 80 80" className="h-full w-full -rotate-90">
-              <circle
-                cx="40"
-                cy="40"
-                r={R}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="5"
-                className="text-[color:var(--hairline)]"
-              />
-              <circle
-                cx="40"
-                cy="40"
-                r={R}
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="6"
-                strokeLinecap="round"
-                strokeDasharray={C}
-                strokeDashoffset={offset}
-                className="text-ink"
-                style={{
-                  transition:
-                    "stroke-dashoffset 600ms cubic-bezier(0.22,1,0.36,1)",
-                }}
-              />
-            </svg>
-            <div className="absolute inset-0 grid place-items-center">
-              <span className="font-display text-sm font-bold text-ink tabular-nums">
-                {pct}%
-              </span>
-            </div>
+      {/* Brutalist Data Point: Progress */}
+      <div className="mt-8 mb-10 flex items-center gap-6">
+        <div className="flex flex-col">
+          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-mute mb-1">
+            Progress
+          </span>
+          <span className="font-display text-4xl font-black tracking-tighter text-ink tabular-nums">
+            {pct}%
+          </span>
+        </div>
+        <div className="flex flex-col">
+          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-mute mb-1">
+            Completed
+          </span>
+          <span className="font-display text-4xl font-black tracking-tighter text-ink tabular-nums">
+            {done}/{total}
+          </span>
+        </div>
+      </div>
+
+      {/* Inline date selector (raw structural) */}
+      {dateSelectorSlot && (
+        <div className="pt-4 pb-6">{dateSelectorSlot}</div>
+      )}
+
+      {/* Up-next action (stark block) */}
+      {nextHabit && (
+        <div className="mt-6 flex flex-col gap-3">
+          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-mute">
+            Up Next
+          </span>
+          <div className="flex items-center justify-between gap-4">
+            <p className="font-display truncate text-3xl font-black tracking-tight text-ink">
+              {nextHabit.habit.name}
+            </p>
+            <button
+              type="button"
+              onClick={() => onCompleteNext(nextHabit.q, nextHabit.i)}
+              className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.25)] text-white transition hover:scale-105 active:scale-95"
+            >
+              <Check className="h-6 w-6" strokeWidth={3} />
+            </button>
           </div>
         </div>
-
-        {/* Inline date selector */}
-        {dateSelectorSlot && (
-          <div className="px-4 pt-3 pb-1">{dateSelectorSlot}</div>
-        )}
-
-        {/* Up-next action */}
-        {nextHabit && (
-          <>
-            <div className="mx-4 mt-2 h-px bg-[color:var(--hairline)]" />
-            <div className="flex items-center justify-between gap-3 px-4 py-3">
-              <div className="min-w-0 flex-1">
-                <span className="text-[9px] font-semibold uppercase tracking-widest text-mute">
-                  Up next
-                </span>
-                <p className="font-display truncate text-sm font-bold text-ink">
-                  {nextHabit.habit.name}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => onCompleteNext(nextHabit.q, nextHabit.i)}
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-ink text-on-ink shadow-md transition hover:scale-105 active:scale-95"
-              >
-                <Check className="h-5 w-5" />
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* Bottom padding when no next-habit */}
-        {!nextHabit && <div className="h-3" />}
-      </div>
+      )}
     </section>
   );
 }

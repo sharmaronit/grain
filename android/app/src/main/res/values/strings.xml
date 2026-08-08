@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">DailyClone</string>
-    <string name="title_activity_main">DailyClone</string>
+    <string name="app_name">Grain</string>
+    <string name="title_activity_main">Grain</string>
     <string name="package_name">com.dailyclone.app</string>
     <string name="custom_url_scheme">com.dailyclone.app</string>
     <string name="wallpaper_description">Grain Live Wallpaper</string>

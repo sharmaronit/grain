@@ -25,6 +25,9 @@ interface AppState {
   
   modalOpen: boolean;
   setModalOpen: (isOpen: boolean) => void;
+  
+  activeGoalId: string | null;
+  setActiveGoalId: (id: string | null) => void;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -51,4 +54,7 @@ export const useStore = create<AppState>((set) => ({
   
   modalOpen: false,
   setModalOpen: (modalOpen) => set({ modalOpen }),
+
+  activeGoalId: null,
+  setActiveGoalId: (activeGoalId) => set({ activeGoalId }),
 }));

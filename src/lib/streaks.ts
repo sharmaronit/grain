@@ -2,7 +2,7 @@
  * Streak computation — pure functions, no Firebase dependency.
  */
 
-import { formatDateKey, isScheduledDay } from "./dates";
+import { formatDateKey, isScheduledDay, getWeekDates } from "./dates";
 
 export interface CompletionEntry {
   done: boolean;
@@ -89,7 +89,6 @@ export function calculateBestStreak(
 
   let bestStreak = 0;
   let currentStreak = 0;
-  let lastScheduledDate: Date | null = null;
 
   // Walk forward through all dates
   const startDate = new Date(dateKeys[0]);
@@ -113,7 +112,6 @@ export function calculateBestStreak(
       currentStreak = 0;
     }
 
-    lastScheduledDate = new Date(cur);
     cur.setDate(cur.getDate() + 1);
   }
 
@@ -130,14 +128,15 @@ export function freezesUsedThisWeek(
   refDate: Date = new Date(),
 ): number {
   let count = 0;
-  const cur = new Date(refDate);
-  cur.setHours(0, 0, 0, 0);
-
-  for (let i = 0; i < 7; i++) {
+  
+  // Get all dates in the current calendar week (Mon-Sun)
+  const weekDates = getWeekDates(refDate);
+  
+  for (const cur of weekDates) {
+    if (cur > refDate) continue; // Only count up to the reference date
     const key = formatDateKey(cur);
     const entry = completionsMap[key]?.[habitId];
     if (entry?.frozenStreak) count++;
-    cur.setDate(cur.getDate() - 1);
   }
 
   return count;

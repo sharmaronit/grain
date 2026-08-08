@@ -6,7 +6,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
+import android.util.Base64;
 import android.util.DisplayMetrics;
 
 import com.getcapacitor.JSObject;
@@ -15,22 +17,46 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
+import org.json.JSONObject;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+
 @CapacitorPlugin(name = "Wallpaper")
 public class WallpaperPlugin extends Plugin {
 
-    /**
-     * Push the latest heatmap data into SharedPreferences so the running
-     * live wallpaper service picks it up via its OnSharedPreferenceChangeListener.
-     */
+    private final ScheduledExecutorService debounceExecutor = Executors.newSingleThreadScheduledExecutor();
+    private ScheduledFuture<?> scheduledStaticUpdate;
+
+    // ── syncWallpaperData ────────────────────────────────────────────────
+    // Saves GRAIN_LIVE_DATA to SharedPreferences.
+    // If a customPhotoBase64 is present, saves the photo to disk separately
+    // so the large base64 never ends up in GRAIN_LIVE_DATA.
+
     @PluginMethod
     public void syncWallpaperData(PluginCall call) {
         try {
             JSObject data = call.getData();
             if (data != null) {
-                String jsonStr = data.toString();
+                // Extract & save custom photo separately, then strip from JSON
+                String jsonStr = savePhotoAndSanitizeJson(data);
+
                 SharedPreferences prefs = getContext()
-                    .getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
-                prefs.edit().putString("GRAIN_LIVE_DATA", jsonStr).apply();
+                    .getSharedPreferences(GrainWallpaperService.PREFS_NAME, Context.MODE_PRIVATE);
+                prefs.edit().putString(GrainWallpaperService.KEY_LIVE_DATA, jsonStr).apply();
+
+                // If the user is using the static fallback, silently refresh it
+                if (prefs.getBoolean("GRAIN_IS_STATIC_FALLBACK", false)) {
+                    if (scheduledStaticUpdate != null && !scheduledStaticUpdate.isDone())
+                        scheduledStaticUpdate.cancel(false);
+                    final String finalJson = jsonStr;
+                    scheduledStaticUpdate = debounceExecutor.schedule(() ->
+                        updateStaticWallpaperBackground(finalJson), 3, TimeUnit.SECONDS);
+                }
             }
             JSObject ret = new JSObject();
             ret.put("success", true);
@@ -40,58 +66,33 @@ public class WallpaperPlugin extends Plugin {
         }
     }
 
-    /**
-     * Check if the device supports live wallpapers.
-     *
-     * Bug 10 fix: Instead of resolveActivity (which returns null on API 30+
-     * due to package visibility), we check WallpaperManager.getWallpaperInfo()
-     * capability and the system feature directly.
-     */
-    @PluginMethod
-    public void isLiveWallpaperSupported(PluginCall call) {
-        JSObject ret = new JSObject();
-        // Live wallpapers have been supported since API 7.
-        // The only case where they don't work is on very rare custom ROMs
-        // that strip the feature. Use the feature flag check.
-        boolean supported = getContext().getPackageManager()
-            .hasSystemFeature("android.software.live_wallpaper");
-        ret.put("supported", supported);
-        call.resolve(ret);
-    }
+    // ── setWallpaper (live) ──────────────────────────────────────────────
 
-    /**
-     * Sync data to SharedPreferences, then launch the system live wallpaper
-     * picker so the user can confirm.
-     *
-     * Bug 11 note: We cannot know if the user confirmed or cancelled the
-     * picker — startActivity is fire-and-forget. The JS side should show
-     * "Wallpaper picker opened" rather than "Applied!".
-     */
     @PluginMethod
     public void setWallpaper(PluginCall call) {
         try {
             JSObject data = call.getData();
             if (data != null && data.has("heatmap")) {
-                String jsonStr = data.toString();
+                String jsonStr = savePhotoAndSanitizeJson(data);
                 SharedPreferences prefs = getContext()
-                    .getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
-                prefs.edit().putString("GRAIN_LIVE_DATA", jsonStr).apply();
+                    .getSharedPreferences(GrainWallpaperService.PREFS_NAME, Context.MODE_PRIVATE);
+                prefs.edit()
+                     .putString(GrainWallpaperService.KEY_LIVE_DATA, jsonStr)
+                     .putBoolean("GRAIN_IS_STATIC_FALLBACK", false)
+                     .apply();
             }
 
             Intent intent = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
-            intent.putExtra(
-                WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
-                new ComponentName(getContext(), GrainWallpaperService.class)
-            );
-            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            
+            intent.putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
+                            new ComponentName(getContext(), GrainWallpaperService.class));
+
+            android.app.Activity activity = getActivity();
+            if (activity == null) { call.reject("No foreground activity"); return; }
+
             try {
-                getContext().startActivity(intent);
+                activity.startActivity(intent);
             } catch (android.content.ActivityNotFoundException e) {
-                // Some OEMs (like Samsung) strip the direct intent. Fallback to the general picker.
-                Intent fallback = new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER);
-                fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                getContext().startActivity(fallback);
+                activity.startActivity(new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER));
             }
 
             JSObject ret = new JSObject();
@@ -102,38 +103,42 @@ public class WallpaperPlugin extends Plugin {
         }
     }
 
-    /**
-     * Fallback: render the heatmap to a Bitmap and set it as a static wallpaper.
-     * Bug 7 fix: Bitmap is recycled after use to prevent memory leaks.
-     */
+    // ── setStaticWallpaper ───────────────────────────────────────────────
+
     @PluginMethod
     public void setStaticWallpaper(PluginCall call) {
         Bitmap bitmap = null;
         try {
             JSObject data = call.getData();
-            String jsonStr = data != null ? data.toString() : null;
+            String jsonStr = savePhotoAndSanitizeJson(data);
+
             GrainWallpaperService.WallpaperData parsed =
                 GrainWallpaperService.WallpaperData.fromJson(jsonStr);
 
             DisplayMetrics metrics = getContext().getResources().getDisplayMetrics();
-            int width = metrics.widthPixels;
+            int width  = metrics.widthPixels;
             int height = metrics.heightPixels;
 
             bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
             Canvas canvas = new Canvas(bitmap);
+            GrainWallpaperService.drawHeatmapToCanvas(getContext(), canvas, width, height, parsed);
 
-            GrainWallpaperService.drawHeatmapToCanvas(
-                getContext(), canvas, width, height, parsed);
+            WallpaperManager.getInstance(getContext()).setBitmap(
+                bitmap,
+                null,
+                true,
+                WallpaperManager.FLAG_SYSTEM | WallpaperManager.FLAG_LOCK
+            );
 
-            WallpaperManager manager = WallpaperManager.getInstance(getContext());
-            manager.setBitmap(bitmap);
+            // Persist so future auto-updates work
+            SharedPreferences prefs = getContext()
+                .getSharedPreferences(GrainWallpaperService.PREFS_NAME, Context.MODE_PRIVATE);
+            prefs.edit()
+                 .putString(GrainWallpaperService.KEY_LIVE_DATA, jsonStr)
+                 .putBoolean("GRAIN_IS_STATIC_FALLBACK", true)
+                 .apply();
 
-            // Also persist the data so the user's settings are remembered
-            if (jsonStr != null) {
-                SharedPreferences prefs = getContext()
-                    .getSharedPreferences("CapacitorStorage", Context.MODE_PRIVATE);
-                prefs.edit().putString("GRAIN_LIVE_DATA", jsonStr).apply();
-            }
+            WallpaperWorker.scheduleNextUpdate(getContext());
 
             JSObject ret = new JSObject();
             ret.put("success", true);
@@ -141,10 +146,81 @@ public class WallpaperPlugin extends Plugin {
         } catch (Exception e) {
             call.reject("Failed to set static wallpaper", e);
         } finally {
-            // Bug 7: Always recycle the bitmap to free ~10MB of native memory
-            if (bitmap != null) {
-                bitmap.recycle();
+            if (bitmap != null) bitmap.recycle();
+        }
+    }
+
+    // ── isLiveWallpaperSupported ─────────────────────────────────────────
+
+    @PluginMethod
+    public void isLiveWallpaperSupported(PluginCall call) {
+        JSObject ret = new JSObject();
+        ret.put("supported",
+            getContext().getPackageManager()
+                .hasSystemFeature("android.software.live_wallpaper"));
+        call.resolve(ret);
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────
+
+    /**
+     * If the call data contains a "customPhotoBase64" field:
+     *   1. Decode the JPEG and save it to the app's private files dir.
+     *   2. Store the absolute path in SharedPreferences (KEY_PHOTO_PATH).
+     *   3. Remove "customPhotoBase64" from the JSON so we never write huge
+     *      base64 strings to SharedPreferences.
+     *
+     * Returns the sanitised JSON string ready to be stored in GRAIN_LIVE_DATA.
+     */
+    private String savePhotoAndSanitizeJson(JSObject data) {
+        if (data == null) return "{}";
+        try {
+            JSONObject obj = new JSONObject(data.toString());
+
+            String b64 = obj.optString("customPhotoBase64", null);
+            if (b64 != null && !b64.isEmpty()) {
+                // Strip data-URL prefix if present
+                if (b64.contains(",")) b64 = b64.substring(b64.indexOf(",") + 1);
+
+                byte[] bytes = Base64.decode(b64, Base64.DEFAULT);
+                File photoFile = new File(getContext().getFilesDir(), "grain_wallpaper_photo.jpg");
+                FileOutputStream fos = new FileOutputStream(photoFile);
+                fos.write(bytes);
+                fos.close();
+
+                // Store the path so GrainWallpaperService can read it
+                SharedPreferences prefs = getContext()
+                    .getSharedPreferences(GrainWallpaperService.PREFS_NAME, Context.MODE_PRIVATE);
+                prefs.edit()
+                     .putString(GrainWallpaperService.KEY_PHOTO_PATH, photoFile.getAbsolutePath())
+                     .apply();
             }
+
+            // Always remove the base64 blob before writing to GRAIN_LIVE_DATA
+            obj.remove("customPhotoBase64");
+            return obj.toString();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return data.toString();
+        }
+    }
+
+    private void updateStaticWallpaperBackground(String jsonStr) {
+        Bitmap bitmap = null;
+        try {
+            GrainWallpaperService.WallpaperData parsed =
+                GrainWallpaperService.WallpaperData.fromJson(jsonStr);
+            DisplayMetrics metrics = getContext().getResources().getDisplayMetrics();
+            bitmap = Bitmap.createBitmap(metrics.widthPixels, metrics.heightPixels,
+                                         Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bitmap);
+            GrainWallpaperService.drawHeatmapToCanvas(
+                getContext(), canvas, metrics.widthPixels, metrics.heightPixels, parsed);
+            WallpaperManager.getInstance(getContext()).setBitmap(bitmap);
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (bitmap != null) bitmap.recycle();
         }
     }
 }

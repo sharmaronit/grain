@@ -55,7 +55,7 @@ export function EditHabitSheet({
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-2xl bg-canvas-soft px-4 py-3 text-sm text-ink outline-none placeholder:text-mute focus:bg-[color:var(--canvas-softer)]"
+            className="w-full rounded-2xl bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] px-4 py-3 text-sm text-ink outline-none placeholder:text-mute focus:bg-[color:var(--canvas-softer)]"
           />
         </Field>
 
@@ -68,7 +68,7 @@ export function EditHabitSheet({
                   key={c}
                   onClick={() => setCategory(c)}
                   className={`pill px-3 py-1.5 text-[11px] font-medium transition ${
-                    active ? "bg-ink text-on-ink" : "bg-canvas-soft text-ink"
+                    active ? "bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.25)] text-white" : "bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] text-ink"
                   }`}
                 >
                   {c}
@@ -87,7 +87,7 @@ export function EditHabitSheet({
                   key={qq}
                   onClick={() => setQ(qq)}
                   className={`pill px-3 py-2.5 text-left text-xs font-medium transition ${
-                    active ? "bg-ink text-on-ink" : "bg-canvas-soft text-ink"
+                    active ? "bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.25)] text-white" : "bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] text-ink"
                   }`}
                 >
                   {QUADRANTS[qq].title}
@@ -106,7 +106,7 @@ export function EditHabitSheet({
                   key={t.key}
                   onClick={() => setTime(t.key === "any" ? undefined : (t.key as NonNullable<Habit["time"]>))}
                   className={`pill px-3 py-1.5 text-[11px] font-medium transition ${
-                    active ? "bg-ink text-on-ink" : "bg-canvas-soft text-ink"
+                    active ? "bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.25)] text-white" : "bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] text-ink"
                   }`}
                 >
                   {t.label}
@@ -120,13 +120,13 @@ export function EditHabitSheet({
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => setIsNumeric(false)}
-              className={`pill px-3 py-2.5 text-xs font-medium transition ${!isNumeric ? "bg-ink text-on-ink" : "bg-canvas-soft text-ink"}`}
+              className={`pill px-3 py-2.5 text-xs font-medium transition ${!isNumeric ? "bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.25)] text-white" : "bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] text-ink"}`}
             >
               Binary
             </button>
             <button
               onClick={() => setIsNumeric(true)}
-              className={`pill px-3 py-2.5 text-xs font-medium transition ${isNumeric ? "bg-ink text-on-ink" : "bg-canvas-soft text-ink"}`}
+              className={`pill px-3 py-2.5 text-xs font-medium transition ${isNumeric ? "bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.25)] text-white" : "bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] text-ink"}`}
             >
               Numeric
             </button>
@@ -142,7 +142,7 @@ export function EditHabitSheet({
                 min={0}
                 step="0.25"
                 onChange={(e) => setTarget(Number(e.target.value) || 0)}
-                className="w-full rounded-2xl bg-canvas-soft px-4 py-3 text-sm text-ink outline-none focus:bg-[color:var(--canvas-softer)]"
+                className="w-full rounded-2xl bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] px-4 py-3 text-sm text-ink outline-none focus:bg-[color:var(--canvas-softer)]"
               />
             </Field>
             <Field label="Unit">
@@ -150,7 +150,7 @@ export function EditHabitSheet({
                 value={unit}
                 onChange={(e) => setUnit(e.target.value)}
                 placeholder="pages, min…"
-                className="w-full rounded-2xl bg-canvas-soft px-4 py-3 text-sm text-ink outline-none placeholder:text-mute focus:bg-[color:var(--canvas-softer)]"
+                className="w-full rounded-2xl bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] px-4 py-3 text-sm text-ink outline-none placeholder:text-mute focus:bg-[color:var(--canvas-softer)]"
               />
             </Field>
           </div>

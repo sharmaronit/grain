@@ -9,6 +9,6 @@ export interface Habit extends HabitDoc {
   best?: number;
 }
 
-export type AppTab = "today" | "consistency" | "matrix" | "wallpaper";
+export type AppTab = "today" | "consistency" | "myday" | "wallpaper" | "goal";
 export type Theme = "dark" | "light";
 export type WallpaperState = "idle" | "applying" | "applied";

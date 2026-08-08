@@ -26,10 +26,10 @@ export function BadgesModal({
             className={`flex items-center gap-3.5 rounded-2xl border p-3.5 transition ${
               m.unlocked
                 ? "border-emerald-500/30 bg-emerald-500/10"
-                : "border-[color:var(--hairline)] bg-canvas-soft opacity-60"
+                : "border-white/10 bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] opacity-60"
             }`}
           >
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-canvas text-2xl">
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/5 backdrop-blur-[40px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] text-white text-2xl">
               {m.icon}
             </div>
             <div className="min-w-0 flex-1">
@@ -39,7 +39,7 @@ export function BadgesModal({
                   className={`rounded-full px-2 py-0.5 text-[9px] font-semibold ${
                     m.unlocked
                       ? "bg-emerald-500/20 text-emerald-300"
-                      : "bg-canvas text-mute"
+                      : "bg-white/5 backdrop-blur-[40px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] text-white text-mute"
                   }`}
                 >
                   {m.unlocked ? "Unlocked" : `${m.days}d goal`}

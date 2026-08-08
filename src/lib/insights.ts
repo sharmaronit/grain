@@ -81,7 +81,7 @@ export function computeWeeklyInsights(
   const weekdayDiff = weekdayRate - weekendRate;
 
   // Compute peak time window
-  let peakWindow: "Morning" | "Afternoon" | "Evening" | "Anytime" = "Morning";
+  let peakWindow: "Morning" | "Afternoon" | "Evening" | "Anytime" = "Anytime";
   let maxRate = -1;
 
   for (const win of ["morning", "afternoon", "evening"] as const) {
@@ -118,8 +118,10 @@ export function computeWeeklyInsights(
     }
   } else if (topHabit && topHabit.streak >= 3) {
     insightSummary = `"${topHabit.name}" is your strongest habit with a ${topHabit.streak}-day streak.`;
-  } else {
+  } else if (peakWindow !== "Anytime") {
     insightSummary = `Your highest completion rate is during ${peakWindow} (${peakWindowRate}%).`;
+  } else {
+    insightSummary = "Set specific times for your habits to unlock peak window tracking.";
   }
 
   return {

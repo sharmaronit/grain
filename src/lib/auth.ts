@@ -87,7 +87,7 @@ export async function signUpEmail(
     .join("")
     .toUpperCase();
 
-  await setDoc(doc(db(), "users", user.uid), {
+  await setDoc(doc(db(), "users", user.email || user.uid), {
     name,
     email: user.email,
     tagline: "Building the 1% better version daily.",
@@ -139,7 +139,7 @@ export async function signInGoogle(): Promise<User> {
 
   if (user) {
     // Create user doc if this is their first sign-in
-    const userRef = doc(db(), "users", user.uid);
+    const userRef = doc(db(), "users", user.email || user.uid);
     const snap = await getDoc(userRef);
     if (!snap.exists()) {
       const name = user.displayName ?? user.email?.split("@")[0] ?? "You";

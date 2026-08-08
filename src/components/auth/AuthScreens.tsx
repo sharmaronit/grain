@@ -5,8 +5,8 @@ import { HABIT_PACKS } from "../../lib/templates";
 
 export function PhoneShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 flex h-[100dvh] w-full justify-center bg-canvas overflow-hidden">
-      <div className="relative flex h-full w-full flex-col overflow-hidden bg-canvas pt-safe pb-safe">
+    <div className="fixed inset-0 flex h-[100dvh] w-full justify-center bg-white/5 backdrop-blur-[40px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] text-white overflow-hidden">
+      <div className="relative flex h-full w-full flex-col overflow-hidden bg-white/5 backdrop-blur-[40px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] text-white pt-safe pb-safe">
         {children}
       </div>
     </div>
@@ -33,7 +33,7 @@ export function LiquidLoadingOverlay({ label }: { label: string }) {
       </div>
       <div className="liquid-glass specular relative flex flex-col items-center gap-3 rounded-3xl px-7 py-6">
         <div className="relative grid h-12 w-12 place-items-center">
-          <div className="absolute inset-0 rounded-full border border-[color:var(--hairline)]" />
+          <div className="absolute inset-0 rounded-full border border-white/10" />
           <Loader2 className="h-6 w-6 animate-spin text-ink" />
         </div>
         <span className="text-[13px] font-medium text-ink">{label}</span>
@@ -162,8 +162,8 @@ export function LoginScreen() {
   };
 
   const inputCls = (invalid: boolean) =>
-    `w-full rounded-2xl border bg-canvas-soft px-4 py-3 text-[14px] text-ink placeholder:text-body focus:outline-none focus:ring-2 disabled:opacity-60 ${
-      invalid ? "border-red-500/60 focus:ring-red-500/30" : "border-[color:var(--hairline)] focus:ring-ink/30"
+    `w-full rounded-2xl bg-white/5 backdrop-blur-[32px] border shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] px-4 py-3 text-[14px] text-white placeholder:text-white/50 focus:outline-none focus:bg-white/10 transition disabled:opacity-60 ${
+      invalid ? "border-red-500/60 focus:border-red-500/80" : "border-white/10 focus:border-white/30"
     }`;
 
   const title =
@@ -186,8 +186,8 @@ export function LoginScreen() {
 
       <div className="relative flex h-full flex-col overflow-y-auto px-6 sm:px-7 pb-6 sm:pb-8 pt-8 sm:pt-14">
         <div className="flex items-center gap-2">
-          <div className="grid h-8 w-8 sm:h-9 sm:w-9 place-items-center rounded-2xl bg-ink text-on-ink">
-            <Flame className="h-4 w-4 sm:h-5 sm:w-5" strokeWidth={2.5} />
+          <div className="grid h-8 w-8 sm:h-9 sm:w-9 place-items-center rounded-2xl bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.25)] overflow-hidden">
+            <img src="/icon.png" alt="Grain Logo" className="h-full w-full object-cover mix-blend-screen opacity-90 drop-shadow-md scale-[1.5]" />
           </div>
           <span className="font-display text-base sm:text-lg font-bold text-ink">Grain</span>
         </div>
@@ -206,7 +206,7 @@ export function LoginScreen() {
               type="button"
               data-lg-press
               disabled={busy}
-              className="pill mt-5 sm:mt-6 flex w-full items-center justify-center gap-2 border border-[color:var(--hairline)] bg-canvas-soft py-2.5 sm:py-3 text-[13px] sm:text-[14px] font-semibold text-ink transition disabled:opacity-70"
+              className="mt-5 sm:mt-6 flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-[32px] shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] py-3 sm:py-3.5 text-[13px] sm:text-[14px] font-semibold text-white hover:bg-white/10 transition disabled:opacity-70"
             >
               <GoogleGlyph /> Continue with Google
             </button>
@@ -310,7 +310,7 @@ export function LoginScreen() {
             type="submit"
             data-lg-press
             disabled={busy}
-            className="pill mt-1 flex w-full items-center justify-center gap-2 bg-ink py-2.5 sm:py-3 text-[13px] sm:text-[14px] font-semibold text-on-ink transition disabled:opacity-70"
+            className="mt-1 flex w-full items-center justify-center gap-2 rounded-2xl bg-white/20 backdrop-blur-[40px] border border-white/30 shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_32px_rgba(0,0,0,0.25)] py-3 sm:py-3.5 text-[13px] sm:text-[14px] font-bold text-white hover:bg-white/30 transition disabled:opacity-70"
           >
             {mode === "signup" ? (<>Create account <ArrowRight className="h-4 w-4" /></>) :
              mode === "forgot" ? (<>Send reset link <ArrowRight className="h-4 w-4" /></>) :
@@ -375,7 +375,7 @@ export function OnboardingScreen({ defaultName, onDone }: { defaultName: string;
 
         {step === 0 ? (
           <div className="mt-8">
-            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-canvas-soft">
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)]">
               <Sparkles className="h-6 w-6 text-ink" />
             </div>
             <h1 className="mt-5 font-display text-[28px] font-bold leading-[1.1] text-ink">
@@ -398,7 +398,7 @@ export function OnboardingScreen({ defaultName, onDone }: { defaultName: string;
           </div>
         ) : step === 1 ? (
           <div className="mt-8">
-            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-canvas-soft">
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)]">
               <span className="font-display text-lg font-bold text-ink">
                 {(name || "?").slice(0, 1).toUpperCase()}
               </span>
@@ -414,7 +414,7 @@ export function OnboardingScreen({ defaultName, onDone }: { defaultName: string;
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Your name"
-              className="mt-5 w-full rounded-2xl border border-[color:var(--hairline)] bg-canvas-soft px-4 py-3 text-[14px] text-ink outline-none focus:ring-2 focus:ring-ink/30"
+              className="mt-5 w-full rounded-2xl border border-white/10 bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] px-4 py-3 text-[14px] text-ink outline-none focus:ring-2 focus:ring-ink/30"
             />
           </div>
         ) : (
@@ -438,8 +438,8 @@ export function OnboardingScreen({ defaultName, onDone }: { defaultName: string;
                     onClick={() => setSelectedPack(pack.id)}
                     className={`flex w-full items-start gap-3.5 rounded-2xl border p-3.5 text-left transition ${
                       active
-                        ? "border-ink bg-ink text-on-ink"
-                        : "border-[color:var(--hairline)] bg-canvas-soft text-ink hover:bg-[color:var(--surface-pressed)]"
+                        ? "border-ink bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.25)] text-white"
+                        : "border-white/10 bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] text-ink hover:bg-[color:var(--surface-pressed)]"
                     }`}
                   >
                     <span className="text-2xl">{pack.icon}</span>
@@ -461,7 +461,7 @@ export function OnboardingScreen({ defaultName, onDone }: { defaultName: string;
             <button
               onClick={() => setStep(step - 1)}
               data-lg-press
-              className="pill border border-[color:var(--hairline)] bg-canvas-soft px-5 py-3 text-[13px] font-semibold text-ink"
+              className="pill border border-white/10 bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] px-5 py-3 text-[13px] font-semibold text-ink"
             >
               Back
             </button>
@@ -473,7 +473,7 @@ export function OnboardingScreen({ defaultName, onDone }: { defaultName: string;
               else onDone(name.trim() || "You", selectedPack);
             }}
             data-lg-press
-            className="pill flex flex-1 items-center justify-center gap-2 bg-ink py-3 text-[14px] font-semibold text-on-ink"
+            className="pill flex flex-1 items-center justify-center gap-2 bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] py-3 text-[14px] font-semibold text-on-ink"
           >
             {step < 2 ? "Continue" : "Start Grain"} <ArrowRight className="h-4 w-4" />
           </button>

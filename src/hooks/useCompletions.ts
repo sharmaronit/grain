@@ -26,6 +26,8 @@ export interface UseCompletionsResult {
     step: number,
     target: number,
   ) => Promise<void>;
+  /** Set a numeric habit's value directly. */
+  setValue: (habitId: string, val: number, target: number) => Promise<void>;
   /** Mark a habit as a rest day (preserves streak). */
   setRestDay: (habitId: string) => Promise<void>;
   /** Freeze a habit's streak for the day. */
@@ -94,6 +96,17 @@ export function useCompletions(
     });
   };
 
+  const setValue = async (habitId: string, val: number, target: number) => {
+    if (!userId) return;
+    const newVal = Math.max(0, Math.min(target, val));
+    const done = newVal >= target;
+    await setCompletionEntry(userId, dateKey, habitId, {
+      done,
+      value: newVal,
+      completedAt: done ? new Date() : null,
+    });
+  };
+
   const adjustValue = async (
     habitId: string,
     dir: 1 | -1,
@@ -137,6 +150,7 @@ export function useCompletions(
     loading,
     dateKey,
     toggleDone,
+    setValue,
     adjustValue,
     setRestDay,
     freezeStreak,

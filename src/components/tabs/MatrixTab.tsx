@@ -1,24 +1,17 @@
-import { useState, useRef } from "react";
-import { Sparkles, Plus, Sunrise, Sun, Moon, Check, Shield, Droplets, Pin, MoreVertical, Minus, Settings, Trash2 } from "lucide-react";
+import { useState, useRef, memo } from "react";
+import { Sparkles, Plus, Check, Shield, Droplets, Pin, MoreVertical, Minus, Settings, Trash2 } from "lucide-react";
 import { useStore } from "../../store/useStore";
 import type { Habit, Quadrant } from "../types";
 
-const QUADRANTS: Record<Quadrant, { title: string; sub: string }> = {
-  q1: { title: "Do first", sub: "Urgent · Important" },
-  q2: { title: "Schedule", sub: "Important · Not urgent" },
-  q3: { title: "Delegate", sub: "Urgent · Low impact" },
-  q4: { title: "Don't do", sub: "Low · Not urgent" },
+const QUADRANTS: Record<Quadrant, { title: string }> = {
+  q1: { title: "Do first" },
+  q2: { title: "Schedule" },
+  q3: { title: "Delegate" },
+  q4: { title: "Don't do" },
 };
 const QUADRANT_ORDER: Quadrant[] = ["q1", "q2", "q3", "q4"];
 
-const TIME_TABS = [
-  { key: "all", label: "All", icon: null },
-  { key: "morning", label: "Morning", icon: Sunrise },
-  { key: "afternoon", label: "Afternoon", icon: Sun },
-  { key: "evening", label: "Evening", icon: Moon },
-] as const;
-
-const catClass = (_c: string) => "bg-canvas-soft text-body border border-[color:var(--hairline)]";
+const catClass = (_c: string) => "bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] text-white";
 
 interface MatrixTabProps {
   totalCount: number;
@@ -31,7 +24,7 @@ interface MatrixTabProps {
   adjustValue: (q: Quadrant, i: number, dir: 1 | -1) => void;
 }
 
-export function MatrixTab({
+export const MatrixTab = memo(function MatrixTab({
   totalCount,
   habits,
   toggleDone,
@@ -41,39 +34,16 @@ export function MatrixTab({
   moveHabit,
   adjustValue,
 }: MatrixTabProps) {
-  const timeFilter = useStore((s) => s.timeFilter);
-  const setTimeFilter = useStore((s) => s.setTimeFilter);
   const setModalOpen = useStore((s) => s.setModalOpen);
   const setEditHabitTarget = useStore((s) => s.setEditHabitTarget);
   const setDetailTarget = useStore((s) => s.setDetailTarget);
 
   return (
-    <div className="animate-tab-fade pt-12">
+    <div className="animate-tab-fade pt-16">
       <section className="px-5">
-        <div className="scrollbar-none mb-3.5 flex gap-1.5 overflow-x-auto">
-          {TIME_TABS.map((t) => {
-            const active = timeFilter === t.key;
-            const Icon = t.icon;
-            return (
-              <button
-                key={t.key}
-                onClick={() => setTimeFilter(t.key)}
-                className={`pill flex shrink-0 items-center gap-1.5 px-3 py-1.5 text-[11px] font-medium transition ${
-                  active
-                    ? "bg-ink text-on-ink"
-                    : "bg-canvas-soft text-mute hover:text-ink hover:bg-[color:var(--surface-pressed)]"
-                }`}
-              >
-                {Icon && <Icon className="h-3 w-3" />}
-                {t.label}
-              </button>
-            );
-          })}
-        </div>
-
         {totalCount === 0 ? (
           <div className="card-soft flex flex-col items-center justify-center gap-3 px-5 py-10 text-center">
-            <div className="grid h-12 w-12 place-items-center rounded-full bg-canvas-soft">
+            <div className="grid h-12 w-12 place-items-center rounded-full bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)]">
               <Sparkles className="h-5 w-5 text-ink" />
             </div>
             <div>
@@ -84,7 +54,7 @@ export function MatrixTab({
             </div>
             <button
               onClick={() => setModalOpen(true)}
-              className="pill mt-1 flex items-center gap-1.5 bg-ink px-4 py-2 text-[12px] font-semibold text-on-ink"
+              className="pill mt-1 flex items-center gap-1.5 bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] px-4 py-2 text-[12px] font-semibold text-on-ink"
               data-lg-press
             >
               <Plus className="h-3.5 w-3.5" strokeWidth={3} /> Create your first habit
@@ -97,7 +67,6 @@ export function MatrixTab({
                 key={q}
                 q={q}
                 habits={habits[q]}
-                timeFilter={timeFilter}
                 onToggle={(i) => toggleDone(q, i)}
                 onRest={(i) => restHabit(q, i)}
                 onPin={(i) => togglePin(q, i)}
@@ -113,12 +82,11 @@ export function MatrixTab({
       </section>
     </div>
   );
-}
+});
 
 function QuadrantCard({
   q,
   habits,
-  timeFilter,
   onToggle,
   onRest,
   onPin,
@@ -130,7 +98,6 @@ function QuadrantCard({
 }: {
   q: Quadrant;
   habits: any[];
-  timeFilter: "all" | "morning" | "afternoon" | "evening";
   onToggle: (i: number) => void;
   onRest: (i: number) => void;
   onPin: (i: number) => void;
@@ -141,7 +108,6 @@ function QuadrantCard({
   onOpenDetail: (i: number) => void;
 }) {
   const meta = QUADRANTS[q];
-  const [collapsed, setCollapsed] = useState(false);
   const [openMenu, setOpenMenu] = useState<number | null>(null);
   const [justDone, setJustDone] = useState<number | null>(null);
   const timerRef = useRef<number | null>(null);
@@ -156,62 +122,43 @@ function QuadrantCard({
     }
   };
 
-  const visible = habits
-    .map((h, i) => ({ h, i }))
-    .filter(({ h }) => timeFilter === "all" || h.time === timeFilter);
-
-  const doneCount = visible.filter(({ h }) => h.done).length;
+  const doneCount = habits.filter((h) => h.done).length;
 
   return (
-    <div className="card-soft relative flex w-full flex-col overflow-hidden border border-[color:var(--hairline)] transition-all">
-      <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="flex items-center justify-between px-4 py-3 text-left transition hover:bg-[color:var(--canvas-softer)] active:scale-[0.995]"
-      >
-        <div className="flex items-center gap-2 min-w-0 flex-1 pr-2">
-          <h3 className="font-display text-sm font-bold text-ink">{meta.title}</h3>
-          <span className="text-[10px] font-medium tracking-wider text-mute">
-            · {meta.sub}
-          </span>
-        </div>
+    <div className="card-soft relative flex w-full flex-col overflow-hidden border border-white/10 transition-all">
+      {/* Simple header — no collapse, no subtitle */}
+      <div className="flex items-center justify-between px-4 py-3">
+        <h3 className="font-display text-sm font-bold text-ink">{meta.title}</h3>
+        <span className="text-[11px] font-semibold tabular-nums text-mute">
+          {doneCount}/{habits.length}
+        </span>
+      </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="text-[11px] font-medium tabular-nums text-mute">
-            {doneCount}/{visible.length}
-          </span>
-          <span className="text-mute font-bold tabular-nums">
-            {collapsed ? "+" : "-"}
-          </span>
-        </div>
-      </button>
-
-      {!collapsed && (
-        <div className="px-3 pb-3 pt-0 space-y-1.5">
-          {visible.map(({ h, i }) => (
-            <HabitRow
-              key={`${h.name}-${i}`}
-              habit={h}
-              justDone={justDone === i}
-              menuOpen={openMenu === i}
-              onMenuToggle={() => setOpenMenu(openMenu === i ? null : i)}
-              onMenuClose={() => setOpenMenu(null)}
-              onToggle={() => handleToggle(i)}
-              onRest={() => onRest(i)}
-              onPin={() => onPin(i)}
-              onDelete={() => onDelete(i)}
-              onMove={() => onMove(i)}
-              onEdit={() => onEdit(i)}
-              onAdjust={(dir: 1 | -1) => onAdjust(i, dir)}
-              onOpenDetail={() => onOpenDetail(i)}
-            />
-          ))}
-          {visible.length === 0 && (
-            <div className="py-2.5 text-center text-[11px] font-medium text-mute">
-              No habits scheduled
-            </div>
-          )}
-        </div>
-      )}
+      <div className="px-3 pb-3 pt-0 space-y-1.5">
+        {habits.map((h, i) => (
+          <HabitRow
+            key={`${h.name}-${i}`}
+            habit={h}
+            justDone={justDone === i}
+            menuOpen={openMenu === i}
+            onMenuToggle={() => setOpenMenu(openMenu === i ? null : i)}
+            onMenuClose={() => setOpenMenu(null)}
+            onToggle={() => handleToggle(i)}
+            onRest={() => onRest(i)}
+            onPin={() => onPin(i)}
+            onDelete={() => onDelete(i)}
+            onMove={() => onMove(i)}
+            onEdit={() => onEdit(i)}
+            onAdjust={(dir: 1 | -1) => onAdjust(i, dir)}
+            onOpenDetail={() => onOpenDetail(i)}
+          />
+        ))}
+        {habits.length === 0 && (
+          <div className="py-2.5 text-center text-[11px] font-medium text-mute">
+            No habits scheduled
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -233,7 +180,8 @@ function HabitRow({
 }: any) {
   const isNumeric = h.target !== undefined;
   const pct = isNumeric ? Math.min(100, ((h.value ?? 0) / (h.target ?? 1)) * 100) : 0;
-
+  // Numeric +/- controls hidden by default — show on tap
+  const [numericOpen, setNumericOpen] = useState(false);
   const [dx, setDx] = useState(0);
   const [dragging, setDragging] = useState(false);
   const startX = useRef<number | null>(null);
@@ -305,7 +253,7 @@ function HabitRow({
 
   return (
     <div
-      className={`group relative overflow-hidden rounded-xl bg-canvas ${
+      className={`group relative overflow-hidden rounded-xl bg-white/5 backdrop-blur-[40px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] text-white ${
         h.done ? "opacity-70" : ""
       } ${justDone ? "animate-sync-pulse" : ""}`}
     >
@@ -363,14 +311,18 @@ function HabitRow({
             e.stopPropagation();
             return;
           }
-          onOpenDetail();
+          if (isNumeric) {
+            setNumericOpen((o) => !o);
+          } else {
+            onOpenDetail();
+          }
         }}
         style={{
           transform: `translate3d(${dx}px,0,0)`,
           transition: dragging ? "none" : "transform 260ms cubic-bezier(.2,.9,.3,1.2)",
           touchAction: "pan-y",
         }}
-        className="relative flex cursor-pointer items-center gap-2 bg-canvas p-2 transition-[background] hover:bg-[color:var(--canvas-softer)]"
+        className="relative flex cursor-pointer items-center gap-2 bg-white/5 backdrop-blur-[40px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] text-white p-2 transition-[background] hover:bg-[color:var(--canvas-softer)]"
       >
         {isNumeric ? (
           <div className="grid h-5 w-5 shrink-0 place-items-center rounded-full border border-[color:var(--hairline-mid)] text-ink">
@@ -384,7 +336,7 @@ function HabitRow({
             }}
             className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border transition ${
               h.done
-                ? "border-ink bg-ink text-on-ink"
+                ? "border-ink bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.25)] text-white"
                 : "border-[color:var(--hairline-mid)] hover:border-ink"
             }`}
             aria-label={h.done ? `Undo ${h.name}` : `Mark ${h.name} done`}
@@ -408,9 +360,14 @@ function HabitRow({
             {h.streak > 0 && (
               <span
                 key={h.streak}
-                className="flex items-center gap-0.5 rounded-full bg-ink px-1.5 py-px text-[8px] font-semibold text-on-ink animate-pop-badge"
+                className="flex items-center gap-0.5 rounded-full bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] px-1.5 py-px text-[8px] font-semibold text-on-ink animate-pop-badge"
               >
                 {h.streak}d
+              </span>
+            )}
+            {isNumeric && (
+              <span className="text-[8px] font-medium text-mute tabular-nums">
+                {(h.value ?? 0).toFixed(1)}/{(h.target ?? 0).toFixed(1)}
               </span>
             )}
           </div>
@@ -442,9 +399,9 @@ function HabitRow({
         </div>
       </div>
 
-      {isNumeric && (
+      {isNumeric && numericOpen && (
         <div
-          className="relative bg-canvas px-2 pb-2"
+          className="bg-white/5 backdrop-blur-[40px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] text-white px-2 pb-2 animate-fade-in-up"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="mb-1 flex items-center justify-between text-[9px] font-medium text-body">
@@ -456,21 +413,21 @@ function HabitRow({
             <div className="flex items-center gap-1">
               <button
                 onClick={() => onAdjust(-1)}
-                className="grid h-5 w-5 place-items-center rounded-full bg-canvas-soft text-ink hover:bg-[color:var(--surface-pressed)]"
+                className="grid h-5 w-5 place-items-center rounded-full bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] text-ink hover:bg-[color:var(--surface-pressed)]"
                 aria-label="Decrease"
               >
                 <Minus className="h-2.5 w-2.5" strokeWidth={3} />
               </button>
               <button
                 onClick={() => onAdjust(1)}
-                className="grid h-5 w-5 place-items-center rounded-full bg-ink text-on-ink hover:opacity-90"
+                className="grid h-5 w-5 place-items-center rounded-full bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.25)] text-white hover:opacity-90"
                 aria-label="Increase"
               >
                 <Plus className="h-2.5 w-2.5" strokeWidth={3} />
               </button>
             </div>
           </div>
-          <div className="h-1 w-full overflow-hidden rounded-full bg-canvas-soft">
+          <div className="h-1 w-full overflow-hidden rounded-full bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)]">
             <div
               className="h-full rounded-full bg-emerald-400/80 transition-all"
               style={{ width: `${pct}%` }}
@@ -480,28 +437,28 @@ function HabitRow({
       )}
 
       {menuOpen && (
-        <div className="absolute right-1 top-8 z-10 w-28 overflow-hidden rounded-lg border border-[color:var(--hairline)] bg-canvas shadow-xl animate-fade-in">
+        <div className="absolute right-1 top-full mt-1 z-30 w-28 overflow-hidden rounded-lg border border-white/10 bg-[#1A1A1A]/50 backdrop-blur-[40px] shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] text-white animate-fade-in">
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(); onMenuClose(); }}
-            className="flex w-full items-center gap-2 px-2 py-1.5 text-[10px] text-ink hover:bg-canvas-soft"
+            className="flex w-full items-center gap-2 px-2 py-1.5 text-[10px] text-white/80 hover:text-white hover:bg-white/10 transition"
           >
             <Settings className="h-3 w-3" /> Edit
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onRest(); onMenuClose(); }}
-            className="flex w-full items-center gap-2 px-2 py-1.5 text-[10px] text-ink hover:bg-canvas-soft"
+            className="flex w-full items-center gap-2 px-2 py-1.5 text-[10px] text-white/80 hover:text-white hover:bg-white/10 transition"
           >
             <Shield className="h-3 w-3" /> Rest day
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onMove(); onMenuClose(); }}
-            className="flex w-full items-center gap-2 px-2 py-1.5 text-[10px] text-ink hover:bg-canvas-soft"
+            className="flex w-full items-center gap-2 px-2 py-1.5 text-[10px] text-white/80 hover:text-white hover:bg-white/10 transition"
           >
             <Sparkles className="h-3 w-3" /> Move
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(); onMenuClose(); }}
-            className="flex w-full items-center gap-2 px-2 py-1.5 text-[10px] text-red-500 hover:bg-canvas-soft"
+            className="flex w-full items-center gap-2 px-2 py-1.5 text-[10px] text-red-400 hover:text-red-300 hover:bg-red-500/10 transition"
           >
             <Trash2 className="h-3 w-3" /> Delete
           </button>

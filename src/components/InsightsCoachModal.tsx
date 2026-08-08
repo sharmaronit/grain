@@ -65,7 +65,7 @@ export function InsightsCoachModal({
       <div className="mt-4 space-y-4">
         <div className="liquid-glass specular flex items-center justify-between rounded-2xl p-4">
           <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-ink text-on-ink">
+            <div className="grid h-10 w-10 place-items-center rounded-2xl bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.25)] text-white">
               <Bot className="h-5 w-5" />
             </div>
             <div>
@@ -81,7 +81,7 @@ export function InsightsCoachModal({
             type="button"
             onClick={refreshAdvice}
             disabled={loading}
-            className="grid h-8 w-8 place-items-center rounded-full bg-canvas-soft text-ink hover:bg-[color:var(--surface-pressed)] disabled:opacity-50"
+            className="grid h-8 w-8 place-items-center rounded-full bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] text-ink hover:bg-[color:var(--surface-pressed)] disabled:opacity-50"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
           </button>
@@ -94,9 +94,9 @@ export function InsightsCoachModal({
           {advice?.map((tip, idx) => (
             <div
               key={idx}
-              className="flex items-start gap-3 rounded-2xl border border-[color:var(--hairline)] bg-canvas-soft p-3.5 text-xs font-medium text-ink leading-relaxed"
+              className="flex items-start gap-3 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] p-3.5 text-xs font-medium text-ink leading-relaxed"
             >
-              <div className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-ink/10 text-[10px] font-bold text-ink">
+              <div className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)]/10 text-[10px] font-bold text-ink">
                 {idx + 1}
               </div>
               <p>{tip}</p>
