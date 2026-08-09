@@ -810,6 +810,7 @@ export function Dashboard({ user }: { user?: any }) {
         id: goal.id,
         title: goal.name,
         heatmap,
+        boxes: heatmap.flatMap(col => col),
         currentStreak: daysLeft,
         completionRate: pct
       };
@@ -1139,7 +1140,7 @@ export function Dashboard({ user }: { user?: any }) {
     if (state.pointers.size === 1 && state.isDragging) {
       const dx = e.clientX - state.startX;
       const dy = e.clientY - state.startY;
-      
+
       if (isMovingPhoto) {
         const newX = state.initialPhotoOffset.x + dx;
         const newY = state.initialPhotoOffset.y + dy;
@@ -1190,11 +1191,11 @@ export function Dashboard({ user }: { user?: any }) {
       }
       state.initialDistance = null;
     }
-    
+
     if (state.pointers.size === 0) {
       state.isDragging = false;
       setIsDraggingWallpaper(false);
-      
+
       if (isMovingPhoto) {
         const match = wallpaperPhotoRef.current?.style.transform.match(/translate\(([^p]+)px,\s*([^p]+)px\)/);
         if (match) setWallpaperPhotoOffset({ x: parseFloat(match[1]), y: parseFloat(match[2]) });
@@ -1206,7 +1207,7 @@ export function Dashboard({ user }: { user?: any }) {
       const remaining = Array.from(state.pointers.values())[0];
       state.startX = remaining.x;
       state.startY = remaining.y;
-      
+
       if (isMovingPhoto) {
         const match = wallpaperPhotoRef.current?.style.transform.match(/translate\(([^p]+)px,\s*([^p]+)px\)/);
         if (match) {
@@ -1290,10 +1291,9 @@ export function Dashboard({ user }: { user?: any }) {
                   />
                 );
               })}
-              <label 
-                className={`relative h-8 w-8 rounded-full border transition-all shrink-0 snap-center flex items-center justify-center bg-[conic-gradient(red,yellow,lime,aqua,blue,fuchsia,red)] ${
-                  gridColorTheme.startsWith("#") ? "border-white ring-2 ring-white ring-offset-2 ring-offset-black/50 scale-110 shadow-md" : "border-white/30 hover:scale-105"
-                }`}
+              <label
+                className={`relative h-8 w-8 rounded-full border transition-all shrink-0 snap-center flex items-center justify-center bg-[conic-gradient(red,yellow,lime,aqua,blue,fuchsia,red)] ${gridColorTheme.startsWith("#") ? "border-white ring-2 ring-white ring-offset-2 ring-offset-black/50 scale-110 shadow-md" : "border-white/30 hover:scale-105"
+                  }`}
                 title="Custom Color"
               >
                 <input
@@ -1452,55 +1452,32 @@ export function Dashboard({ user }: { user?: any }) {
           <div className="absolute top-4 left-0 right-0 z-40 flex items-center justify-between px-4 pointer-events-none">
             {/* Spacer to maintain true center */}
             <div className="w-9" />
-            
-            {/* Live/Static Toggle (Only visible in wallpaper tab, positioned below the island) */}
-            {activeTab === "wallpaper" && (
-              <div className="absolute top-[52px] left-0 right-0 flex justify-center z-30 pointer-events-none px-4 animate-fade-in-down">
-                <div className="flex items-center rounded-full border border-[color:var(--hairline-mid)] p-1 bg-canvas/85 backdrop-blur-xl shadow-lg pointer-events-auto">
-                  <button 
-                    onClick={() => applyWallpaper(false)}
-                    className={`flex items-center gap-1.5 px-4 h-9 rounded-full text-[12px] font-bold transition-all ${!wallpaperSync ? "text-mute hover:text-ink" : "bg-ink text-on-ink shadow-sm"}`}
-                  >
-                    <div className={`w-2.5 h-2.5 rounded-full ${wallpaperSync ? "bg-green-400 animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.6)]" : "bg-[color:var(--hairline-mid)]"}`} /> Live
-                  </button>
-                  <button 
-                    onClick={() => applyWallpaper(true)}
-                    className={`flex items-center gap-1.5 px-4 h-9 rounded-full text-[12px] font-bold transition-all ${wallpaperSync ? "text-mute hover:text-ink" : "bg-ink text-on-ink shadow-sm"}`}
-                  >
-                    <div className={`w-2.5 h-2.5 rounded-full ${!wallpaperSync ? "bg-[color:var(--canvas-softer)]" : "bg-[color:var(--hairline-mid)]"}`} /> Static
-                  </button>
-                </div>
-              </div>
-            )}
-            
+
             {/* Themes Window (Only visible in wallpaper tab, positioned at the top) */}
             {activeTab === "wallpaper" && (
-              <div className="absolute top-[108px] left-0 right-0 flex justify-center z-30 pointer-events-none px-4">
+              <div className="absolute top-[60px] left-0 right-0 flex justify-center z-30 pointer-events-none px-4">
                 {(() => {
                   const wt = wallpaperThemeOf(wallpaperTheme, theme);
                   const isBrightTheme = wt.bg === "#f5f5f5" || (wt.bg as string) === "#ffffff";
                   return (
                     <div
-                      className={`w-full max-w-[500px] pointer-events-auto liquid-glass rounded-[32px] shadow-2xl transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] flex flex-col items-center overflow-hidden ${
-                        drawerOpen ? "max-h-[240px]" : "max-h-[48px]"
-                      }`}
+                      className={`w-full max-w-[500px] pointer-events-auto liquid-glass rounded-[32px] shadow-2xl transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] flex flex-col items-center overflow-hidden ${drawerOpen ? "max-h-[240px]" : "max-h-[48px]"
+                        }`}
                     >
                       {/* Content (First, so it expands downwards from the top) */}
                       <div className={`w-full overflow-x-auto hide-scrollbar snap-x transition-opacity duration-300 ${drawerOpen ? "opacity-100 p-4 pt-6" : "opacity-0 h-0"}`}>
-                        <div className={`flex min-w-max gap-6 items-start px-2 ${
-                          isBrightTheme 
-                            ? "[&_*]:!text-black [&_[role=slider]]:!border-black/30" 
+                        <div className={`flex min-w-max gap-6 items-start px-2 ${isBrightTheme
+                            ? "[&_*]:!text-black [&_[role=slider]]:!border-black/30"
                             : "[&_*]:!text-white [&_[role=slider]]:!border-white/30"
-                        }`}>
+                          }`}>
                           {renderSettingsMenu()}
                         </div>
                       </div>
 
                       {/* Handle (At the bottom of the drawer) */}
-                      <div 
-                        className={`w-full flex justify-center items-center shrink-0 transition-all duration-500 cursor-pointer ${
-                          drawerOpen ? "h-6 pb-3" : (isBrightTheme ? "h-12 hover:bg-white/70" : "h-12 hover:bg-black/70")
-                        }`}
+                      <div
+                        className={`w-full flex justify-center items-center shrink-0 transition-all duration-500 cursor-pointer ${drawerOpen ? "h-6 pb-3" : (isBrightTheme ? "h-12 hover:bg-white/70" : "h-12 hover:bg-black/70")
+                          }`}
                         onPointerDown={(e) => {
                           toolbarDragStartY.current = e.clientY;
                           try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { }
@@ -1558,48 +1535,44 @@ export function Dashboard({ user }: { user?: any }) {
                   }, 2000);
                 }
               }}
-              className={`pointer-events-auto flex items-center justify-center rounded-full border border-[color:var(--hairline-mid)] p-1 pl-1 text-xs font-semibold text-ink backdrop-blur-xl shadow-lg transition-all duration-500 ease-out active:scale-95 ${
-                showTitlePill ? "gap-2 pr-3.5 bg-canvas text-ink ring-1 ring-ink/10" : "gap-0 pr-1 bg-canvas/85"
-              }`}
+              className={`pointer-events-auto flex items-center justify-center rounded-full border border-[color:var(--hairline-mid)] p-1 pl-1 text-xs font-semibold text-ink backdrop-blur-xl shadow-lg transition-all duration-500 ease-out active:scale-95 ${showTitlePill ? "gap-2 pr-3.5 bg-canvas text-ink ring-1 ring-ink/10" : "gap-0 pr-1 bg-canvas/85"
+                }`}
               aria-label="App logo and section title"
             >
               <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full overflow-hidden relative">
                 {showTitlePill ? (
                   <div className="absolute inset-0 bg-ink/10 rounded-full flex items-center justify-center animate-pulse">
-                    <img src="/icon.png" alt="" className={`h-full w-full object-contain object-center filter drop-shadow-sm scale-105 ${
-                      (wallpaperThemeOf(wallpaperTheme, theme).bg === "#f5f5f5" || (wallpaperThemeOf(wallpaperTheme, theme).bg as string) === "#ffffff") ? "invert" : ""
-                    }`} />
+                    <img src="/icon.png" alt="" className={`h-full w-full object-contain object-center filter drop-shadow-sm scale-105 ${(wallpaperThemeOf(wallpaperTheme, theme).bg === "#f5f5f5" || (wallpaperThemeOf(wallpaperTheme, theme).bg as string) === "#ffffff") ? "invert" : ""
+                      }`} />
                   </div>
                 ) : (
                   <img
                     src="/icon.png"
                     alt="Grain logo"
-                    className={`h-full w-full object-contain object-center filter drop-shadow-sm scale-105 transition-all duration-500 ${
-                      (wallpaperThemeOf(wallpaperTheme, theme).bg === "#f5f5f5" || (wallpaperThemeOf(wallpaperTheme, theme).bg as string) === "#ffffff") ? "invert" : ""
-                    }`}
+                    className={`h-full w-full object-contain object-center filter drop-shadow-sm scale-105 transition-all duration-500 ${(wallpaperThemeOf(wallpaperTheme, theme).bg === "#f5f5f5" || (wallpaperThemeOf(wallpaperTheme, theme).bg as string) === "#ffffff") ? "invert" : ""
+                      }`}
                   />
                 )}
               </div>
               <span
-                className={`overflow-hidden transition-all duration-500 ease-out flex items-center gap-2 ${
-                  showTitlePill ? "max-w-[240px] opacity-100" : "max-w-0 opacity-0"
-                }`}
+                className={`overflow-hidden transition-all duration-500 ease-out flex items-center gap-2 ${showTitlePill ? "max-w-[240px] opacity-100" : "max-w-0 opacity-0"
+                  }`}
               >
                 <span className="h-3.5 w-px bg-[color:var(--hairline-mid)] shrink-0 opacity-70" />
                 <span className="text-mute font-medium text-[11px] leading-none shrink-0 whitespace-nowrap flex items-center">
                   {activeTab === "today"
                     ? `Daily habits · ${totalStreak}d streak`
                     : activeTab === "consistency"
-                    ? `Consistency · ${totalStreak}d streak`
-                    : activeTab === "myday"
-                      ? "My Day"
-                    : activeTab === "goal"
-                    ? "Your goals"
-                    : "Live wallpaper"}
+                      ? `Consistency · ${totalStreak}d streak`
+                      : activeTab === "myday"
+                        ? "My Day"
+                        : activeTab === "goal"
+                          ? "Your goals"
+                          : "Live wallpaper"}
                 </span>
               </span>
             </button>
-            
+
             {/* Context Pill (Dynamic Island) */}
             <div className={`absolute left-1/2 -translate-x-1/2 top-[env(safe-area-inset-top,24px)] transition-all duration-500 ${toast ? 'scale-100 opacity-100 translate-y-0' : 'scale-90 opacity-0 -translate-y-8 pointer-events-none'}`} style={{ transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)' }}>
               <button
@@ -1642,7 +1615,7 @@ export function Dashboard({ user }: { user?: any }) {
               {/* Controls overlay at top of Full Screen Preview */}
               <div className="absolute top-[env(safe-area-inset-top,24px)] mt-4 left-0 right-0 flex items-center justify-between px-6 z-50 pointer-events-none">
                 <div className="flex items-center gap-2">
-                  <button 
+                  <button
                     type="button"
                     onClick={() => photoInputRef.current?.click()}
                     className="pointer-events-auto flex items-center justify-center h-10 w-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 text-white cursor-pointer active:scale-95 transition-all hover:bg-black/60 shadow-lg"
@@ -1654,9 +1627,8 @@ export function Dashboard({ user }: { user?: any }) {
                     <button
                       type="button"
                       onClick={() => setIsMovingPhoto(prev => !prev)}
-                      className={`pointer-events-auto flex items-center justify-center h-10 px-4 rounded-full backdrop-blur-md border border-white/20 text-white font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg ${
-                        isMovingPhoto ? "bg-white text-black" : "bg-black/40 hover:bg-black/60"
-                      }`}
+                      className={`pointer-events-auto flex items-center justify-center h-10 px-4 rounded-full backdrop-blur-md border border-white/20 text-white font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg ${isMovingPhoto ? "bg-white text-black" : "bg-black/40 hover:bg-black/60"
+                        }`}
                     >
                       {isMovingPhoto ? "Done Moving" : "Move Photo"}
                     </button>
@@ -1686,14 +1658,14 @@ export function Dashboard({ user }: { user?: any }) {
 
                 {wallpaperTheme === "custom" && wallpaperCustomPhoto && (
                   <>
-                    <img 
+                    <img
                       ref={wallpaperPhotoRef}
-                      src={wallpaperCustomPhoto} 
-                      className="absolute inset-0 w-full h-full object-cover pointer-events-none transition-transform" 
+                      src={wallpaperCustomPhoto}
+                      className="absolute inset-0 w-full h-full object-cover pointer-events-none transition-transform"
                       style={{
                         transform: `translate(${wallpaperPhotoOffset.x}px, ${wallpaperPhotoOffset.y}px) scale(${wallpaperPhotoScale})`
                       }}
-                      alt="" 
+                      alt=""
                     />
                     <div className="absolute inset-0 pointer-events-none bg-black transition-opacity" style={{ opacity: wallpaperPhotoOverlay }} />
                   </>
@@ -1931,7 +1903,7 @@ export function Dashboard({ user }: { user?: any }) {
                         const gapSize = previewWeeks > 26 ? 2 : 3;
                         let bestSize = 6;
                         let bestCols = 7;
-                        
+
                         // Find the largest cell size that fits N cells into the screen.
                         for (let s = 48; s >= 6; s--) {
                           let c = Math.floor((availW + gapSize) / (s + gapSize));
@@ -2049,6 +2021,24 @@ export function Dashboard({ user }: { user?: any }) {
                 </div> {/* End Draggable Container */}
               </div>
 
+              {/* Controls overlay at bottom of Full Screen Preview */}
+              <div className="absolute bottom-28 left-0 right-0 flex flex-col items-center justify-end z-50 animate-fade-in-up px-4 pointer-events-none">
+                {/* Live/Static Toggle moved to bottom */}
+                <div className="flex items-center rounded-full border border-[color:var(--hairline-mid)] p-1 bg-canvas/85 backdrop-blur-xl shadow-lg pointer-events-auto">
+                  <button
+                    onClick={() => applyWallpaper(false)}
+                    className={`flex items-center gap-1.5 px-4 h-9 rounded-full text-[12px] font-bold transition-all ${!wallpaperSync ? "text-mute hover:text-ink" : "bg-ink text-on-ink shadow-sm"}`}
+                  >
+                    <div className={`w-2.5 h-2.5 rounded-full ${wallpaperSync ? "bg-green-400 animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.6)]" : "bg-[color:var(--hairline-mid)]"}`} /> Live
+                  </button>
+                  <button
+                    onClick={() => applyWallpaper(true)}
+                    className={`flex items-center gap-1.5 px-4 h-9 rounded-full text-[12px] font-bold transition-all ${wallpaperSync ? "text-mute hover:text-ink" : "bg-ink text-on-ink shadow-sm"}`}
+                  >
+                    <div className={`w-2.5 h-2.5 rounded-full ${!wallpaperSync ? "bg-[color:var(--canvas-softer)]" : "bg-[color:var(--hairline-mid)]"}`} /> Static
+                  </button>
+                </div>
+              </div>
 
             </div>
           )}
@@ -2064,9 +2054,9 @@ export function Dashboard({ user }: { user?: any }) {
             {/* TAB 1: TODAY */}
             {activeTab === "today" && (
               <div className="space-y-4 animate-tab-fade pt-16">
-                
+
                 <div className="flex justify-end px-5">
-                  <button 
+                  <button
                     onClick={() => setSwipeMode(true)}
                     className="flex items-center gap-1.5 rounded-full card-soft bg-[color:var(--canvas-soft)] px-3 py-1.5 text-xs font-bold text-ink shadow-sm transition hover:bg-ink/5"
                   >
@@ -2282,13 +2272,13 @@ export function Dashboard({ user }: { user?: any }) {
                   ) : (
                     <div className="flex flex-col gap-6">
                       {TIME_ORDER.map((timeKey) => {
-                        const timeHabits = flatHabits.filter(h => 
-                          h.time === timeKey || 
+                        const timeHabits = flatHabits.filter(h =>
+                          h.time === timeKey ||
                           (!h.time && timeKey === "any")
                         );
-                        
+
                         if (timeHabits.length === 0) return null;
-                        
+
                         const timeIcons = {
                           morning: <Sunrise className="w-[18px] h-[18px] text-[color:var(--brand)]" />,
                           afternoon: <Sun className="w-[18px] h-[18px] text-[color:var(--brand)]" />,
@@ -2302,7 +2292,7 @@ export function Dashboard({ user }: { user?: any }) {
                           evening: "Evening",
                           any: "Anytime"
                         };
-                        
+
                         return (
                           <div key={timeKey} className="card-soft relative flex w-full flex-col overflow-hidden border border-[color:var(--hairline)] transition-all">
                             <div className="flex items-center justify-between px-4 py-3 text-left">
@@ -2327,7 +2317,7 @@ export function Dashboard({ user }: { user?: any }) {
                                   onRest={() => setHabitRestDay(h.id)}
                                   onPin={() => { togglePin(h.quadrant, habits[h.quadrant].findIndex(hx => hx.id === h.id)); setOpenMenuId(null); }}
                                   onDelete={() => { deleteHabit(h.quadrant, habits[h.quadrant].findIndex(hx => hx.id === h.id)); setOpenMenuId(null); }}
-                                  onMove={() => {}}
+                                  onMove={() => { }}
                                   onEdit={() => setEditHabitTarget({ q: h.quadrant, i: habits[h.quadrant].findIndex(hx => hx.id === h.id) })}
                                   onAdjust={(dir) => adjustValue(h.quadrant, habits[h.quadrant].findIndex(hx => hx.id === h.id), dir)}
                                   onSetValue={(val) => setHabitValue(h.id, val, h.target ?? 1)}
@@ -3621,7 +3611,7 @@ export const HabitRow = memo(function HabitRow({
     if (!dragging) setDragging(true);
     const val = rubberband(rawX);
     dxRef.current = val;
-    
+
     requestAnimationFrame(() => {
       if (rowRef.current) {
         rowRef.current.style.transform = `translate3d(${val}px,0,0)`;
@@ -3659,7 +3649,7 @@ export const HabitRow = memo(function HabitRow({
       onRest();
     }
     dxRef.current = 0;
-    
+
     requestAnimationFrame(() => {
       if (rowRef.current) {
         rowRef.current.style.transform = 'translate3d(0,0,0)';
@@ -3668,7 +3658,7 @@ export const HabitRow = memo(function HabitRow({
       if (leftBgRef.current) { leftBgRef.current.style.opacity = "0"; leftBgRef.current.style.width = "8px"; }
       if (rightBgRef.current) { rightBgRef.current.style.opacity = "0"; rightBgRef.current.style.width = "8px"; }
     });
-    
+
     setDragging(false);
     startX.current = null;
     startY.current = null;
@@ -3683,12 +3673,12 @@ export const HabitRow = memo(function HabitRow({
   if (isNumeric) {
     const pct = Math.min(100, (h.value / (h.target || 1)) * 100);
     return (
-      <div 
+      <div
         className="relative w-full rounded-[24px] liquid-glass overflow-hidden flex flex-col p-5 mb-2 cursor-pointer transition hover:bg-[color:var(--canvas-soft)]"
         onClick={onOpenDetail}
       >
         <div className="absolute inset-x-0 bottom-0 h-[60%] bg-gradient-to-t from-ink/5 to-transparent pointer-events-none" />
-        
+
         <div className="relative flex items-center gap-4 z-10">
           <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-ink/5 shadow-[inset_0_0_20px_color-mix(in_srgb,var(--ink)_5%,transparent)]">
             <Droplets className="h-6 w-6 text-ink drop-shadow-[0_0_8px_color-mix(in_srgb,var(--ink)_40%,transparent)]" />
@@ -3710,10 +3700,10 @@ export const HabitRow = memo(function HabitRow({
 
           <div className="flex shrink-0 items-center gap-1 self-start pt-1">
             <button onClick={(e) => { e.stopPropagation(); onPin(); }} className={`grid h-7 w-7 place-items-center rounded-full transition ${h.pinned ? 'text-ink' : 'text-mute hover:bg-ink/10'}`}>
-               <Pin className="h-3.5 w-3.5" fill={h.pinned ? "currentColor" : "none"} />
+              <Pin className="h-3.5 w-3.5" fill={h.pinned ? "currentColor" : "none"} />
             </button>
             <button onClick={(e) => { e.stopPropagation(); onMenuToggle(); }} className="grid h-7 w-7 place-items-center rounded-full text-mute hover:bg-ink/10">
-               <MoreVertical className="h-3.5 w-3.5" />
+              <MoreVertical className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
@@ -3743,10 +3733,10 @@ export const HabitRow = memo(function HabitRow({
           </span>
 
           <div className="w-full h-2.5 rounded-full bg-ink/10 shadow-inner relative overflow-hidden">
-             <div 
-               className="absolute inset-y-0 left-0 rounded-full bg-ink shadow-[0_0_12px_color-mix(in_srgb,var(--ink)_40%,transparent)] transition-all duration-500 ease-out"
-               style={{ width: `${pct}%` }}
-             />
+            <div
+              className="absolute inset-y-0 left-0 rounded-full bg-ink shadow-[0_0_12px_color-mix(in_srgb,var(--ink)_40%,transparent)] transition-all duration-500 ease-out"
+              style={{ width: `${pct}%` }}
+            />
           </div>
         </div>
 
