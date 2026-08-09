@@ -865,6 +865,7 @@ export function Dashboard({ user }: { user?: any }) {
             photoOffsetX: wallpaperPhotoOffset.x,
             photoOffsetY: wallpaperPhotoOffset.y,
             photoScale: wallpaperPhotoScale,
+            stackedGoals: stackedGoals
           });
           showToast("Wallpaper picker opened \u2014 confirm to apply", undefined, 4000);
         } else {
@@ -887,6 +888,7 @@ export function Dashboard({ user }: { user?: any }) {
             photoOffsetX: wallpaperPhotoOffset.x,
             photoOffsetY: wallpaperPhotoOffset.y,
             photoScale: wallpaperPhotoScale,
+            stackedGoals: stackedGoals
           });
           showToast("Static wallpaper applied!", undefined, 4000);
         }
