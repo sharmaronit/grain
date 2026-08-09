@@ -1453,9 +1453,29 @@ export function Dashboard({ user }: { user?: any }) {
             {/* Spacer to maintain true center */}
             <div className="w-9" />
             
+            {/* Live/Static Toggle (Only visible in wallpaper tab, positioned below the island) */}
+            {activeTab === "wallpaper" && (
+              <div className="absolute top-[52px] left-0 right-0 flex justify-center z-30 pointer-events-none px-4 animate-fade-in-down">
+                <div className="flex items-center rounded-full border border-[color:var(--hairline-mid)] p-1 bg-canvas/85 backdrop-blur-xl shadow-lg pointer-events-auto">
+                  <button 
+                    onClick={() => applyWallpaper(false)}
+                    className={`flex items-center gap-1.5 px-4 h-9 rounded-full text-[12px] font-bold transition-all ${!wallpaperSync ? "text-mute hover:text-ink" : "bg-ink text-on-ink shadow-sm"}`}
+                  >
+                    <div className={`w-2.5 h-2.5 rounded-full ${wallpaperSync ? "bg-green-400 animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.6)]" : "bg-[color:var(--hairline-mid)]"}`} /> Live
+                  </button>
+                  <button 
+                    onClick={() => applyWallpaper(true)}
+                    className={`flex items-center gap-1.5 px-4 h-9 rounded-full text-[12px] font-bold transition-all ${wallpaperSync ? "text-mute hover:text-ink" : "bg-ink text-on-ink shadow-sm"}`}
+                  >
+                    <div className={`w-2.5 h-2.5 rounded-full ${!wallpaperSync ? "bg-[color:var(--canvas-softer)]" : "bg-[color:var(--hairline-mid)]"}`} /> Static
+                  </button>
+                </div>
+              </div>
+            )}
+            
             {/* Themes Window (Only visible in wallpaper tab, positioned at the top) */}
             {activeTab === "wallpaper" && (
-              <div className="absolute top-[60px] left-0 right-0 flex justify-center z-30 pointer-events-none px-4">
+              <div className="absolute top-[108px] left-0 right-0 flex justify-center z-30 pointer-events-none px-4">
                 {(() => {
                   const wt = wallpaperThemeOf(wallpaperTheme, theme);
                   const isBrightTheme = wt.bg === "#f5f5f5" || (wt.bg as string) === "#ffffff";
@@ -2029,24 +2049,6 @@ export function Dashboard({ user }: { user?: any }) {
                 </div> {/* End Draggable Container */}
               </div>
 
-              {/* Controls overlay at bottom of Full Screen Preview */}
-              <div className="absolute bottom-28 left-0 right-0 flex flex-col items-center justify-end z-50 animate-fade-in-up px-4 pointer-events-none">
-                {/* Live/Static Toggle moved to bottom */}
-                <div className="flex items-center rounded-full border border-[color:var(--hairline-mid)] p-1 bg-canvas/85 backdrop-blur-xl shadow-lg pointer-events-auto">
-                  <button 
-                    onClick={() => applyWallpaper(false)}
-                    className={`flex items-center gap-1.5 px-4 h-9 rounded-full text-[12px] font-bold transition-all ${!wallpaperSync ? "text-mute hover:text-ink" : "bg-ink text-on-ink shadow-sm"}`}
-                  >
-                    <div className={`w-2.5 h-2.5 rounded-full ${wallpaperSync ? "bg-green-400 animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.6)]" : "bg-[color:var(--hairline-mid)]"}`} /> Live
-                  </button>
-                  <button 
-                    onClick={() => applyWallpaper(true)}
-                    className={`flex items-center gap-1.5 px-4 h-9 rounded-full text-[12px] font-bold transition-all ${wallpaperSync ? "text-mute hover:text-ink" : "bg-ink text-on-ink shadow-sm"}`}
-                  >
-                    <div className={`w-2.5 h-2.5 rounded-full ${!wallpaperSync ? "bg-[color:var(--canvas-softer)]" : "bg-[color:var(--hairline-mid)]"}`} /> Static
-                  </button>
-                </div>
-              </div>
 
             </div>
           )}
