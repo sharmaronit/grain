@@ -25,5 +25,25 @@ public class MainActivity extends BridgeActivity {
             WebSettings settings = webView.getSettings();
             settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
         }
+
+        // Enable 120Hz / High Refresh Rate if supported
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            android.view.Window window = getWindow();
+            android.view.Display display = window.getWindowManager().getDefaultDisplay();
+            android.view.Display.Mode[] modes = display.getSupportedModes();
+            float maxRefreshRate = 0;
+            int maxModeId = 0;
+            for (android.view.Display.Mode mode : modes) {
+                if (mode.getRefreshRate() > maxRefreshRate) {
+                    maxRefreshRate = mode.getRefreshRate();
+                    maxModeId = mode.getModeId();
+                }
+            }
+            if (maxModeId != 0) {
+                android.view.WindowManager.LayoutParams params = window.getAttributes();
+                params.preferredDisplayModeId = maxModeId;
+                window.setAttributes(params);
+            }
+        }
     }
 }
