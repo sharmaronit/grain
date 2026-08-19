@@ -66,6 +66,7 @@ export interface UserProfile {
   wallpaperOffset?: { x: number; y: number };
   wallpaperSync: boolean;
   remindersOn: boolean;
+  reminderTime?: string;
   previewWeeks: number;
   activeGoalId?: string;
 }

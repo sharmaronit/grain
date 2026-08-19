@@ -55,7 +55,7 @@ export const GoalTab = memo(function GoalTab({ goals, onDelete, onSetActiveGoal 
       {/* Active Goal Hero */}
       {activeGoal && (
         <div 
-          className="relative overflow-hidden rounded-[24px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] p-6 mb-8"
+          className="liquid-glass specular relative overflow-hidden rounded-[24px] border border-[color:color-mix(in_srgb,var(--accent)_15%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_20%,transparent),0_8px_32px_rgba(0,0,0,0.3)] p-6 mb-8"
           style={{ '--goal-color': activeGoal.color } as React.CSSProperties}
         >
           <div className="absolute top-0 left-0 w-full h-1" style={{ backgroundColor: activeGoal.color }} />
@@ -74,7 +74,7 @@ export const GoalTab = memo(function GoalTab({ goals, onDelete, onSetActiveGoal 
               <div className="flex flex-col items-center justify-center">
                 <div className="relative w-32 h-32 mb-4">
                   <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                    <circle cx="50" cy="50" r="45" fill="transparent" stroke="currentColor" strokeWidth="8" className="text-black/5" />
+                    <circle cx="50" cy="50" r="45" fill="transparent" stroke="currentColor" strokeWidth="8" className="text-ink/10" />
                     <circle 
                       cx="50" cy="50" r="45" fill="transparent" 
                       stroke={activeGoal.color} 
@@ -110,10 +110,10 @@ export const GoalTab = memo(function GoalTab({ goals, onDelete, onSetActiveGoal 
           return (
             <div 
               key={g.id} 
-              className={`flex items-center justify-between p-4 rounded-2xl border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] transition-all ${
+              className={`liquid-glass specular flex items-center justify-between p-4 rounded-2xl border border-[color:color-mix(in_srgb,var(--accent)_12%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_18%,transparent),0_8px_24px_rgba(0,0,0,0.25)] transition-all duration-300 ${
                 isActive 
-                  ? "bg-white/10 backdrop-blur-[32px]" 
-                  : "bg-white/5 backdrop-blur-[16px] hover:bg-white/10"
+                  ? "bg-[color:color-mix(in_srgb,var(--canvas)_70%,transparent)] border-[color:color-mix(in_srgb,var(--accent)_28%,transparent)]" 
+                  : "hover:bg-[color:color-mix(in_srgb,var(--canvas)_65%,transparent)]"
               }`}
             >
               <div className="flex items-center gap-4">
@@ -134,10 +134,10 @@ export const GoalTab = memo(function GoalTab({ goals, onDelete, onSetActiveGoal 
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleSetActiveGoal(isActive ? null : g.id)}
-                  className={`grid w-10 h-10 place-items-center rounded-full border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] transition ${
+                  className={`grid w-10 h-10 place-items-center rounded-full border border-[color:color-mix(in_srgb,var(--accent)_15%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_18%,transparent),0_8px_24px_rgba(0,0,0,0.2)] transition ${
                     isActive 
-                      ? "bg-white/20 backdrop-blur-[40px] text-white" 
-                      : "bg-white/5 backdrop-blur-[32px] text-mute hover:text-white hover:bg-white/10"
+                      ? "bg-ink text-on-ink shadow-lg scale-105" 
+                      : "bg-[color:color-mix(in_srgb,var(--canvas)_40%,transparent)] text-mute hover:text-ink hover:bg-[color:color-mix(in_srgb,var(--canvas)_60%,transparent)]"
                   }`}
                 >
                   <Star className="w-4 h-4" fill={isActive ? "currentColor" : "none"} strokeWidth={isActive ? 2 : 2.5} />
@@ -148,7 +148,7 @@ export const GoalTab = memo(function GoalTab({ goals, onDelete, onSetActiveGoal 
                       onDelete(g.id);
                     }
                   }}
-                  className="grid w-10 h-10 place-items-center rounded-full bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] text-mute hover:text-red-500 hover:bg-red-50"
+                  className="grid w-10 h-10 place-items-center rounded-full bg-[color:color-mix(in_srgb,var(--canvas)_40%,transparent)] border border-[color:color-mix(in_srgb,var(--accent)_12%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_15%,transparent),0_8px_24px_rgba(0,0,0,0.2)] text-mute hover:text-red-500 hover:bg-red-500/10 transition"
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>
@@ -168,7 +168,7 @@ export const GoalTab = memo(function GoalTab({ goals, onDelete, onSetActiveGoal 
 
       <button
         onClick={() => setIsAdding(true)}
-        className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] py-4 text-[13px] font-bold text-ink border border-dashed border-[color:var(--hairline-strong)] hover:bg-[color:var(--surface-pressed)] transition"
+        className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl liquid-glass specular py-4 text-[13px] font-bold text-ink border border-dashed border-[color:color-mix(in_srgb,var(--accent)_25%,transparent)] hover:bg-[color:color-mix(in_srgb,var(--canvas)_65%,transparent)] transition shadow-lg"
       >
         <Plus className="h-5 w-5" /> Add Goal
       </button>

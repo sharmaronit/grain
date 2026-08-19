@@ -4,10 +4,10 @@ import type { InsightsResult } from "../lib/insights";
 
 export function InsightsCard({ insights }: { insights: InsightsResult }) {
   return (
-    <div className="card-soft relative overflow-hidden rounded-[24px] border border-white/10 p-4 transition-all">
+    <div className="liquid-glass specular relative overflow-hidden rounded-[24px] border border-[color:color-mix(in_srgb,var(--accent)_12%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_20%,transparent),0_8px_32px_rgba(0,0,0,0.3)] p-4 transition-all">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="grid h-7 w-7 place-items-center rounded-xl bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.25)] text-white">
+          <div className="grid h-7 w-7 place-items-center rounded-xl bg-[color:color-mix(in_srgb,var(--canvas)_40%,transparent)] border border-[color:color-mix(in_srgb,var(--accent)_20%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_25%,transparent)] text-ink">
             <Sparkles className="h-3.5 w-3.5" />
           </div>
           <h3 className="font-display text-sm font-bold text-ink">Weekly Insights</h3>
@@ -22,21 +22,21 @@ export function InsightsCard({ insights }: { insights: InsightsResult }) {
       </p>
 
       <div className="mt-3.5 grid grid-cols-3 gap-2">
-        <div className="rounded-xl bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] px-3 py-2">
+        <div className="rounded-xl bg-[color:color-mix(in_srgb,var(--canvas)_40%,transparent)] backdrop-blur-xl border border-[color:color-mix(in_srgb,var(--accent)_12%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_15%,transparent)] px-3 py-2">
           <span className="text-[9px] font-bold uppercase tracking-wider text-body">Weekdays</span>
           <div className="font-display text-base font-bold text-ink tabular-nums">
             {insights.weekdayRate}%
           </div>
         </div>
 
-        <div className="rounded-xl bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] px-3 py-2">
+        <div className="rounded-xl bg-[color:color-mix(in_srgb,var(--canvas)_40%,transparent)] backdrop-blur-xl border border-[color:color-mix(in_srgb,var(--accent)_12%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_15%,transparent)] px-3 py-2">
           <span className="text-[9px] font-bold uppercase tracking-wider text-body">Weekends</span>
           <div className="font-display text-base font-bold text-ink tabular-nums">
             {insights.weekendRate}%
           </div>
         </div>
 
-        <div className="rounded-xl bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] px-3 py-2">
+        <div className="rounded-xl bg-[color:color-mix(in_srgb,var(--canvas)_40%,transparent)] backdrop-blur-xl border border-[color:color-mix(in_srgb,var(--accent)_12%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_15%,transparent)] px-3 py-2">
           <span className="text-[9px] font-bold uppercase tracking-wider text-body">Peak</span>
           <div className="font-display truncate text-xs font-bold text-ink">
             {insights.peakWindow}

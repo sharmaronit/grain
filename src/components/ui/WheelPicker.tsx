@@ -47,12 +47,14 @@ export const WheelPicker = <T extends string | number>({
           const container = e.currentTarget;
           if ((container as any).scrollTimeout) clearTimeout((container as any).scrollTimeout);
           (container as any).scrollTimeout = setTimeout(() => {
-            const index = Math.max(0, Math.min(options.length - 1, Math.round(container.scrollLeft / itemWidth)));
-            const newValue = options[index].key;
-            if (newValue !== value) {
-              onChange(newValue);
-            }
-          }, 100);
+            window.requestAnimationFrame(() => {
+              const index = Math.max(0, Math.min(options.length - 1, Math.round(container.scrollLeft / itemWidth)));
+              const newValue = options[index].key;
+              if (newValue !== value) {
+                onChange(newValue);
+              }
+            });
+          }, 80);
         }}
       >
         <div style={{ width: `calc(50% - ${itemWidth / 2}px)` }} className="shrink-0" />

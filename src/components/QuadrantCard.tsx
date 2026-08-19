@@ -72,7 +72,7 @@ export function QuadrantCard({
   const doneCount = visible.filter(({ h }) => h.done).length;
 
   return (
-    <div className="card-soft relative flex w-full flex-col overflow-hidden border border-white/10 transition-all">
+    <div className="liquid-glass specular relative flex w-full flex-col overflow-hidden rounded-[24px] border border-[color:color-mix(in_srgb,var(--accent)_12%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_20%,transparent),0_8px_32px_rgba(0,0,0,0.3)] transition-all">
       {/* Header bar */}
       <button
         type="button"

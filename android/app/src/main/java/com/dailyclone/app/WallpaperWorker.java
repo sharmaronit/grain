@@ -39,92 +39,41 @@ public class WallpaperWorker extends Worker {
         String jsonStr = prefs.getString(GrainWallpaperService.KEY_LIVE_DATA, null);
 
         if (isStatic && jsonStr != null) {
+            Bitmap bitmap = null;
             try {
-                JSONObject obj = new JSONObject(jsonStr);
+                GrainWallpaperService.WallpaperData parsed = GrainWallpaperService.WallpaperData.fromJson(jsonStr);
 
-                // Shift main heatmap
-                JSONArray heatmap = obj.optJSONArray("heatmap");
-                if (heatmap != null) {
-                    obj.put("heatmap", shiftHeatmapArray(heatmap));
-                }
-
-                // Shift goals heatmaps
-                JSONArray stackedGoals = obj.optJSONArray("stackedGoals");
-                if (stackedGoals != null) {
-                    for (int i = 0; i < stackedGoals.length(); i++) {
-                        JSONObject goal = stackedGoals.optJSONObject(i);
-                        if (goal != null) {
-                            JSONArray goalHeatmap = goal.optJSONArray("heatmap");
-                            if (goalHeatmap != null) {
-                                goal.put("heatmap", shiftHeatmapArray(goalHeatmap));
-                            }
-                        }
-                    }
-                }
-
-                String newJson = obj.toString();
-                prefs.edit().putString(GrainWallpaperService.KEY_LIVE_DATA, newJson).apply();
-
-                GrainWallpaperService.WallpaperData parsed = GrainWallpaperService.WallpaperData.fromJson(newJson);
-
-                // Generate new bitmap
+                // Generate new bitmap (drawHeatmapToCanvas handles dynamic column/day shifting)
                 DisplayMetrics metrics = context.getResources().getDisplayMetrics();
                 int width  = metrics.widthPixels;
                 int height = metrics.heightPixels;
 
-                Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+                bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
                 Canvas canvas = new Canvas(bitmap);
                 GrainWallpaperService.drawHeatmapToCanvas(context, canvas, width, height, parsed);
 
-                WallpaperManager.getInstance(context).setBitmap(bitmap);
+                String screenTarget = prefs.getString("GRAIN_STATIC_SCREEN_TARGET", "both");
+                int flags = WallpaperManager.FLAG_SYSTEM | WallpaperManager.FLAG_LOCK;
+                if ("home".equals(screenTarget)) {
+                    flags = WallpaperManager.FLAG_SYSTEM;
+                } else if ("lock".equals(screenTarget)) {
+                    flags = WallpaperManager.FLAG_LOCK;
+                }
+
+                WallpaperManager.getInstance(context).setBitmap(bitmap, null, true, flags);
                 Log.d(TAG, "Static wallpaper updated successfully for the new day.");
 
             } catch (Exception e) {
                 Log.e(TAG, "Failed to update static wallpaper", e);
                 return Result.failure();
+            } finally {
+                if (bitmap != null) bitmap.recycle();
             }
         }
 
         // Schedule the next one for next midnight
         scheduleNextUpdate(context);
         return Result.success();
-    }
-
-    private JSONArray shiftHeatmapArray(JSONArray original) throws Exception {
-        if (original == null || original.length() == 0) return original;
-        int cols = original.length();
-        JSONArray firstCol = original.optJSONArray(0);
-        if (firstCol == null) return original;
-        int rows = firstCol.length();
-        
-        int[] flat = new int[cols * rows];
-        int index = 0;
-        for (int c = 0; c < cols; c++) {
-            JSONArray col = original.optJSONArray(c);
-            if (col != null) {
-                for (int r = 0; r < rows; r++) {
-                    flat[index++] = col.optInt(r, 0);
-                }
-            }
-        }
-        
-        // Shift left by 1
-        for (int i = 0; i < flat.length - 1; i++) {
-            flat[i] = flat[i + 1];
-        }
-        flat[flat.length - 1] = 0;
-        
-        // Unflatten
-        JSONArray shifted = new JSONArray();
-        index = 0;
-        for (int c = 0; c < cols; c++) {
-            JSONArray newCol = new JSONArray();
-            for (int r = 0; r < rows; r++) {
-                newCol.put(flat[index++]);
-            }
-            shifted.put(newCol);
-        }
-        return shifted;
     }
 
     public static void scheduleNextUpdate(Context context) {
@@ -155,3 +104,4 @@ public class WallpaperWorker extends Worker {
         Log.d(TAG, "Scheduled next wallpaper update in " + (timeDiff / 1000) + " seconds.");
     }
 }
+

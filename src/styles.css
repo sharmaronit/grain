@@ -90,39 +90,17 @@
     border-color: var(--hairline);
   }
 
-  /* Smooth crossfade when [data-theme] flips between dark and light.
-     Scope to elements that actually re-token to avoid a universal `*`
-     transition (which forces style recalcs on every scroll/hover). */
-  html,
-  body,
+  /* Smooth crossfade only for explicitly styled elements */
   [class*="card-"],
-  [class*="btn-"],
   [class*="chip-"],
-  .liquid-glass,
-  .liquid-blob,
-  header,
-  section,
-  article,
-  aside,
-  nav,
-  main,
-  button,
-  a,
-  input,
-  textarea,
-  select,
-  [role="button"] {
-    transition: background-color 320ms ease, background 320ms ease,
-      color 320ms ease, border-color 320ms ease, fill 320ms ease,
-      stroke 320ms ease;
-    contain: layout paint style;
+  .liquid-glass {
+    contain: layout paint;
   }
 
   button,
   a,
   [role="button"] {
-    transition-property: background-color, background, color, border-color, transform;
-    transition-duration: 320ms, 320ms, 320ms, 320ms, 120ms;
+    transition: transform 120ms ease, opacity 150ms ease;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -161,8 +139,8 @@
 
 @utility card-uber {
   background: color-mix(in srgb, var(--canvas) 60%, transparent);
-  backdrop-filter: blur(40px) saturate(150%);
-  -webkit-backdrop-filter: blur(40px) saturate(150%);
+  backdrop-filter: blur(36px) saturate(150%);
+  -webkit-backdrop-filter: blur(36px) saturate(150%);
   color: var(--ink);
   border-radius: var(--radius-xl);
   border: 1px solid color-mix(in srgb, var(--accent) 15%, transparent) !important;
@@ -170,12 +148,13 @@
   position: relative;
   overflow: hidden;
   contain: layout paint;
+  transform: translateZ(0);
 }
 
 @utility card-soft {
   background: color-mix(in srgb, var(--canvas) 75%, transparent);
-  backdrop-filter: blur(30px) saturate(150%);
-  -webkit-backdrop-filter: blur(30px) saturate(150%);
+  backdrop-filter: blur(24px) saturate(140%);
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
   color: var(--ink);
   border-radius: var(--radius-xl);
   border: 1px solid color-mix(in srgb, var(--accent) 8%, transparent) !important;
@@ -183,6 +162,7 @@
   position: relative;
   overflow: hidden;
   contain: layout paint;
+  transform: translateZ(0);
 }
 
 @utility card-invert {
@@ -191,17 +171,32 @@
   border-radius: var(--radius-xl);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   contain: layout paint;
+  transform: translateZ(0);
 }
 
 @utility liquid-glass {
   position: relative;
   background: color-mix(in srgb, var(--canvas) 50%, transparent);
-  backdrop-filter: blur(40px) saturate(150%);
-  -webkit-backdrop-filter: blur(40px) saturate(150%);
+  backdrop-filter: blur(32px) saturate(150%);
+  -webkit-backdrop-filter: blur(32px) saturate(150%);
   border: 1px solid color-mix(in srgb, var(--accent) 10%, transparent) !important;
   box-shadow: inset 0 1px 1px color-mix(in srgb, var(--accent) 20%, transparent), 0 8px 32px rgba(0, 0, 0, 0.3);
   overflow: hidden;
   contain: layout paint;
+  transform: translateZ(0);
+}
+
+/* Mobile & touch performance optimization: adjust blur radius for ultra-smooth 60fps scrolling */
+@media (pointer: coarse) {
+  .liquid-glass,
+  .card-uber {
+    backdrop-filter: blur(18px) saturate(135%);
+    -webkit-backdrop-filter: blur(18px) saturate(135%);
+  }
+  .card-soft {
+    backdrop-filter: blur(14px) saturate(130%);
+    -webkit-backdrop-filter: blur(14px) saturate(130%);
+  }
 }
 
 
@@ -545,19 +540,19 @@
 
 /* Safe area padding utilities for native mobile (Capacitor / Android) */
 @utility pt-safe {
-  padding-top: max(env(safe-area-inset-top, 0px), 8px);
+  padding-top: max(var(--sa-top, env(safe-area-inset-top, 0px)), 8px);
 }
 
 @utility pb-safe {
-  padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
+  padding-bottom: max(var(--sa-bottom, env(safe-area-inset-bottom, 0px)), 8px);
 }
 
 @utility mt-safe {
-  margin-top: max(env(safe-area-inset-top, 0px), 8px);
+  margin-top: max(var(--sa-top, env(safe-area-inset-top, 0px)), 8px);
 }
 
 @utility mb-safe {
-  margin-bottom: max(env(safe-area-inset-bottom, 0px), 8px);
+  margin-bottom: max(var(--sa-bottom, env(safe-area-inset-bottom, 0px)), 8px);
 }
 
 /* ============ App-wide Smooth Animations & Profile Opening Effects ============ */
@@ -713,8 +708,40 @@
   }
 }
 
+@keyframes tab-slide-left {
+  0% {
+    opacity: 0;
+    transform: translate3d(24px, 0, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes tab-slide-right {
+  0% {
+    opacity: 0;
+    transform: translate3d(-24px, 0, 0);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
 @utility animate-tab-fade {
-  animation: tab-fade-enter 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: tab-fade-enter 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+@utility animate-tab-slide-left {
+  animation: tab-slide-left 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
+}
+
+@utility animate-tab-slide-right {
+  animation: tab-slide-right 0.24s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   will-change: transform, opacity;
 }
 

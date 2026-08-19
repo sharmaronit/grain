@@ -9,6 +9,67 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" />
   </head>
   <body class="bg-black text-white antialiased">
+    <style>
+      @keyframes grain-splash-icon {
+        0% { transform: scale(0.6) rotate(-10deg); opacity: 0; filter: blur(10px); }
+        40% { transform: scale(1.1) rotate(5deg); opacity: 1; filter: blur(0px); }
+        60% { transform: scale(0.95) rotate(-2deg); opacity: 1; filter: blur(0px); }
+        100% { transform: scale(1) rotate(0deg); opacity: 1; filter: blur(0px); }
+      }
+      @keyframes grain-fade-in-up {
+        from { opacity: 0; transform: translateY(12px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      #splash-screen {
+        position: fixed; inset: 0; z-index: 99999;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        background-color: #09090b; 
+        transition: all 0.5s ease-out;
+      }
+      #splash-screen.fade-out {
+        opacity: 0; transform: scale(1.02); filter: blur(4px); pointer-events: none;
+      }
+      .splash-glow {
+        position: absolute; width: 256px; height: 256px;
+        background: rgba(255,255,255,0.05); border-radius: 50%;
+        filter: blur(60px);
+      }
+      .splash-icon-container {
+        width: 96px; height: 96px; border-radius: 24px;
+        background: rgba(255,255,255,0.05); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+        border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+        display: flex; align-items: center; justify-content: center; overflow: hidden;
+        animation: grain-splash-icon 1.2s cubic-bezier(0.25, 1, 0.3, 1) forwards;
+        position: relative; z-index: 1;
+      }
+      .splash-icon-container img {
+        width: 150%; height: 150%; object-fit: cover; mix-blend-mode: screen; opacity: 0.9;
+      }
+      .splash-text {
+        font-family: "Space Grotesk", "Inter", sans-serif;
+        font-size: 24px; font-weight: 700; color: #fff; letter-spacing: -0.01em; margin-top: 16px;
+        animation: grain-fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+        animation-delay: 0.4s;
+        position: relative; z-index: 1;
+      }
+      
+      @media (prefers-color-scheme: light) {
+        #splash-screen { background-color: #ffffff; }
+        .splash-glow { background: rgba(0,0,0,0.05); }
+        .splash-icon-container { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.1); }
+        .splash-icon-container img { mix-blend-mode: multiply; filter: invert(1); }
+        .splash-text { color: #000; }
+      }
+    </style>
+    
+    <div id="splash-screen">
+      <div class="splash-glow"></div>
+      <div class="splash-icon-container">
+        <img src="/icon.png" alt="Grain" />
+      </div>
+      <div class="splash-text">Grain</div>
+    </div>
+
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

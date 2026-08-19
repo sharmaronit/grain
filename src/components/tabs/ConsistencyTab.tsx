@@ -110,13 +110,13 @@ export const ConsistencyTab = memo(function ConsistencyTab({
             <div className="relative">
               <button
                 onClick={() => setFilterOpen((v) => !v)}
-                className="flex items-center gap-2 px-3 py-1.5 text-xs bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_24px_rgba(0,0,0,0.3)] text-white rounded-lg font-medium hover:bg-white/10 transition"
+                className="flex items-center gap-2 px-3 py-1.5 text-xs bg-[color:color-mix(in_srgb,var(--canvas)_50%,transparent)] backdrop-blur-xl border border-[color:color-mix(in_srgb,var(--accent)_15%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_20%,transparent),0_8px_24px_rgba(0,0,0,0.2)] text-ink rounded-xl font-medium hover:bg-[color:color-mix(in_srgb,var(--canvas)_70%,transparent)] transition"
               >
                 <span className="max-w-[100px] truncate">{selectedHabit}</span>
                 <ChevronDown className={`h-3.5 w-3.5 transition-transform ${filterOpen ? "rotate-180" : ""}`} />
               </button>
               {filterOpen && (
-                <div className="absolute right-0 top-full z-30 mt-2 w-48 overflow-hidden rounded-xl border border-white/10 bg-[#1A1A1A]/50 backdrop-blur-[40px] shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] text-white animate-fade-in">
+                <div className="absolute right-0 top-full z-30 mt-2 w-48 overflow-hidden rounded-2xl border border-[color:color-mix(in_srgb,var(--accent)_15%,transparent)] bg-[color:color-mix(in_srgb,var(--canvas)_80%,transparent)] backdrop-blur-2xl shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_20%,transparent),0_12px_32px_rgba(0,0,0,0.35)] text-ink animate-fade-in">
                   {CATEGORIES.map((c) => (
                     <button
                       key={c}
@@ -125,11 +125,11 @@ export const ConsistencyTab = memo(function ConsistencyTab({
                          setFilterOpen(false);
                       }}
                       className={`flex w-full items-center justify-between px-4 py-3 text-left text-sm transition-colors ${
-                        c === selectedHabit ? "bg-white/10 backdrop-blur-md shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] text-white font-bold" : "text-white/80 font-medium hover:bg-white/5"
+                        c === selectedHabit ? "bg-[color:color-mix(in_srgb,var(--accent)_15%,transparent)] text-ink font-bold" : "text-body font-medium hover:bg-[color:color-mix(in_srgb,var(--canvas)_60%,transparent)] hover:text-ink"
                       }`}
                     >
                       {c}
-                      {c === selectedHabit && <Check className="h-4 w-4 text-white" />}
+                      {c === selectedHabit && <Check className="h-4 w-4 text-ink" />}
                     </button>
                   ))}
                 </div>

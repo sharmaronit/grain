@@ -34,14 +34,31 @@ const authStore = {
 export function AuthGate({ children }: { children: (user: any) => React.ReactNode }) {
   const { user, loading } = useAuth();
 
-  if (loading) {
-    return (
-      <PhoneShell>
-        <div className="flex h-full items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-ink" />
-        </div>
-      </PhoneShell>
-    );
+  // We'll enforce a minimum 1.5s splash screen time for the animation to finish playing smoothly.
+  const [minSplashTimePassed, setMinSplashTimePassed] = useState(false);
+
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setMinSplashTimePassed(true);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  React.useEffect(() => {
+    if (!loading && minSplashTimePassed) {
+      const splash = document.getElementById("splash-screen");
+      if (splash) {
+        splash.classList.add("fade-out");
+        setTimeout(() => {
+          splash.remove();
+        }, 500);
+      }
+    }
+  }, [loading, minSplashTimePassed]);
+
+  if (loading || !minSplashTimePassed) {
+    // Return null while the HTML splash screen covers the window
+    return null;
   }
 
   if (!user) {

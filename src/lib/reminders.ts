@@ -53,6 +53,15 @@ export async function scheduleDailyReminder(enabled: boolean): Promise<boolean> 
               repeats: true,
             },
           },
+          {
+            title: "Reminders active",
+            body: "You'll receive a reminder every day at 8:00 PM.",
+            id: 1002,
+            schedule: {
+              at: new Date(Date.now() + 5000), // Fire in 5 seconds
+              repeats: false,
+            },
+          }
         ],
       });
     } catch (e) {

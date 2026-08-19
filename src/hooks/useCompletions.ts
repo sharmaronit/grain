@@ -90,11 +90,22 @@ export function useCompletions(
     if (!userId) return;
     const current = getEntry(habitId);
     const nowDone = !current.done;
-    await setCompletionEntry(userId, dateKey, habitId, {
+    const updated: CompletionEntry = {
       ...current,
       done: nowDone,
       completedAt: nowDone ? new Date() : null,
-    });
+    };
+
+    // Optimistic local update (instant response in UI)
+    setEntries((prev) => ({ ...prev, [habitId]: updated }));
+    
+    try {
+      await setCompletionEntry(userId, dateKey, habitId, updated);
+    } catch (err) {
+      console.error("[useCompletions] toggleDone error:", err);
+      // Revert on error
+      setEntries((prev) => ({ ...prev, [habitId]: current }));
+    }
   };
 
   const setValue = async (habitId: string, val: number, target: number) => {
@@ -102,12 +113,21 @@ export function useCompletions(
     const current = getEntry(habitId);
     const newVal = Math.max(0, Math.min(target, val));
     const done = newVal >= target;
-    await setCompletionEntry(userId, dateKey, habitId, {
+    const updated: CompletionEntry = {
       ...current,
       done,
       value: newVal,
       completedAt: done && !current.done ? new Date() : current.completedAt,
-    });
+    };
+
+    setEntries((prev) => ({ ...prev, [habitId]: updated }));
+
+    try {
+      await setCompletionEntry(userId, dateKey, habitId, updated);
+    } catch (err) {
+      console.error("[useCompletions] setValue error:", err);
+      setEntries((prev) => ({ ...prev, [habitId]: current }));
+    }
   };
 
   const adjustValue = async (
@@ -121,47 +141,92 @@ export function useCompletions(
     const currentVal = current.value ?? 0;
     const newVal = Math.max(0, Math.min(target, currentVal + dir * step));
     const done = newVal >= target;
-    await setCompletionEntry(userId, dateKey, habitId, {
+    const updated: CompletionEntry = {
       ...current,
       value: newVal,
       done,
       completedAt: done && !current.done ? new Date() : current.completedAt,
-    });
+    };
+
+    setEntries((prev) => ({ ...prev, [habitId]: updated }));
+
+    try {
+      await setCompletionEntry(userId, dateKey, habitId, updated);
+    } catch (err) {
+      console.error("[useCompletions] adjustValue error:", err);
+      setEntries((prev) => ({ ...prev, [habitId]: current }));
+    }
   };
 
   const setRestDay = async (habitId: string) => {
     if (!userId) return;
     const current = getEntry(habitId);
-    await setCompletionEntry(userId, dateKey, habitId, {
+    const updated: CompletionEntry = {
       ...current,
       restDay: true,
       done: true, // counts as "done" in UI to grey it out
-    });
+    };
+
+    setEntries((prev) => ({ ...prev, [habitId]: updated }));
+
+    try {
+      await setCompletionEntry(userId, dateKey, habitId, updated);
+    } catch (err) {
+      console.error("[useCompletions] setRestDay error:", err);
+      setEntries((prev) => ({ ...prev, [habitId]: current }));
+    }
   };
 
   const markSkipped = async (habitId: string) => {
     if (!userId) return;
     const current = getEntry(habitId);
-    await setCompletionEntry(userId, dateKey, habitId, {
+    const updated: CompletionEntry = {
       ...current,
       skipped: true,
-      done: false, // ensure it's not marked as completed
-    });
+      done: false,
+    };
+
+    setEntries((prev) => ({ ...prev, [habitId]: updated }));
+
+    try {
+      await setCompletionEntry(userId, dateKey, habitId, updated);
+    } catch (err) {
+      console.error("[useCompletions] markSkipped error:", err);
+      setEntries((prev) => ({ ...prev, [habitId]: current }));
+    }
   };
 
   const freezeStreak = async (habitId: string) => {
     if (!userId) return;
     const current = getEntry(habitId);
-    await setCompletionEntry(userId, dateKey, habitId, {
+    const updated: CompletionEntry = {
       ...current,
       frozenStreak: true,
-    });
+    };
+
+    setEntries((prev) => ({ ...prev, [habitId]: updated }));
+
+    try {
+      await setCompletionEntry(userId, dateKey, habitId, updated);
+    } catch (err) {
+      console.error("[useCompletions] freezeStreak error:", err);
+      setEntries((prev) => ({ ...prev, [habitId]: current }));
+    }
   };
 
   const saveNote = async (habitId: string, note: string) => {
     if (!userId) return;
     const current = getEntry(habitId);
-    await setCompletionEntry(userId, dateKey, habitId, { ...current, note });
+    const updated: CompletionEntry = { ...current, note };
+
+    setEntries((prev) => ({ ...prev, [habitId]: updated }));
+
+    try {
+      await setCompletionEntry(userId, dateKey, habitId, updated);
+    } catch (err) {
+      console.error("[useCompletions] saveNote error:", err);
+      setEntries((prev) => ({ ...prev, [habitId]: current }));
+    }
   };
 
   return {

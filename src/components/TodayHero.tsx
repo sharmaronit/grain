@@ -84,7 +84,7 @@ export function TodayHero({
             <button
               type="button"
               onClick={() => onCompleteNext(nextHabit.q, nextHabit.i)}
-              className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.25)] text-white transition hover:scale-105 active:scale-95"
+              className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-[color:color-mix(in_srgb,var(--canvas)_40%,transparent)] backdrop-blur-2xl border border-[color:color-mix(in_srgb,var(--accent)_20%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_25%,transparent),0_8px_32px_rgba(0,0,0,0.25)] text-ink transition hover:scale-105 active:scale-95"
             >
               <Check className="h-6 w-6" strokeWidth={3} />
             </button>

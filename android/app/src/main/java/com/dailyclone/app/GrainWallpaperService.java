@@ -1,6 +1,9 @@
 package com.dailyclone.app;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -35,6 +38,7 @@ public class GrainWallpaperService extends WallpaperService {
 
     public static class WallpaperData {
         public int[][] heatmap;
+        public long   heatmapStartMs = 0;
         public String themeKey     = "amoled";
         public int    previewWeeks = 26;
         public int    currentStreak  = 0;
@@ -60,6 +64,7 @@ public class GrainWallpaperService extends WallpaperService {
             public int completionRate;
         }
         public GoalData[] stackedGoals = null;
+        public String[] habitText = null;
 
         /** Parse from the GRAIN_LIVE_DATA JSON stored in SharedPreferences.
          *  NOTE: base64 photo data is intentionally NOT stored here —
@@ -69,6 +74,7 @@ public class GrainWallpaperService extends WallpaperService {
             if (jsonStr == null) return d;
             try {
                 JSONObject obj = new JSONObject(jsonStr);
+                d.heatmapStartMs = obj.optLong("heatmapStartMs", 0L);
                 d.themeKey     = obj.optString("theme", "amoled");
                 d.previewWeeks = Math.max(12, Math.min(52, obj.optInt("previewWeeks", 26)));
                 d.currentStreak  = obj.optInt("currentStreak", 0);
@@ -130,10 +136,86 @@ public class GrainWallpaperService extends WallpaperService {
                         }
                     }
                 }
+
+                JSONArray habitsArr = obj.optJSONArray("habitText");
+                if (habitsArr != null && habitsArr.length() > 0) {
+                    d.habitText = new String[habitsArr.length()];
+                    for (int i = 0; i < habitsArr.length(); i++) {
+                        d.habitText[i] = habitsArr.optString(i);
+                    }
+                }
             } catch (JSONException e) {
                 e.printStackTrace();
             }
             return d;
+        }
+
+        /** Creates a copy of WallpaperData with heatmap columns shifted dynamically if weeks have passed. */
+        public WallpaperData getDynamicAdjusted() {
+            WallpaperData copy = new WallpaperData();
+            copy.heatmapStartMs = this.heatmapStartMs;
+            copy.themeKey = this.themeKey;
+            copy.previewWeeks = this.previewWeeks;
+            copy.currentStreak = this.currentStreak;
+            copy.completionRate = this.completionRate;
+            copy.offsetY = this.offsetY;
+            copy.isGoalActive = this.isGoalActive;
+            copy.accentColor = this.accentColor;
+            copy.gridStyle = this.gridStyle;
+            copy.photoOverlay = this.photoOverlay;
+            copy.statsAlignment = this.statsAlignment;
+            copy.gridColorTheme = this.gridColorTheme;
+            copy.offsetX = this.offsetX;
+            copy.gridScale = this.gridScale;
+            copy.photoOffsetX = this.photoOffsetX;
+            copy.photoOffsetY = this.photoOffsetY;
+            copy.photoScale = this.photoScale;
+            copy.stackedGoals = this.stackedGoals;
+            copy.habitText = this.habitText;
+
+            if (this.heatmap == null || this.heatmap.length == 0) {
+                return copy;
+            }
+
+            int cols = this.heatmap.length;
+            int[][] currentGrid = new int[cols][7];
+            for (int c = 0; c < cols; c++) {
+                System.arraycopy(this.heatmap[c], 0, currentGrid[c], 0, 7);
+            }
+
+            Calendar now = getMidnightCalendar();
+            long nowMs = now.getTimeInMillis();
+            int todayDow = (now.get(Calendar.DAY_OF_WEEK) + 5) % 7; // Mon=0 .. Sun=6
+            long currentWeekMondayMs = nowMs - (todayDow * 86400000L);
+
+            if (this.heatmapStartMs > 0) {
+                long syncedWeekMondayMs = this.heatmapStartMs + (51L * 7L * 86400000L);
+                long diffWeeks = (currentWeekMondayMs - syncedWeekMondayMs) / (7L * 86400000L);
+
+                if (diffWeeks > 0) {
+                    int shift = (int) Math.min(diffWeeks, cols);
+                    int[][] shifted = new int[cols][7];
+                    for (int c = 0; c < cols - shift; c++) {
+                        System.arraycopy(currentGrid[c + shift], 0, shifted[c], 0, 7);
+                    }
+                    currentGrid = shifted;
+                    copy.completionRate = 0; // New week starts with 0% completion
+                } else if (diffWeeks == 0) {
+                    // Check if today is a new day compared to when data was synced
+                    // The last column is current week. If today's cell is unpopulated, today's rate resets.
+                    long syncedDayMs = syncedWeekMondayMs;
+                    // If current day has advanced past sync day
+                    if (nowMs > syncedDayMs) {
+                        // If today's habits haven't been completed yet, show 0% for today in stats
+                        if (currentGrid[cols - 1][todayDow] == 0) {
+                            copy.completionRate = 0;
+                        }
+                    }
+                }
+            }
+
+            copy.heatmap = currentGrid;
+            return copy;
         }
     }
 
@@ -233,10 +315,11 @@ public class GrainWallpaperService extends WallpaperService {
                                            int width, int height,
                                            WallpaperData data) {
         if (data == null) data = new WallpaperData();
+        WallpaperData adjusted = data.getDynamicAdjusted();
 
         int[] bg = {0}, fg = {0}, accent = {0};
         int[][] ints = {null};
-        resolveTheme(data.themeKey, data.gridColorTheme, bg, fg, accent, ints);
+        resolveTheme(adjusted.themeKey, adjusted.gridColorTheme, bg, fg, accent, ints);
 
         float density = ctx.getResources().getDisplayMetrics().density;
         Paint paint     = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -245,7 +328,7 @@ public class GrainWallpaperService extends WallpaperService {
         // ── Background ──────────────────────────────────────────────────
 
         boolean drewPhoto = false;
-        if ("custom".equals(data.themeKey)) {
+        if ("custom".equals(adjusted.themeKey)) {
             // Load saved photo from filesystem (saved by WallpaperPlugin, NOT from base64 in JSON)
             SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             String photoPath = prefs.getString(KEY_PHOTO_PATH, null);
@@ -257,18 +340,18 @@ public class GrainWallpaperService extends WallpaperService {
                         float scaleX = (float) width  / photo.getWidth();
                         float scaleY = (float) height / photo.getHeight();
                         float baseScale  = Math.max(scaleX, scaleY);
-                        float scale = baseScale * data.photoScale;
+                        float scale = baseScale * adjusted.photoScale;
                         int drawW    = Math.round(photo.getWidth()  * scale);
                         int drawH    = Math.round(photo.getHeight() * scale);
-                        int offX     = (width  - drawW) / 2 + Math.round(data.photoOffsetX * density);
-                        int offY     = (height - drawH) / 2 + Math.round(data.photoOffsetY * density);
+                        int offX     = (width  - drawW) / 2 + Math.round(adjusted.photoOffsetX * density);
+                        int offY     = (height - drawH) / 2 + Math.round(adjusted.photoOffsetY * density);
                         canvas.drawBitmap(photo,
                             new android.graphics.Rect(0, 0, photo.getWidth(), photo.getHeight()),
                             new android.graphics.Rect(offX, offY, offX + drawW, offY + drawH),
                             null);
                         photo.recycle();
                         // Overlay dimmer
-                        int alpha = Math.round(data.photoOverlay * 255f);
+                        int alpha = Math.round(adjusted.photoOverlay * 255f);
                         canvas.drawARGB(alpha, 0, 0, 0);
                         drewPhoto = true;
                     }
@@ -277,7 +360,7 @@ public class GrainWallpaperService extends WallpaperService {
                 }
             }
             if (!drewPhoto) canvas.drawColor(Color.BLACK);
-        } else if ("neon".equals(data.themeKey)) {
+        } else if ("neon".equals(adjusted.themeKey)) {
             LinearGradient shader = new LinearGradient(0, 0, width, height,
                 new int[]{Color.parseColor("#EC4899"), Color.parseColor("#8B5CF6"),
                            Color.parseColor("#06B6D4")},
@@ -290,7 +373,7 @@ public class GrainWallpaperService extends WallpaperService {
         }
 
         // ── No data state ───────────────────────────────────────────────
-        if (data.heatmap == null || data.heatmap.length == 0) {
+        if (adjusted.heatmap == null || adjusted.heatmap.length == 0) {
             textPaint.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
             textPaint.setTextSize(14f * density);
             textPaint.setColor(fg[0]);
@@ -302,15 +385,24 @@ public class GrainWallpaperService extends WallpaperService {
         }
 
         // ── Dispatch to grid renderer ───────────────────────────────────
-        if ("year".equals(data.gridStyle)) {
-            drawYearGrid(canvas, width, height, data, paint, textPaint, fg, accent, ints, density);
-        } else if ("month".equals(data.gridStyle)) {
-            drawMonthGrid(canvas, width, height, data, paint, textPaint, fg, accent, ints, density);
-        } else if ("goals".equals(data.gridStyle)) {
-            drawStackedGoals(canvas, width, height, data, paint, textPaint, fg, accent, ints, density);
+        if ("year".equals(adjusted.gridStyle)) {
+            drawYearGrid(canvas, width, height, adjusted, paint, textPaint, fg, accent, ints, density);
+        } else if ("month".equals(adjusted.gridStyle)) {
+            drawMonthGrid(canvas, width, height, adjusted, paint, textPaint, fg, accent, ints, density);
+        } else if ("goals".equals(adjusted.gridStyle)) {
+            drawStackedGoals(canvas, width, height, adjusted, paint, textPaint, fg, accent, ints, density);
         } else {
-            drawWeeksGrid(canvas, width, height, data, paint, textPaint, fg, accent, ints, density);
+            drawWeeksGrid(canvas, width, height, adjusted, paint, textPaint, fg, accent, ints, density);
         }
+    }
+
+    private static Calendar getMidnightCalendar() {
+        Calendar c = Calendar.getInstance();
+        c.set(Calendar.HOUR_OF_DAY, 0);
+        c.set(Calendar.MINUTE, 0);
+        c.set(Calendar.SECOND, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        return c;
     }
 
     // ── Weeks grid ──────────────────────────────────────────────────────
@@ -472,9 +564,14 @@ public class GrainWallpaperService extends WallpaperService {
                 float y = blockStartY + r * (sq + gap);
                 int level = clamp(goal.boxes[i]);
 
-                paint.setColor(level == 0 ? Color.argb(20, 255, 255, 255) : ints[0][level]);
-                if (level >= 2) paint.setShadowLayer(6f * dp, 0, 0, ints[0][level]);
-                else            paint.clearShadowLayer();
+                if (level == 1) {
+                    paint.setColor(Color.argb(100, 150, 150, 150));
+                    paint.clearShadowLayer();
+                } else {
+                    paint.setColor(level == 0 ? Color.argb(20, 255, 255, 255) : ints[0][level]);
+                    if (level >= 2) paint.setShadowLayer(6f * dp, 0, 0, ints[0][level]);
+                    else            paint.clearShadowLayer();
+                }
 
                 RectF rect = new RectF(x, y, x + sq, y + sq);
                 float cr = 2f * dp;
@@ -507,7 +604,7 @@ public class GrainWallpaperService extends WallpaperService {
     private static void drawYearGrid(Canvas canvas, int w, int h, WallpaperData data,
                                      Paint paint, Paint tp,
                                      int[] fg, int[] accent, int[][] ints, float dp) {
-        Calendar todayCal = Calendar.getInstance();
+        Calendar todayCal = getMidnightCalendar();
         int currentYear = todayCal.get(Calendar.YEAR);
         
         float sq = 8f * dp * data.gridScale; // match 8px square in web app
@@ -527,10 +624,11 @@ public class GrainWallpaperService extends WallpaperService {
         float startX = (w - gridW) / 2f + (data.offsetX * dp);
         float startY = h * data.offsetY - gridH / 2f;
         
-        // Map heatmap data to calendar dates
-        // Heatmap covers exactly 364 days ending today.
+        // Heatmap covers exactly 52 weeks (364 days) starting on Monday 51 weeks ago
+        int todayDow = (todayCal.get(Calendar.DAY_OF_WEEK) + 5) % 7; // Mon=0
         long todayMs = todayCal.getTimeInMillis();
-        long heatmapStartMs = todayMs - (52L * 7L - 1L) * 86400000L;
+        long mondayThisWeekMs = todayMs - (todayDow * 86400000L);
+        long heatmapStartMs = data.heatmapStartMs > 0 ? data.heatmapStartMs : (mondayThisWeekMs - (51L * 7L * 86400000L));
         
         for (int m = 0; m < 12; m++) {
             int col = m % 3;
@@ -563,7 +661,7 @@ public class GrainWallpaperService extends WallpaperService {
                 float cx = mx + c * (sq + gap);
                 float cy = gridTop + r * (sq + gap);
                 
-                Calendar dCal = Calendar.getInstance();
+                Calendar dCal = getMidnightCalendar();
                 dCal.set(currentYear, m, d);
                 
                 boolean isToday = dCal.get(Calendar.YEAR) == todayCal.get(Calendar.YEAR) && 
@@ -578,7 +676,7 @@ public class GrainWallpaperService extends WallpaperService {
                     if (diffDays >= 0 && diffDays < 52 * 7) {
                         int hCol = diffDays / 7;
                         int hRow = diffDays % 7;
-                        if (data.heatmap != null && hCol < data.heatmap.length) {
+                        if (data.heatmap != null && hCol >= 0 && hCol < data.heatmap.length) {
                             level = clamp(data.heatmap[hCol][hRow]);
                         }
                     }
@@ -610,7 +708,7 @@ public class GrainWallpaperService extends WallpaperService {
     private static void drawMonthGrid(Canvas canvas, int w, int h, WallpaperData data,
                                       Paint paint, Paint tp,
                                       int[] fg, int[] accent, int[][] ints, float dp) {
-        Calendar cal     = Calendar.getInstance();
+        Calendar cal     = getMidnightCalendar();
         int year         = cal.get(Calendar.YEAR);
         int month        = cal.get(Calendar.MONTH);
         int todayDate    = cal.get(Calendar.DAY_OF_MONTH);
@@ -665,6 +763,10 @@ public class GrainWallpaperService extends WallpaperService {
         
         currentY += headerH;
 
+        int todayDow = (cal.get(Calendar.DAY_OF_WEEK) + 5) % 7;
+        long mondayThisWeekMs = cal.getTimeInMillis() - (todayDow * 86400000L);
+        long heatmapStartMs = data.heatmapStartMs > 0 ? data.heatmapStartMs : (mondayThisWeekMs - (51L * 7L * 86400000L));
+
         for (int cell = 0; cell < totalCells; cell++) {
             if (cell < startOffset) continue;
             int dayNum   = cell - startOffset + 1;
@@ -675,18 +777,18 @@ public class GrainWallpaperService extends WallpaperService {
             boolean isTd = dayNum == todayDate;
             boolean isFu = dayNum > todayDate;
 
-            // Map to heatmap column
-            Calendar dc = Calendar.getInstance();
+            // Direct date-offset lookup into 52-week heatmap
+            Calendar dc = getMidnightCalendar();
             dc.set(year, month, dayNum);
-            int dDow     = (dc.get(Calendar.DAY_OF_WEEK) + 5) % 7;
-            long diffMs  = cal.getTimeInMillis() - dc.getTimeInMillis();
+            long diffMs = dc.getTimeInMillis() - heatmapStartMs;
             int diffDays = (int) Math.round((double) diffMs / 86400000.0);
-            int weeksBack = (int) Math.ceil(diffDays / 7.0);
-            int hColIdx   = (data.heatmap != null ? data.heatmap.length : 0) - 1 - weeksBack;
+            int hColIdx = diffDays / 7;
+            int hRowIdx = diffDays % 7;
 
             int level = 0;
-            if (!isFu && data.heatmap != null && hColIdx >= 0 && hColIdx < data.heatmap.length)
-                level = clamp(data.heatmap[hColIdx][dDow]);
+            if (!isFu && data.heatmap != null && hColIdx >= 0 && hColIdx < data.heatmap.length && hRowIdx >= 0 && hRowIdx < 7) {
+                level = clamp(data.heatmap[hColIdx][hRowIdx]);
+            }
 
             RectF r = new RectF(x, y, x + sq, y + sq);
             
@@ -777,6 +879,32 @@ public class GrainWallpaperService extends WallpaperService {
         }
         
         canvas.drawText(text, textX, pillTopY + pv + tp.getTextSize() * 0.82f, tp);
+
+        // Draw habit texts above the stats pill, respecting statsAlignment
+        if (data.habitText != null && data.habitText.length > 0) {
+            tp.setTextSize(10f * dp);
+            tp.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+            tp.setColor(fg[0]);
+            tp.setAlpha(200);
+            
+            float textHabitX;
+            if ("left".equals(data.statsAlignment)) {
+                textHabitX = gridLeft;
+                tp.setTextAlign(Paint.Align.LEFT);
+            } else if ("right".equals(data.statsAlignment)) {
+                textHabitX = gridRight;
+                tp.setTextAlign(Paint.Align.RIGHT);
+            } else {
+                textHabitX = gridLeft + (gridRight - gridLeft) / 2f;
+                tp.setTextAlign(Paint.Align.CENTER);
+            }
+
+            float startYHabits = pillTopY - 14f * dp - (data.habitText.length - 1) * (14f * dp);
+            for (int i = 0; i < data.habitText.length; i++) {
+                canvas.drawText(data.habitText[i].toUpperCase(), textHabitX, startYHabits + i * (14f * dp), tp);
+            }
+            tp.setAlpha(255);
+        }
     }
 
     // ── Utility ─────────────────────────────────────────────────────────
@@ -797,11 +925,32 @@ public class GrainWallpaperService extends WallpaperService {
         private WallpaperData cachedData = new WallpaperData();
         private final Runnable drawRunner = this::draw;
 
+        private final BroadcastReceiver timeChangedReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (visible) {
+                    reloadData();
+                    handler.post(drawRunner);
+                }
+            }
+        };
+
         @Override
         public void onCreate(SurfaceHolder s) {
             super.onCreate(s);
             SharedPreferences p = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             p.registerOnSharedPreferenceChangeListener(this);
+
+            IntentFilter filter = new IntentFilter();
+            filter.addAction(Intent.ACTION_DATE_CHANGED);
+            filter.addAction(Intent.ACTION_TIME_CHANGED);
+            filter.addAction(Intent.ACTION_TIMEZONE_CHANGED);
+            try {
+                registerReceiver(timeChangedReceiver, filter);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
             reloadData();
         }
 
@@ -809,6 +958,9 @@ public class GrainWallpaperService extends WallpaperService {
         public void onDestroy() {
             super.onDestroy();
             handler.removeCallbacks(drawRunner);
+            try {
+                unregisterReceiver(timeChangedReceiver);
+            } catch (Exception ignored) {}
             SharedPreferences p = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             p.unregisterOnSharedPreferenceChangeListener(this);
         }
@@ -851,13 +1003,26 @@ public class GrainWallpaperService extends WallpaperService {
             SurfaceHolder holder = getSurfaceHolder();
             Canvas canvas = null;
             try {
-                canvas = holder.lockCanvas();
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    canvas = holder.lockHardwareCanvas();
+                } else {
+                    canvas = holder.lockCanvas();
+                }
                 if (canvas != null)
                     drawHeatmapToCanvas(GrainWallpaperService.this, canvas,
                                         canvas.getWidth(), canvas.getHeight(), cachedData);
+            } catch (Exception e) {
+                e.printStackTrace();
             } finally {
-                if (canvas != null) holder.unlockCanvasAndPost(canvas);
+                if (canvas != null) {
+                    try {
+                        holder.unlockCanvasAndPost(canvas);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                }
             }
         }
     }
 }
+

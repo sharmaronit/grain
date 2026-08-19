@@ -55,7 +55,7 @@ public class WallpaperPlugin extends Plugin {
                         scheduledStaticUpdate.cancel(false);
                     final String finalJson = jsonStr;
                     scheduledStaticUpdate = debounceExecutor.schedule(() ->
-                        updateStaticWallpaperBackground(finalJson), 3, TimeUnit.SECONDS);
+                        updateStaticWallpaperBackground(finalJson), 500, TimeUnit.MILLISECONDS);
                 }
             }
             JSObject ret = new JSObject();
@@ -123,11 +123,19 @@ public class WallpaperPlugin extends Plugin {
             Canvas canvas = new Canvas(bitmap);
             GrainWallpaperService.drawHeatmapToCanvas(getContext(), canvas, width, height, parsed);
 
+            String screenTarget = data.optString("screenTarget", "both");
+            int flags = WallpaperManager.FLAG_SYSTEM | WallpaperManager.FLAG_LOCK;
+            if ("home".equals(screenTarget)) {
+                flags = WallpaperManager.FLAG_SYSTEM;
+            } else if ("lock".equals(screenTarget)) {
+                flags = WallpaperManager.FLAG_LOCK;
+            }
+
             WallpaperManager.getInstance(getContext()).setBitmap(
                 bitmap,
                 null,
                 true,
-                WallpaperManager.FLAG_SYSTEM | WallpaperManager.FLAG_LOCK
+                flags
             );
 
             // Persist so future auto-updates work
@@ -135,6 +143,7 @@ public class WallpaperPlugin extends Plugin {
                 .getSharedPreferences(GrainWallpaperService.PREFS_NAME, Context.MODE_PRIVATE);
             prefs.edit()
                  .putString(GrainWallpaperService.KEY_LIVE_DATA, jsonStr)
+                 .putString("GRAIN_STATIC_SCREEN_TARGET", screenTarget)
                  .putBoolean("GRAIN_IS_STATIC_FALLBACK", true)
                  .apply();
 
@@ -175,9 +184,7 @@ public class WallpaperPlugin extends Plugin {
     private String savePhotoAndSanitizeJson(JSObject data) {
         if (data == null) return "{}";
         try {
-            JSONObject obj = new JSONObject(data.toString());
-
-            String b64 = obj.optString("customPhotoBase64", null);
+            String b64 = data.optString("customPhotoBase64", null);
             if (b64 != null && !b64.isEmpty()) {
                 // Strip data-URL prefix if present
                 if (b64.contains(",")) b64 = b64.substring(b64.indexOf(",") + 1);
@@ -195,14 +202,13 @@ public class WallpaperPlugin extends Plugin {
                      .putString(GrainWallpaperService.KEY_PHOTO_PATH, photoFile.getAbsolutePath())
                      .apply();
             }
-
-            // Always remove the base64 blob before writing to GRAIN_LIVE_DATA
-            obj.remove("customPhotoBase64");
-            return obj.toString();
         } catch (Exception e) {
             e.printStackTrace();
-            return data.toString();
+        } finally {
+            // Always remove the base64 blob before writing to GRAIN_LIVE_DATA
+            data.remove("customPhotoBase64");
         }
+        return data.toString();
     }
 
     private void updateStaticWallpaperBackground(String jsonStr) {
@@ -216,7 +222,23 @@ public class WallpaperPlugin extends Plugin {
             Canvas canvas = new Canvas(bitmap);
             GrainWallpaperService.drawHeatmapToCanvas(
                 getContext(), canvas, metrics.widthPixels, metrics.heightPixels, parsed);
-            WallpaperManager.getInstance(getContext()).setBitmap(bitmap);
+
+            SharedPreferences prefs = getContext()
+                .getSharedPreferences(GrainWallpaperService.PREFS_NAME, Context.MODE_PRIVATE);
+            String screenTarget = prefs.getString("GRAIN_STATIC_SCREEN_TARGET", "both");
+            int flags = WallpaperManager.FLAG_SYSTEM | WallpaperManager.FLAG_LOCK;
+            if ("home".equals(screenTarget)) {
+                flags = WallpaperManager.FLAG_SYSTEM;
+            } else if ("lock".equals(screenTarget)) {
+                flags = WallpaperManager.FLAG_LOCK;
+            }
+
+            WallpaperManager.getInstance(getContext()).setBitmap(
+                bitmap,
+                null,
+                true,
+                flags
+            );
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
@@ -224,3 +246,4 @@ public class WallpaperPlugin extends Plugin {
         }
     }
 }
+

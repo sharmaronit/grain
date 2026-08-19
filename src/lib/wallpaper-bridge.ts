@@ -2,6 +2,7 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 
 export interface WallpaperData {
   heatmap: number[][];
+  heatmapStartMs?: number;
   theme: string;
   previewWeeks: number;
   currentStreak: number;
@@ -19,6 +20,7 @@ export interface WallpaperData {
   photoOffsetX?: number;
   photoOffsetY?: number;
   photoScale?: number;
+  screenTarget?: string;
   stackedGoals?: {
     id: string;
     title: string;
@@ -26,6 +28,7 @@ export interface WallpaperData {
     currentStreak: number;
     completionRate: number;
   }[];
+  habitText?: string[];
 }
 
 export interface WallpaperPluginDef {

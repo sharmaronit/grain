@@ -14,16 +14,29 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(WallpaperPlugin.class);
         super.onCreate(savedInstanceState);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);
+        getWindow().setNavigationBarColor(android.graphics.Color.TRANSPARENT);
+
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
             getWindow().getAttributes().layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
         }
 
-        // Force WebView to clear cache on launch so fresh Vite JS/CSS bundles are loaded
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+            getWindow().setNavigationBarContrastEnforced(false);
+            getWindow().setStatusBarContrastEnforced(false);
+        }
+
+        // Configure WebView for performance and cache handling
         if (this.bridge != null && this.bridge.getWebView() != null) {
             WebView webView = this.bridge.getWebView();
             webView.clearCache(true);
             WebSettings settings = webView.getSettings();
-            settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
+            settings.setCacheMode(WebSettings.LOAD_DEFAULT);
+            
+            webView.setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null);
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                webView.getSettings().setForceDark(WebSettings.FORCE_DARK_OFF);
+            }
         }
 
         // Enable 120Hz / High Refresh Rate if supported

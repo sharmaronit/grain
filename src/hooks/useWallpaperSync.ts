@@ -23,6 +23,7 @@ export interface UseWallpaperSyncProps {
   photoOffsetX?: number;
   photoOffsetY?: number;
   photoScale?: number;
+  heatmapStartMs: number;
   stackedGoals?: {
     id: string;
     title: string;
@@ -30,6 +31,7 @@ export interface UseWallpaperSyncProps {
     currentStreak: number;
     completionRate: number;
   }[];
+  habitText?: string[];
 }
 
 /**
@@ -39,6 +41,7 @@ export interface UseWallpaperSyncProps {
  */
 export function useWallpaperSync({
   heatmap,
+  heatmapStartMs,
   totalStreak,
   completionRate,
   wallpaperTheme,
@@ -54,17 +57,28 @@ export function useWallpaperSync({
   offsetX,
   gridScale,
   gridColorTheme,
+  photoOffsetX,
+  photoOffsetY,
+  photoScale,
   stackedGoals,
+  habitText,
 }: UseWallpaperSyncProps) {
   const syncTimeout = useRef<number | null>(null);
   const lastPayload = useRef<any>(null);
+  const lastSentPhoto = useRef<string | null>(null);
 
   useEffect(() => {
     // Only run on native Android and only if the user hasn't paused sync
     if (!Capacitor.isNativePlatform() || !wallpaperSync) return;
 
+    const photoChanged = customPhotoBase64 !== lastSentPhoto.current;
+    if (photoChanged && customPhotoBase64) {
+      lastSentPhoto.current = customPhotoBase64;
+    }
+
     const payload = {
       heatmap,
+      heatmapStartMs,
       theme: wallpaperTheme,
       previewWeeks,
       currentStreak: totalStreak,
@@ -72,14 +86,19 @@ export function useWallpaperSync({
       isGoalActive,
       accentColor,
       gridStyle,
-      customPhotoBase64,
+      // Only transmit the heavy base64 payload when it has actually changed
+      customPhotoBase64: photoChanged ? customPhotoBase64 : undefined,
       photoOverlay,
       statsAlignment,
       offsetY,
       offsetX,
       gridScale,
       gridColorTheme,
+      photoOffsetX,
+      photoOffsetY,
+      photoScale,
       stackedGoals,
+      habitText,
     };
 
     if (equal(payload, lastPayload.current)) {
@@ -101,5 +120,29 @@ export function useWallpaperSync({
         window.clearTimeout(syncTimeout.current);
       }
     };
-  }, [heatmap, totalStreak, completionRate, wallpaperTheme, previewWeeks, wallpaperSync, isGoalActive, gridStyle, customPhotoBase64, photoOverlay, statsAlignment, accentColor, offsetY, offsetX, gridScale, gridColorTheme, stackedGoals]);
+  }, [
+    heatmap,
+    heatmapStartMs,
+    totalStreak,
+    completionRate,
+    wallpaperTheme,
+    previewWeeks,
+    wallpaperSync,
+    isGoalActive,
+    gridStyle,
+    customPhotoBase64,
+    photoOverlay,
+    statsAlignment,
+    accentColor,
+    offsetY,
+    offsetX,
+    gridScale,
+    gridColorTheme,
+    photoOffsetX,
+    photoOffsetY,
+    photoScale,
+    stackedGoals,
+    habitText,
+  ]);
 }
+

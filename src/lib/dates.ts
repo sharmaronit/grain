@@ -63,7 +63,11 @@ export function dateRange(start: Date, end: Date): Date[] {
 export function heatmapStartDate(ref: Date = new Date()): Date {
   const start = new Date(ref);
   start.setHours(0, 0, 0, 0);
-  start.setDate(start.getDate() - 363);
+  const dow = isoDow(start);
+  // Snap to Monday of current week
+  start.setDate(start.getDate() - dow);
+  // Go back 51 weeks to get exactly 52 full weeks (364 days)
+  start.setDate(start.getDate() - (51 * 7));
   return start;
 }
 

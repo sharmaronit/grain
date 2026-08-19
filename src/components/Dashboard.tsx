@@ -1,5 +1,6 @@
 import { ConsistencyTab } from "../components/tabs/ConsistencyTab";
 import { SwipeModeView } from "./SwipeModeView";
+import { HabitCard } from "./HabitCard";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, startTransition, memo } from "react";
 import { toPng } from "html-to-image";
@@ -84,6 +85,8 @@ import {
   isSameDay,
   shortDay,
   todayKey,
+  heatmapStartDate,
+  isoDow,
 } from "../lib/dates";
 import {
   calculateStreak,
@@ -120,6 +123,15 @@ import {
 
 import type { AppTab, Theme, WallpaperState, Habit } from "../components/types";
 import { WheelPicker } from "./ui/WheelPicker";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerClose,
+} from "./ui/drawer";
 
 const catClass = (_c: string) => "bg-canvas-soft text-body border border-[color:var(--hairline)]";
 
@@ -151,9 +163,10 @@ function generateHeatmap(): number[][] {
 }
 
 const TODAY_COL = 51;
-const TODAY_ROW = 3;
+const TODAY_ROW = isoDow(new Date());
 
 export function Dashboard({ user }: { user?: any }) {
+  const [showStaticTargetSelector, setShowStaticTargetSelector] = useState(false);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -201,23 +214,21 @@ export function Dashboard({ user }: { user?: any }) {
   const [dateStyle, setDateStyle] = useState<"underline" | "block" | "mono">("underline");
   const [dateDropdownOpen, setDateDropdownOpen] = useState(false);
 
+  const TAB_ORDER: AppTab[] = ["today", "consistency", "myday", "matrix", "goal", "wallpaper"];
   const [activeTab, setActiveTab] = useState<AppTab>("today");
+  const [tabDirection, setTabDirection] = useState<"left" | "right">("left");
   const [swipeMode, setSwipeMode] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
   const switchTab = (tab: AppTab) => {
     if (activeTab === tab) return;
-    const update = () => {
-      startTransition(() => {
-        setActiveTab(tab);
-      });
-    };
-    if (document.startViewTransition) {
-      document.startViewTransition(update);
-    } else {
-      update();
-    }
+    const currentIdx = TAB_ORDER.indexOf(activeTab);
+    const nextIdx = TAB_ORDER.indexOf(tab);
+    setTabDirection(nextIdx >= currentIdx ? "left" : "right");
+    startTransition(() => {
+      setActiveTab(tab);
+    });
   };
 
   const { goals } = useGoals(userId);
@@ -817,8 +828,14 @@ export function Dashboard({ user }: { user?: any }) {
     });
   }, [wallpaperGridStyle, goals]);
 
+  const habitTextLines = useMemo(() => {
+    if (wallpaperHabitSet === "none" || wallpaperGridStyle !== "weeks") return undefined;
+    return HABIT_SETS.find(s => s.key === wallpaperHabitSet)?.habits as string[] | undefined;
+  }, [wallpaperHabitSet, wallpaperGridStyle]);
+
   useWallpaperSync({
     heatmap: displayedHeatmap,
+    heatmapStartMs: heatmapStartDate().getTime(),
     totalStreak: displayedTotalStreak,
     completionRate: displayedRate,
     wallpaperTheme,
@@ -837,10 +854,11 @@ export function Dashboard({ user }: { user?: any }) {
     photoOffsetX: wallpaperPhotoOffset.x,
     photoOffsetY: wallpaperPhotoOffset.y,
     photoScale: wallpaperPhotoScale,
-    stackedGoals: stackedGoals
+    stackedGoals: stackedGoals,
+    habitText: habitTextLines,
   });
 
-  const applyWallpaper = async (forceStatic: boolean = false) => {
+  const applyWallpaper = async (forceStatic: boolean = false, screenTarget: string = "both") => {
     if (wallpaperState !== "idle") return;
     setWallpaperState("applying");
     try {
@@ -849,6 +867,7 @@ export function Dashboard({ user }: { user?: any }) {
         if (supported && !forceStatic) {
           await WallpaperNative.setWallpaper({
             heatmap: displayedHeatmap,
+            heatmapStartMs: heatmapStartDate().getTime(),
             theme: wallpaperTheme,
             previewWeeks,
             currentStreak: displayedTotalStreak,
@@ -866,12 +885,15 @@ export function Dashboard({ user }: { user?: any }) {
             photoOffsetX: wallpaperPhotoOffset.x,
             photoOffsetY: wallpaperPhotoOffset.y,
             photoScale: wallpaperPhotoScale,
-            stackedGoals: stackedGoals
+            stackedGoals: stackedGoals,
+            habitText: habitTextLines,
           });
           showToast("Wallpaper picker opened \u2014 confirm to apply", undefined, 4000);
         } else {
           await WallpaperNative.setStaticWallpaper({
+            screenTarget,
             heatmap: displayedHeatmap,
+            heatmapStartMs: heatmapStartDate().getTime(),
             theme: wallpaperTheme,
             previewWeeks,
             currentStreak: displayedTotalStreak,
@@ -889,7 +911,8 @@ export function Dashboard({ user }: { user?: any }) {
             photoOffsetX: wallpaperPhotoOffset.x,
             photoOffsetY: wallpaperPhotoOffset.y,
             photoScale: wallpaperPhotoScale,
-            stackedGoals: stackedGoals
+            stackedGoals: stackedGoals,
+            habitText: habitTextLines,
           });
           showToast("Static wallpaper applied!", undefined, 4000);
         }
@@ -2032,7 +2055,11 @@ export function Dashboard({ user }: { user?: any }) {
                     <div className={`w-2.5 h-2.5 rounded-full ${wallpaperSync ? "bg-green-400 animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.6)]" : "bg-[color:var(--hairline-mid)]"}`} /> Live
                   </button>
                   <button
-                    onClick={() => applyWallpaper(true)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowStaticTargetSelector(true);
+                    }}
                     className={`flex items-center gap-1.5 px-4 h-9 rounded-full text-[12px] font-bold transition-all ${wallpaperSync ? "text-mute hover:text-ink" : "bg-ink text-on-ink shadow-sm"}`}
                   >
                     <div className={`w-2.5 h-2.5 rounded-full ${!wallpaperSync ? "bg-[color:var(--canvas-softer)]" : "bg-[color:var(--hairline-mid)]"}`} /> Static
@@ -2053,9 +2080,9 @@ export function Dashboard({ user }: { user?: any }) {
 
             {/* TAB 1: TODAY */}
             {activeTab === "today" && (
-              <div className="space-y-4 animate-tab-fade pt-16">
+              <div className={`space-y-4 pt-16 ${tabDirection === "left" ? "animate-tab-slide-left" : "animate-tab-slide-right"}`}>
 
-                <div className="flex justify-end px-5">
+                <div className="flex justify-start px-5">
                   <button
                     onClick={() => setSwipeMode(true)}
                     className="flex items-center gap-1.5 rounded-full card-soft bg-[color:var(--canvas-soft)] px-3 py-1.5 text-xs font-bold text-ink shadow-sm transition hover:bg-ink/5"
@@ -2175,10 +2202,10 @@ export function Dashboard({ user }: { user?: any }) {
                     <div className="flex flex-col items-center gap-4 py-8">
                       {/* Ghost habit card */}
                       <div
-                        className="animate-breathe w-full rounded-2xl border-2 border-dashed border-[color:var(--hairline-mid)] bg-canvas-soft p-4 flex items-center gap-3 cursor-pointer transition hover:bg-canvas-softer"
+                        className="animate-breathe w-full rounded-2xl border-2 border-dashed border-[color:color-mix(in_srgb,var(--accent)_20%,transparent)] bg-[color:color-mix(in_srgb,var(--canvas)_50%,transparent)] backdrop-blur-2xl shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_15%,transparent),0_8px_24px_rgba(0,0,0,0.2)] p-4 flex items-center gap-3.5 cursor-pointer transition-all hover:bg-[color:color-mix(in_srgb,var(--canvas)_65%,transparent)] hover:border-[color:color-mix(in_srgb,var(--accent)_30%,transparent)]"
                         onClick={() => setModalOpen(true)}
                       >
-                        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full border-2 border-dashed border-[color:var(--hairline-mid)]">
+                        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-dashed border-[color:color-mix(in_srgb,var(--accent)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--canvas)_40%,transparent)]">
                           <Plus className="h-4 w-4 text-ink" strokeWidth={2.5} />
                         </div>
                         <div className="min-w-0 flex-1">
@@ -2188,41 +2215,20 @@ export function Dashboard({ user }: { user?: any }) {
                       </div>
                     </div>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-2.5">
                       {QUADRANT_ORDER.flatMap((q) =>
                         habits[q].map((h, i) => (
-                          <div
-                            key={`${q}-${i}-${h.name}`}
-                            className="animate-fade-in-up card-soft flex items-center p-3 group cursor-pointer hover:border-[color:var(--hairline-mid)] transition"
-                            style={{ animationDelay: `${(i) * 40}ms` }}
-                            onClick={() => {
-                              setDetail({ q, i });
+                          <HabitCard
+                            key={`${q}-${i}-${(h as any).id || h.name}`}
+                            habit={h}
+                            quadrant={q}
+                            index={i}
+                            onToggle={toggleDone}
+                            onOpenDetail={(quad, idx) => {
+                              setDetail({ q: quad, i: idx });
                               setNoteDraft("");
                             }}
-                          >
-                            <div className="flex items-center gap-3 min-w-0 flex-1">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleDone(q, i);
-                                }}
-                                className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border-2 transition ${h.done
-                                  ? "bg-ink border-ink text-on-ink animate-check-pop"
-                                  : "border-[color:var(--hairline-mid)] text-transparent hover:border-ink"
-                                  }`}
-                              >
-                                <Check className="h-4 w-4" strokeWidth={3} />
-                              </button>
-                              <div className="min-w-0 flex-1">
-                                <p className={`text-sm font-semibold truncate ${h.done ? "line-through opacity-50 text-body" : "text-ink"}`}>
-                                  {h.name}
-                                </p>
-                                <p className="text-[10px] text-body">{QUADRANTS[q].title} · {h.streak}d streak</p>
-                              </div>
-                            </div>
-                            {/* Chevron hint — no trash icon */}
-                            <ArrowRight className="h-3.5 w-3.5 text-mute opacity-0 group-hover:opacity-100 transition shrink-0" />
-                          </div>
+                          />
                         ))
                       )}
                     </div>
@@ -2233,26 +2239,28 @@ export function Dashboard({ user }: { user?: any }) {
 
             {/* TAB 2: CONSISTENCY */}
             {activeTab === "consistency" && (
-              <ConsistencyTab
-                heatmap={heatmap}
-                selectedHabit={selectedHabit}
-                setSelectedHabit={setSelectedHabit}
-                doneCount={doneCount}
-                totalCount={totalCount}
-                totalStreak={totalStreak}
-                rate={rate}
-                weeklyInsights={weeklyInsights}
-                showToast={showToast}
-              />
+              <div className={tabDirection === "left" ? "animate-tab-slide-left" : "animate-tab-slide-right"}>
+                <ConsistencyTab
+                  heatmap={heatmap}
+                  selectedHabit={selectedHabit}
+                  setSelectedHabit={setSelectedHabit}
+                  doneCount={doneCount}
+                  totalCount={totalCount}
+                  totalStreak={totalStreak}
+                  rate={rate}
+                  weeklyInsights={weeklyInsights}
+                  showToast={showToast}
+                />
+              </div>
             )}
 
             {/* TAB 3: MY DAY */}
             {activeTab === "myday" && (
-              <div className="animate-tab-fade pt-16 pb-32">
+              <div className={`pt-16 pb-32 ${tabDirection === "left" ? "animate-tab-slide-left" : "animate-tab-slide-right"}`}>
                 <section className="px-5">
                   {totalCount === 0 ? (
-                    <div className="card-soft flex flex-col items-center justify-center gap-3 px-5 py-10 text-center">
-                      <div className="grid h-12 w-12 place-items-center rounded-full bg-canvas-soft border border-[color:var(--hairline)]">
+                    <div className="liquid-glass specular flex flex-col items-center justify-center gap-3 px-5 py-10 text-center rounded-3xl">
+                      <div className="grid h-12 w-12 place-items-center rounded-full bg-[color:color-mix(in_srgb,var(--canvas)_40%,transparent)] border border-[color:color-mix(in_srgb,var(--accent)_15%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_20%,transparent)]">
                         <Sparkles className="h-5 w-5 text-ink" />
                       </div>
                       <div>
@@ -2263,7 +2271,7 @@ export function Dashboard({ user }: { user?: any }) {
                       </div>
                       <button
                         onClick={() => setModalOpen(true)}
-                        className="pill mt-2 flex items-center gap-1.5 bg-ink px-5 py-2.5 text-[13px] font-semibold text-on-ink"
+                        className="pill mt-2 flex items-center gap-1.5 bg-ink px-5 py-2.5 text-[13px] font-semibold text-on-ink shadow-lg active:scale-95 transition"
                         data-lg-press
                       >
                         <Plus className="h-4 w-4" strokeWidth={3} /> Create habit
@@ -2294,7 +2302,7 @@ export function Dashboard({ user }: { user?: any }) {
                         };
 
                         return (
-                          <div key={timeKey} className="card-soft relative flex w-full flex-col overflow-hidden border border-[color:var(--hairline)] transition-all">
+                          <div key={timeKey} className="liquid-glass specular relative flex w-full flex-col overflow-hidden rounded-[24px] border border-[color:color-mix(in_srgb,var(--accent)_12%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_20%,transparent),0_8px_32px_rgba(0,0,0,0.3)] transition-all">
                             <div className="flex items-center justify-between px-4 py-3 text-left">
                               <h3 className="font-display text-sm font-bold text-ink flex items-center gap-2">
                                 {timeIcons[timeKey]}
@@ -2342,7 +2350,7 @@ export function Dashboard({ user }: { user?: any }) {
 
           {/* Goal Tab */}
           {activeTab === "goal" && (
-            <div className="absolute inset-0 z-10">
+            <div className={`absolute inset-0 z-10 ${tabDirection === "left" ? "animate-tab-slide-left" : "animate-tab-slide-right"}`}>
               <GoalTab
                 goals={goals}
                 onDelete={async (id) => {
@@ -3161,6 +3169,52 @@ export function Dashboard({ user }: { user?: any }) {
           )}
         </div>
       </div>
+
+      {showStaticTargetSelector && (
+        <div className="fixed inset-0 z-[9999] flex flex-col justify-end animate-fade-in pointer-events-auto p-4 pb-0">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 backdrop-blur-sm" 
+            style={{ background: 'color-mix(in srgb, var(--ink) 30%, transparent)' }}
+            onClick={() => setShowStaticTargetSelector(false)} 
+          />
+          {/* Content */}
+          <div className="relative liquid-glass specular rounded-t-[32px] p-6 pb-12 shadow-2xl animate-sheet-slide-up border border-[color:var(--hairline-strong)]">
+            <div className="mx-auto mt-0 mb-6 h-1.5 w-12 rounded-full bg-[color:var(--hairline-strong)]" />
+            
+            <h2 className="text-xl font-bold text-center text-[color:var(--ink)] mb-2">Set Static Wallpaper</h2>
+            <p className="text-center text-[color:var(--mute)] mb-6 text-sm">Choose where to apply the wallpaper.</p>
+            
+            <div className="flex flex-col gap-3 max-w-sm mx-auto">
+              <button 
+                onClick={() => { setShowStaticTargetSelector(false); applyWallpaper(true, 'home'); }} 
+                className="w-full bg-[color:var(--canvas-soft)] text-[color:var(--ink)] font-bold h-14 rounded-2xl flex items-center justify-center border border-[color:var(--hairline)] active:scale-[0.98] transition-all hover:bg-[color:var(--canvas-softer)]"
+              >
+                Home Screen
+              </button>
+              <button 
+                onClick={() => { setShowStaticTargetSelector(false); applyWallpaper(true, 'lock'); }} 
+                className="w-full bg-[color:var(--canvas-soft)] text-[color:var(--ink)] font-bold h-14 rounded-2xl flex items-center justify-center border border-[color:var(--hairline)] active:scale-[0.98] transition-all hover:bg-[color:var(--canvas-softer)]"
+              >
+                Lock Screen
+              </button>
+              <button 
+                onClick={() => { setShowStaticTargetSelector(false); applyWallpaper(true, 'both'); }} 
+                className="w-full bg-ink text-on-ink font-bold h-14 rounded-2xl flex items-center justify-center active:scale-[0.98] transition-all hover:opacity-90 shadow-lg"
+              >
+                Both Screens
+              </button>
+              
+              <button 
+                onClick={() => setShowStaticTargetSelector(false)}
+                className="w-full mt-2 h-12 font-semibold text-[color:var(--mute)] active:text-[color:var(--ink)] transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

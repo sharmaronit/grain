@@ -42,8 +42,8 @@ export const MatrixTab = memo(function MatrixTab({
     <div className="animate-tab-fade pt-16">
       <section className="px-5">
         {totalCount === 0 ? (
-          <div className="card-soft flex flex-col items-center justify-center gap-3 px-5 py-10 text-center">
-            <div className="grid h-12 w-12 place-items-center rounded-full bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)]">
+          <div className="liquid-glass specular flex flex-col items-center justify-center gap-3 px-5 py-10 text-center rounded-3xl">
+            <div className="grid h-12 w-12 place-items-center rounded-full bg-[color:color-mix(in_srgb,var(--canvas)_40%,transparent)] border border-[color:color-mix(in_srgb,var(--accent)_15%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_20%,transparent)]">
               <Sparkles className="h-5 w-5 text-ink" />
             </div>
             <div>
@@ -54,7 +54,7 @@ export const MatrixTab = memo(function MatrixTab({
             </div>
             <button
               onClick={() => setModalOpen(true)}
-              className="pill mt-1 flex items-center gap-1.5 bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] px-4 py-2 text-[12px] font-semibold text-on-ink"
+              className="pill mt-1 flex items-center gap-1.5 bg-ink px-4 py-2 text-[12px] font-semibold text-on-ink shadow-lg active:scale-95 transition"
               data-lg-press
             >
               <Plus className="h-3.5 w-3.5" strokeWidth={3} /> Create your first habit
@@ -125,7 +125,7 @@ function QuadrantCard({
   const doneCount = habits.filter((h) => h.done).length;
 
   return (
-    <div className="card-soft relative flex w-full flex-col overflow-hidden border border-white/10 transition-all">
+    <div className="liquid-glass specular relative flex w-full flex-col overflow-hidden rounded-[24px] border border-[color:color-mix(in_srgb,var(--accent)_12%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_20%,transparent),0_8px_32px_rgba(0,0,0,0.3)] transition-all">
       {/* Simple header — no collapse, no subtitle */}
       <div className="flex items-center justify-between px-4 py-3">
         <h3 className="font-display text-sm font-bold text-ink">{meta.title}</h3>

@@ -5,7 +5,15 @@ import { AuthGate } from "./components/auth/AuthGate";
 import { Dashboard } from "./components/Dashboard";
 import "./styles.css";
 
+import { SafeArea } from "capacitor-plugin-safe-area";
+
 const queryClient = new QueryClient();
+
+// Fetch safe area insets and inject into CSS
+SafeArea.getSafeAreaInsets().then(({ insets }) => {
+  document.documentElement.style.setProperty("--sa-top", `${insets.top}px`);
+  document.documentElement.style.setProperty("--sa-bottom", `${insets.bottom}px`);
+}).catch(e => console.error("SafeArea error:", e));
 
 const rootElement = document.getElementById("root");
 if (rootElement) {
