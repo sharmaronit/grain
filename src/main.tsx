@@ -22,7 +22,7 @@ if (rootElement) {
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
         <AuthGate>
-          {(user) => <Dashboard user={user} />}
+          {(user) => <Dashboard key={user.uid} user={user} />}
         </AuthGate>
       </QueryClientProvider>
     </React.StrictMode>

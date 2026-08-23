@@ -180,6 +180,10 @@ export async function resetPassword(email: string): Promise<void> {
 
 /** Sign out. */
 export async function signOut(): Promise<void> {
+  try {
+    localStorage.removeItem("grain_onboarded");
+    sessionStorage.removeItem("grain_onboarded");
+  } catch { }
   await firebaseSignOut(auth());
 }
 

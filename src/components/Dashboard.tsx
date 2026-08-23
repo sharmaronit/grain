@@ -289,6 +289,12 @@ export function Dashboard({ user }: { user?: any }) {
   const [onboardingOpen, setOnboardingOpen] = useState(() => {
     return typeof window !== "undefined" && !localStorage.getItem("grain_onboarded");
   });
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && !localStorage.getItem("grain_onboarded")) {
+      setOnboardingOpen(true);
+    }
+  }, [userId]);
   const [weeklyReviewOpen, setWeeklyReviewOpen] = useState(false);
   const [activeSettingTab, setActiveSettingTab] = useState<"theme" | "style" | "color" | "habits" | "stats" | "size">("theme");
   const [applyMenuOpen, setApplyMenuOpen] = useState(false);
@@ -2766,6 +2772,10 @@ export function Dashboard({ user }: { user?: any }) {
               destructive
               onConfirm={() => {
                 try { navigator.vibrate?.(18); } catch { }
+                try {
+                  localStorage.removeItem("grain_onboarded");
+                  sessionStorage.removeItem("grain_onboarded");
+                } catch { }
                 signOut();
               }}
             />

@@ -5,7 +5,7 @@ import { Dashboard } from "../components/Dashboard";
 export const Route = createFileRoute("/")({
   component: () => (
     <AuthGate>
-      {(user) => <Dashboard user={user} />}
+      {(user) => <Dashboard key={user.uid} user={user} />}
     </AuthGate>
   ),
 });
