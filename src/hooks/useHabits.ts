@@ -19,6 +19,7 @@ import {
   addHabit as fbAddHabit,
   updateHabitDoc,
   deleteHabitDoc,
+  deleteHabitDocs,
   restoreHabit,
   type HabitDoc,
   type Quadrant,
@@ -61,8 +62,10 @@ export interface UseHabitsResult {
     habitId: string,
     patch: Partial<Omit<HabitDoc, "id" | "createdAt">>,
   ) => Promise<void>;
-  /** Delete a habit. Returns the deleted habit for undo. */
+  /** Delete a single habit. Returns the deleted habit for undo. */
   remove: (habitId: string) => Promise<HabitDoc | undefined>;
+  /** Delete multiple habits in an atomic batch. Returns deleted habits for undo. */
+  removeMany: (habitIds: string[]) => Promise<HabitDoc[]>;
   /** Restore a previously deleted habit (for undo). */
   restore: (habit: HabitDoc) => Promise<void>;
 }
@@ -138,14 +141,49 @@ export function useHabits(userId: string | null): UseHabitsResult {
   const remove = async (habitId: string): Promise<HabitDoc | undefined> => {
     if (!userId) return;
     const removed = habits.find((h) => h.id === habitId);
-    await deleteHabitDoc(userId, habitId);
+    // Optimistically remove from local state immediately
+    setHabits((prev) => prev.filter((h) => h.id !== habitId));
+    try {
+      await deleteHabitDoc(userId, habitId);
+    } catch (err) {
+      console.error("[useHabits] Failed to delete habit from Firestore:", err);
+      // Revert if delete failed
+      if (removed) {
+        setHabits((prev) => [...prev, removed]);
+      }
+      throw err;
+    }
     return removed;
+  };
+
+  const removeMany = async (habitIds: string[]): Promise<HabitDoc[]> => {
+    if (!userId || habitIds.length === 0) return [];
+    const removedList = habits.filter((h) => habitIds.includes(h.id));
+    // Optimistically remove from local state immediately
+    setHabits((prev) => prev.filter((h) => !habitIds.includes(h.id)));
+    try {
+      await deleteHabitDocs(userId, habitIds);
+    } catch (err) {
+      console.error("[useHabits] Failed to bulk delete habits from Firestore:", err);
+      // Revert if batch delete failed
+      setHabits((prev) => [...prev, ...removedList]);
+      throw err;
+    }
+    return removedList;
   };
 
   const restore = async (habit: HabitDoc): Promise<void> => {
     if (!userId) return;
-    await restoreHabit(userId, habit);
+    // Optimistically add back to local state
+    setHabits((prev) => (prev.some((h) => h.id === habit.id) ? prev : [...prev, habit]));
+    try {
+      await restoreHabit(userId, habit);
+    } catch (err) {
+      console.error("[useHabits] Failed to restore habit:", err);
+      setHabits((prev) => prev.filter((h) => h.id !== habit.id));
+      throw err;
+    }
   };
 
-  return { habits, byQuadrant, loading, add, update, remove, restore };
+  return { habits, byQuadrant, loading, add, update, remove, removeMany, restore };
 }

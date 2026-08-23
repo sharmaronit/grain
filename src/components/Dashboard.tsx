@@ -344,6 +344,7 @@ export function Dashboard({ user }: { user?: any }) {
     add: addHabit,
     update: updateHabitDoc,
     remove: removeHabitDoc,
+    removeMany: removeManyHabits,
     restore: restoreHabitDoc,
   } = useHabits(userId);
 
@@ -2868,31 +2869,30 @@ export function Dashboard({ user }: { user?: any }) {
               onConfirm={async () => {
                 try { navigator.vibrate?.([30, 80, 50]); } catch { }
                 const idsToDelete = Array.from(selectedHabitIds);
-                const removedDocs: any[] = [];
-
-                for (const habitId of idsToDelete) {
-                  const removed = await removeHabitDoc(habitId);
-                  if (removed) removedDocs.push(removed);
-                }
-
                 setBulkDeleteConfirmOpen(false);
                 setIsSelectionMode(false);
                 setSelectedHabitIds(new Set());
 
-                showToast(
-                  `Deleted ${removedDocs.length} habit${removedDocs.length > 1 ? "s" : ""}`,
-                  {
-                    label: "Undo",
-                    onClick: async () => {
-                      try { navigator.vibrate?.(10); } catch { }
-                      for (const doc of removedDocs) {
-                        await restoreHabitDoc(doc);
-                      }
-                      showToast(`Restored ${removedDocs.length} habit${removedDocs.length > 1 ? "s" : ""}`);
+                try {
+                  const removedDocs = await removeManyHabits(idsToDelete);
+                  showToast(
+                    `Deleted ${removedDocs.length} habit${removedDocs.length > 1 ? "s" : ""}`,
+                    {
+                      label: "Undo",
+                      onClick: async () => {
+                        try { navigator.vibrate?.(10); } catch { }
+                        for (const doc of removedDocs) {
+                          await restoreHabitDoc(doc);
+                        }
+                        showToast(`Restored ${removedDocs.length} habit${removedDocs.length > 1 ? "s" : ""}`);
+                      },
                     },
-                  },
-                  6000
-                );
+                    6000
+                  );
+                } catch (err) {
+                  console.error("Bulk delete failed:", err);
+                  showToast("Failed to delete habits. Please try again.");
+                }
               }}
             />
           )}

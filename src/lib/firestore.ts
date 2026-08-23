@@ -16,6 +16,7 @@ import {
   updateDoc,
   deleteDoc,
   deleteField,
+  writeBatch,
   query,
   where,
   orderBy,
@@ -175,6 +176,19 @@ export async function deleteHabitDoc(
   habitId: string,
 ): Promise<void> {
   await deleteDoc(doc(db(), "users", userId, "habits", habitId));
+}
+
+/** Delete multiple habits permanently in an atomic batch. */
+export async function deleteHabitDocs(
+  userId: string,
+  habitIds: string[],
+): Promise<void> {
+  if (!userId || habitIds.length === 0) return;
+  const batch = writeBatch(db());
+  for (const habitId of habitIds) {
+    batch.delete(doc(db(), "users", userId, "habits", habitId));
+  }
+  await batch.commit();
 }
 
 // ── Goals ────────────────────────────────────────────────
