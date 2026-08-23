@@ -85,19 +85,30 @@ export function OnboardingModal({ onClose, onAddHabits }: OnboardingModalProps) 
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-md animate-fade-in overflow-hidden">
-      {/* Background Photographic Wallpaper */}
-      <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
-        <img
-          src="/photo.jpg"
-          alt=""
-          className="w-full h-full object-cover opacity-40 grayscale scale-105"
-          style={{
-            objectPosition: "center top",
-            filter: "grayscale(100%) contrast(1.1) brightness(0.75)",
-          }}
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-2xl animate-fade-in overflow-hidden">
+      {/* Background Animated Blur Gradient */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden z-0">
+        <div
+          className="liquid-blob absolute -left-20 -top-20 h-80 w-80 rounded-full"
+          style={{ background: "color-mix(in oklab, var(--ink) 25%, transparent)" }}
+          aria-hidden
         />
-        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-black/70" />
+        <div
+          className="liquid-blob absolute top-1/3 -right-20 h-96 w-96 rounded-full"
+          style={{
+            background: "color-mix(in oklab, var(--ink) 18%, transparent)",
+            animationDelay: "-4s",
+          }}
+          aria-hidden
+        />
+        <div
+          className="liquid-blob absolute -bottom-20 left-1/4 h-80 w-80 rounded-full"
+          style={{
+            background: "color-mix(in oklab, var(--ink) 20%, transparent)",
+            animationDelay: "-8s",
+          }}
+          aria-hidden
+        />
       </div>
 
       <div className="liquid-glass specular relative z-10 w-full max-w-md overflow-hidden rounded-[32px] border border-[color:color-mix(in_srgb,var(--hairline)_70%,transparent)] bg-[color:color-mix(in_srgb,var(--canvas)_88%,transparent)] p-6 shadow-2xl flex flex-col max-h-[90vh]">

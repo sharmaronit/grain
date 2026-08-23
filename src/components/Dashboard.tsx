@@ -1483,9 +1483,9 @@ export function Dashboard({ user }: { user?: any }) {
           })()}
         >
 
-          {/* Liquid drifting blobs — animated ambient light */}
-          {theme === "dark" && activeTab !== "consistency" && (
-            <>
+          {/* Liquid drifting blobs — animated blur gradient ambient light for all non-consistency screens */}
+          {activeTab !== "consistency" && activeTab !== "wallpaper" && (
+            <div className="pointer-events-none absolute inset-0 overflow-hidden z-0">
               <div
                 className="liquid-blob absolute -left-24 -top-24 h-72 w-72 rounded-full"
                 style={{ background: "color-mix(in oklab, var(--ink) 22%, transparent)" }}
@@ -1507,11 +1507,11 @@ export function Dashboard({ user }: { user?: any }) {
                 }}
                 aria-hidden
               />
-            </>
+            </div>
           )}
 
-          {/* Photographic Peak Background for Dashboard Tabs */}
-          {activeTab !== "wallpaper" && (
+          {/* Photographic Trekking Peak Background — ONLY for Consistency Tab */}
+          {activeTab === "consistency" && (
             <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
               <img
                 src="/photo.jpg"
