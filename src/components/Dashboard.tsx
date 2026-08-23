@@ -1,6 +1,8 @@
 import { ConsistencyTab } from "../components/tabs/ConsistencyTab";
 import { SwipeModeView } from "./SwipeModeView";
 import { HabitCard } from "./HabitCard";
+import { OnboardingModal } from "./OnboardingModal";
+import { WeeklyReviewModal } from "./WeeklyReviewModal";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, startTransition, memo } from "react";
 import { toPng } from "html-to-image";
@@ -214,7 +216,7 @@ export function Dashboard({ user }: { user?: any }) {
   const [dateStyle, setDateStyle] = useState<"underline" | "block" | "mono">("underline");
   const [dateDropdownOpen, setDateDropdownOpen] = useState(false);
 
-  const TAB_ORDER: AppTab[] = ["today", "consistency", "myday", "matrix", "goal", "wallpaper"];
+  const TAB_ORDER: AppTab[] = ["today", "consistency", "myday", "goal", "wallpaper"];
   const [activeTab, setActiveTab] = useState<AppTab>("today");
   const [tabDirection, setTabDirection] = useState<"left" | "right">("left");
   const [swipeMode, setSwipeMode] = useState(false);
@@ -284,6 +286,10 @@ export function Dashboard({ user }: { user?: any }) {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [onboardingOpen, setOnboardingOpen] = useState(() => {
+    return typeof window !== "undefined" && !localStorage.getItem("grain_onboarded");
+  });
+  const [weeklyReviewOpen, setWeeklyReviewOpen] = useState(false);
   const [activeSettingTab, setActiveSettingTab] = useState<"theme" | "style" | "color" | "habits" | "stats" | "size">("theme");
   const [applyMenuOpen, setApplyMenuOpen] = useState(false);
   const toolbarDragStartY = useRef<number | null>(null);
@@ -1674,444 +1680,7 @@ export function Dashboard({ user }: { user?: any }) {
           </div>
 
 
-          {/* Full Screen Preview Modal */}
-          {activeTab === "wallpaper" && (
-            <div className="animate-fade-in absolute inset-0 z-10 flex flex-col bg-black pointer-events-auto">
 
-              {/* Controls overlay at top of Full Screen Preview */}
-              <div className="absolute top-[env(safe-area-inset-top,24px)] mt-4 left-0 right-0 flex items-center justify-between px-6 z-50 pointer-events-none">
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => photoInputRef.current?.click()}
-                    className="pointer-events-auto flex items-center justify-center h-10 w-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 text-white cursor-pointer active:scale-95 transition-all hover:bg-black/60 shadow-lg"
-                  >
-                    <ImagePlus size={20} />
-                  </button>
-                  <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} onClick={(e) => e.stopPropagation()} />
-                  {wallpaperTheme === "custom" && (
-                    <button
-                      type="button"
-                      onClick={() => setIsMovingPhoto(prev => !prev)}
-                      className={`pointer-events-auto flex items-center justify-center h-10 px-4 rounded-full backdrop-blur-md border border-white/20 text-white font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg ${isMovingPhoto ? "bg-white text-black" : "bg-black/40 hover:bg-black/60"
-                        }`}
-                    >
-                      {isMovingPhoto ? "Done Moving" : "Move Photo"}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Live Wallpaper Scene (Fills the entire screen) */}
-              <div
-                key={syncPulse}
-                ref={previewRef}
-                className={`wp-scene absolute inset-0 flex flex-col items-center justify-center ${syncPulse ? "animate-sync-pulse" : ""}`}
-                style={{
-                  background: wallpaperThemeOf(wallpaperTheme, theme).bg,
-                  ["--ink" as string]: wallpaperThemeOf(wallpaperTheme, theme).bg,
-                  ["--on-ink" as string]: wallpaperThemeOf(wallpaperTheme, theme).fg,
-                  color: wallpaperThemeOf(wallpaperTheme, theme).fg,
-                }}
-              >
-                {/* Snapping Crosshairs */}
-                {isDraggingWallpaper && (wallpaperGridStyle === "month" || wallpaperGridStyle === "year") && (
-                  <>
-                    <div className={`absolute top-0 bottom-0 left-1/2 w-[1px] -translate-x-1/2 z-0 transition-colors duration-200 ${wallpaperOffset.x === 0 ? "bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.8)]" : "bg-white/20"}`} />
-                    <div className={`absolute left-0 right-0 top-1/2 h-[1px] -translate-y-1/2 z-0 transition-colors duration-200 ${wallpaperOffset.y === 0 ? "bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.8)]" : "bg-white/20"}`} />
-                  </>
-                )}
-
-                {wallpaperTheme === "custom" && wallpaperCustomPhoto && (
-                  <>
-                    <img
-                      ref={wallpaperPhotoRef}
-                      src={wallpaperCustomPhoto}
-                      className="absolute inset-0 w-full h-full object-cover pointer-events-none transition-transform"
-                      style={{
-                        transform: `translate(${wallpaperPhotoOffset.x}px, ${wallpaperPhotoOffset.y}px) scale(${wallpaperPhotoScale})`
-                      }}
-                      alt=""
-                    />
-                    <div className="absolute inset-0 pointer-events-none bg-black transition-opacity" style={{ opacity: wallpaperPhotoOverlay }} />
-                  </>
-                )}
-                {/* Overlay hint */}
-                <div className={`absolute top-[env(safe-area-inset-top,24px)] mt-24 left-0 right-0 flex justify-center pointer-events-none opacity-50 z-40 transition-opacity duration-300 ${isMovingPhoto ? "opacity-100" : ""}`}>
-                  <span className="bg-black/50 text-white px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest backdrop-blur-md">
-                    {isMovingPhoto ? "Drag to reposition photo · Pinch to resize" : "Drag to reposition · Pinch to resize"}
-                  </span>
-                </div>
-
-                {/* Draggable container */}
-                <div
-                  ref={wallpaperGridRef}
-                  className="relative w-full h-full flex flex-col items-center justify-center cursor-move"
-                  style={{ transform: `translate(${wallpaperOffset.x}px, ${wallpaperOffset.y}px) scale(${wallpaperScale})`, touchAction: "none" }}
-                  onPointerDown={handlePointerDown}
-                  onPointerMove={handlePointerMove}
-                  onPointerUp={handlePointerUp}
-                  onPointerCancel={handlePointerUp}
-                  onWheel={handleWheel}
-                >
-                  {wallpaperGridStyle === "year" ? (
-                    /* ── Year Calendar View ── */
-                    (() => {
-                      const today = new Date();
-                      const year = today.getFullYear();
-                      const months = Array.from({ length: 12 }, (_, m) => {
-                        const monthName = new Date(year, m, 1).toLocaleString("default", { month: "short" });
-                        const daysInMonth = new Date(year, m + 1, 0).getDate();
-                        const firstDow = (new Date(year, m, 1).getDay() + 6) % 7; // 0=Mon
-                        return { m, monthName, daysInMonth, firstDow };
-                      });
-                      const totalDays = new Date(year, 12, 0).getDate() + (new Date(year, 0, 1).getDay());
-                      const daysInYear = (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) ? 366 : 365;
-                      const dayOfYear = Math.floor((today.getTime() - new Date(year, 0, 1).getTime()) / 86400000) + 1;
-                      const daysLeft = daysInYear - dayOfYear;
-                      const pct = Math.round((dayOfYear / daysInYear) * 100);
-                      const themeColors = wallpaperTokens(wallpaperTheme, gridColorTheme, theme);
-
-                      // Build a per-day completion map from heatmap
-                      // heatmap is 52 weeks × 7 days, starting from heatmapStartDate
-                      const startDate = new Date(today);
-                      startDate.setDate(startDate.getDate() - (52 * 7 - 1));
-                      const completionMap = new Map<string, number>();
-                      displayedHeatmap.forEach((col, ci) => {
-                        col.forEach((v, ri) => {
-                          const d = new Date(startDate);
-                          d.setDate(startDate.getDate() + ci * 7 + ri);
-                          const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-                          completionMap.set(key, v);
-                        });
-                      });
-
-                      return (
-                        <div className="w-full flex flex-col items-center justify-center -mt-8">
-                          <div className="grid gap-x-6 gap-y-7" style={{ gridTemplateColumns: "repeat(3, max-content)", justifyContent: "center" }}>
-                            {months.map(({ m, monthName, daysInMonth, firstDow }) => {
-                              const cells = [];
-                              // leading empty cells
-                              for (let e = 0; e < firstDow; e++) {
-                                cells.push(<div key={`e-${e}`} style={{ width: 8, height: 8 }} />);
-                              }
-                              for (let d = 1; d <= daysInMonth; d++) {
-                                const isToday = today.getFullYear() === year && today.getMonth() === m && today.getDate() === d;
-                                const isFuture = new Date(year, m, d) > today;
-                                const key = `${year}-${m}-${d}`;
-                                const v = completionMap.get(key) ?? 0;
-                                let bg: string;
-                                if (isFuture) {
-                                  bg = "rgba(255,255,255,0.04)";
-                                } else {
-                                  bg = v === 0 ? themeColors.empty : v === 1 ? themeColors.low : v === 2 ? themeColors.mid : themeColors.hi;
-                                }
-                                cells.push(
-                                  <div
-                                    key={d}
-                                    style={{
-                                      width: 8,
-                                      height: 8,
-                                      borderRadius: 2,
-                                      background: bg,
-                                      border: isToday ? `1px solid ${themeColors.accent}` : undefined,
-                                      boxShadow: isToday ? `0 0 6px ${themeColors.accent}40` : undefined,
-                                    }}
-                                  />
-                                );
-                              }
-                              return (
-                                <div key={m} className="flex flex-col gap-1.5">
-                                  <span style={{ fontSize: 9, opacity: 0.55, letterSpacing: "0.02em", fontWeight: 500, textTransform: "capitalize", paddingLeft: 1 }}>
-                                    {monthName}
-                                  </span>
-                                  <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 8px)", gap: 3 }}>
-                                    {cells}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })()
-                  ) : wallpaperGridStyle === "month" ? (
-                    /* ── Month Calendar View (reference-style) ── */
-                    (() => {
-                      const today = new Date();
-                      const year = today.getFullYear();
-                      const month = today.getMonth();
-                      const monthName = today.toLocaleString("default", { month: "long" }).toUpperCase();
-                      const daysInMonth = new Date(year, month + 1, 0).getDate();
-                      const firstDow = (new Date(year, month, 1).getDay() + 6) % 7; // 0=Mon
-                      const fg = wallpaperThemeOf(wallpaperTheme, theme).fg;
-                      const themeColors = wallpaperTokens(wallpaperTheme, gridColorTheme, theme);
-
-                      // Build completion map
-                      const startDate = new Date(today);
-                      startDate.setDate(startDate.getDate() - (52 * 7 - 1));
-                      const completionMap = new Map<string, number>();
-                      displayedHeatmap.forEach((col, ci) => {
-                        col.forEach((v, ri) => {
-                          const d = new Date(startDate);
-                          d.setDate(startDate.getDate() + ci * 7 + ri);
-                          const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-                          completionMap.set(key, v);
-                        });
-                      });
-
-                      // Build calendar cells (leading blanks + day cells)
-                      const totalCells = firstDow + daysInMonth;
-                      const rows = Math.ceil(totalCells / 7);
-                      const cells: { day: number | null; isToday: boolean; isFuture: boolean; v: number }[] = [];
-                      for (let i = 0; i < rows * 7; i++) {
-                        const dayNum = i - firstDow + 1;
-                        if (dayNum < 1 || dayNum > daysInMonth) {
-                          cells.push({ day: null, isToday: false, isFuture: false, v: 0 });
-                        } else {
-                          const isToday = today.getDate() === dayNum;
-                          const isFuture = new Date(year, month, dayNum) > today;
-                          const key = `${year}-${month}-${dayNum}`;
-                          const v = completionMap.get(key) ?? 0;
-                          cells.push({ day: dayNum, isToday, isFuture, v });
-                        }
-                      }
-
-                      const DAY_HEADERS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
-                      const CELL_SIZE = 42;
-                      const GAP = 2;
-
-                      return (
-                        <div className="w-full flex flex-col px-6" style={{ paddingTop: "72px" }}>
-                          {/* Month name */}
-                          <div className="text-center mb-6" style={{ fontSize: 13, fontWeight: 600, letterSpacing: "0.25em", color: fg, opacity: 0.7 }}>
-                            {monthName}
-                          </div>
-
-                          {/* Day headers */}
-                          <div style={{ display: "grid", gridTemplateColumns: `repeat(7, ${CELL_SIZE}px)`, gap: `${GAP}px`, marginBottom: 8 }}>
-                            {DAY_HEADERS.map((h) => (
-                              <div key={h} style={{ textAlign: "center", fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", color: fg, opacity: 0.4 }}>
-                                {h}
-                              </div>
-                            ))}
-                          </div>
-
-                          {/* Day grid */}
-                          <div style={{ display: "grid", gridTemplateColumns: `repeat(7, ${CELL_SIZE}px)`, gap: `${GAP}px` }}>
-                            {cells.map((cell, idx) => {
-                              if (cell.day === null) {
-                                return <div key={idx} style={{ width: CELL_SIZE, height: CELL_SIZE }} />;
-                              }
-                              const textOpacity = cell.isFuture ? 0.25 : cell.isToday ? 1 : 0.85;
-
-                              return (
-                                <div
-                                  key={idx}
-                                  style={{
-                                    width: CELL_SIZE,
-                                    height: CELL_SIZE,
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    position: "relative",
-                                  }}
-                                >
-                                  {/* Today circle ring */}
-                                  {cell.isToday && (
-                                    <div style={{
-                                      position: "absolute",
-                                      inset: 3,
-                                      borderRadius: "50%",
-                                      border: `1.5px solid ${themeColors.accent}`,
-                                      opacity: 0.9,
-                                    }} />
-                                  )}
-
-                                  {/* Day number */}
-                                  <span style={{
-                                    fontSize: 15,
-                                    fontWeight: cell.isToday ? 700 : 400,
-                                    color: fg,
-                                    opacity: textOpacity,
-                                    lineHeight: 1,
-                                    fontVariantNumeric: "tabular-nums",
-                                  }}>
-                                    {cell.day}
-                                  </span>
-
-                                  {/* Completion dot */}
-                                  {!cell.isFuture && (
-                                    <div style={{
-                                      width: 4,
-                                      height: 4,
-                                      borderRadius: "50%",
-                                      background: cell.isToday ? themeColors.accent : (cell.v === 0 ? themeColors.empty : cell.v === 1 ? themeColors.low : cell.v === 2 ? themeColors.mid : themeColors.hi),
-                                      marginTop: 3,
-                                    }} />
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      );
-                    })()
-                  ) : wallpaperGridStyle === "weeks" ? (
-                    /* ── Weeks Heatmap View (existing) ── */
-                    <div
-                      className={`grid mt-16 ${wallpaperSync ? "" : "opacity-60"}`}
-                      style={(() => {
-                        const N = previewWeeks * 7;
-                        const availW = typeof window !== "undefined" ? window.innerWidth - 48 : 342;
-                        const availH = typeof window !== "undefined" ? window.innerHeight - 240 : 600;
-                        const gapSize = previewWeeks > 26 ? 2 : 3;
-                        let bestSize = 6;
-                        let bestCols = 7;
-
-                        // Find the largest cell size that fits N cells into the screen.
-                        for (let s = 48; s >= 6; s--) {
-                          let c = Math.floor((availW + gapSize) / (s + gapSize));
-                          let r = Math.floor((availH + gapSize) / (s + gapSize));
-                          if (c * r >= N) {
-                            bestSize = s;
-                            bestCols = c;
-                            break;
-                          }
-                        }
-
-                        const borderRadius = bestSize > 12 ? 4 : 2;
-
-                        return {
-                          gridTemplateColumns: `repeat(${bestCols}, max-content)`,
-                          gridAutoFlow: "row",
-                          justifyContent: "center",
-                          alignContent: "center",
-                          gap: `${gapSize}px`,
-                          "--wp-cell-size": `${bestSize}px`,
-                          "--wp-cell-radius": `${borderRadius}px`
-                        } as any;
-                      })()}
-                    >
-                      {displayedHeatmap.slice(-previewWeeks).flatMap((col, ci) => {
-                        const absCi = 52 - previewWeeks + ci;
-                        return col.map((v, ri) => {
-                          const isToday = absCi === TODAY_COL && ri === TODAY_ROW;
-                          return (
-                            <div
-                              key={`${ci}-${ri}`}
-                              className={`${isToday ? "animate-cell-flash ring-2 ring-inset ring-[color:var(--wp-accent)]" : ""}`}
-                              style={{
-                                width: "var(--wp-cell-size)",
-                                height: "var(--wp-cell-size)",
-                                borderRadius: "var(--wp-cell-radius)",
-                                background:
-                                  v === 0
-                                    ? "var(--wp-empty)"
-                                    : v === 1
-                                      ? "var(--wp-low)"
-                                      : v === 2
-                                        ? "var(--wp-mid)"
-                                        : "var(--wp-hi)",
-                              }}
-                            />
-                          );
-                        });
-                      })}
-                    </div>
-                  ) : (
-                    /* ── Stacked Goals View ── */
-                    <div className={`flex flex-col items-center gap-12 mt-16 w-full ${wallpaperSync ? "" : "opacity-60"}`}>
-                      {stackedGoals.length === 0 ? (
-                        <div className="text-[14px] opacity-50 font-semibold uppercase tracking-widest text-center mt-20">
-                          No active goals
-                        </div>
-                      ) : (
-                        stackedGoals.map((sg) => (
-                          <div key={sg.id} className="flex flex-col items-center w-full">
-                            <div className="flex flex-wrap gap-1 justify-center px-4 mb-4 max-w-[320px] mx-auto">
-                              {sg.heatmap && sg.heatmap.flatMap(col => col).map((v: number, i: number) => (
-                                <div
-                                  key={i}
-                                  className="h-2 w-2 rounded-[2px] transition-colors"
-                                  style={{
-                                    background:
-                                      v === 0
-                                        ? "rgba(255, 255, 255, 0.08)"
-                                        : v === 1
-                                          ? "var(--wp-low)"
-                                          : v === 2
-                                            ? "var(--wp-mid)"
-                                            : "var(--wp-hi)",
-                                  }}
-                                />
-                              ))}
-                            </div>
-                            <div className="flex flex-col items-center gap-1">
-                              <span className="text-[12px] uppercase tracking-widest font-bold opacity-80">
-                                {sg.title}
-                              </span>
-                              <span style={{ color: "rgba(255, 255, 255, 0.5)", fontWeight: 700, fontSize: "11px" }}>
-                                {sg.currentStreak}d left - {sg.completionRate}%
-                              </span>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  )}
-
-                  {wallpaperHabitSet !== "none" && wallpaperGridStyle === "weeks" && (
-                    <div className="mt-12 flex flex-col items-center gap-2 opacity-80">
-                      {(HABIT_SETS.find(s => s.key === wallpaperHabitSet)?.habits || []).map((h, i) => (
-                        <span key={i} className="text-[12px] uppercase tracking-widest font-semibold">{h}</span>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className={`mt-12 w-full px-12 text-[11px] font-semibold opacity-70 ${wallpaperStatsAlign === 'left' ? 'text-left' : wallpaperStatsAlign === 'right' ? 'text-right' : 'text-center'}`}>
-                    {activeGoalId && goals.some(g => g.id === activeGoalId) ? (
-                      <span style={{ color: "rgba(255, 255, 255, 0.5)", fontWeight: 700, letterSpacing: "0.02em", fontSize: "11px" }}>
-                        {displayedTotalStreak}d left - {displayedRate}%
-                      </span>
-                    ) : (
-                      <span>
-                        {displayedTotalStreak} day streak · {displayedRate}%
-                      </span>
-                    )}
-                    <br />
-                    <span className="opacity-50 mt-1 block">{wallpaperSync ? "LIVE SYNC ON" : "SNAPSHOT PAUSED"}</span>
-                  </div>
-
-                </div> {/* End Draggable Container */}
-              </div>
-
-              {/* Controls overlay at bottom of Full Screen Preview */}
-              <div className="absolute bottom-28 left-0 right-0 flex flex-col items-center justify-end z-50 animate-fade-in-up px-4 pointer-events-none">
-                {/* Live/Static Toggle moved to bottom */}
-                <div className="flex items-center rounded-full border border-[color:var(--hairline-mid)] p-1 bg-canvas/85 backdrop-blur-xl shadow-lg pointer-events-auto">
-                  <button
-                    onClick={() => applyWallpaper(false)}
-                    className={`flex items-center gap-1.5 px-4 h-9 rounded-full text-[12px] font-bold transition-all ${!wallpaperSync ? "text-mute hover:text-ink" : "bg-ink text-on-ink shadow-sm"}`}
-                  >
-                    <div className={`w-2.5 h-2.5 rounded-full ${wallpaperSync ? "bg-green-400 animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.6)]" : "bg-[color:var(--hairline-mid)]"}`} /> Live
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setShowStaticTargetSelector(true);
-                    }}
-                    className={`flex items-center gap-1.5 px-4 h-9 rounded-full text-[12px] font-bold transition-all ${wallpaperSync ? "text-mute hover:text-ink" : "bg-ink text-on-ink shadow-sm"}`}
-                  >
-                    <div className={`w-2.5 h-2.5 rounded-full ${!wallpaperSync ? "bg-[color:var(--canvas-softer)]" : "bg-[color:var(--hairline-mid)]"}`} /> Static
-                  </button>
-                </div>
-              </div>
-
-            </div>
-          )}
 
           <div
             ref={swipeContainerRef}
@@ -2301,6 +1870,7 @@ export function Dashboard({ user }: { user?: any }) {
                   rate={rate}
                   weeklyInsights={weeklyInsights}
                   showToast={showToast}
+                  onOpenWeeklyReview={() => setWeeklyReviewOpen(true)}
                 />
               </div>
             </div>
@@ -2426,12 +1996,455 @@ export function Dashboard({ user }: { user?: any }) {
                   setActiveGoalId(id);
                   if (userId) {
                     await updateDoc(doc(getFirestore(), "users", userId), {
-                      "prefs.activeGoalId": id
+                                      "prefs.activeGoalId": id
                     }).catch(console.error);
                   }
                 }}
               />
             </div>
+            </div>
+
+            {/* TAB 5: WALLPAPER */}
+            <div
+              data-tab-id="wallpaper"
+              className="w-full h-full flex-shrink-0 snap-start snap-always overflow-hidden relative"
+              ref={activeTab === "wallpaper" ? scrollRef : undefined}
+            >
+              <div className="absolute inset-0 z-10 flex flex-col bg-black pointer-events-auto">
+
+                {/* Controls overlay at top of Full Screen Preview */}
+                <div className="absolute top-[env(safe-area-inset-top,24px)] mt-4 left-0 right-0 flex items-center justify-between px-6 z-50 pointer-events-none">
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => photoInputRef.current?.click()}
+                      className="pointer-events-auto flex items-center justify-center h-10 w-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 text-white cursor-pointer active:scale-95 transition-all hover:bg-black/60 shadow-lg"
+                    >
+                      <ImagePlus size={20} />
+                    </button>
+                    <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} onClick={(e) => e.stopPropagation()} />
+                    {wallpaperTheme === "custom" && (
+                      <button
+                        type="button"
+                        onClick={() => setIsMovingPhoto(prev => !prev)}
+                        className={`pointer-events-auto flex items-center justify-center h-10 px-4 rounded-full backdrop-blur-md border border-white/20 text-white font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg ${isMovingPhoto ? "bg-white text-black" : "bg-black/40 hover:bg-black/60"
+                          }`}
+                      >
+                        {isMovingPhoto ? "Done Moving" : "Move Photo"}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Live Wallpaper Scene (Fills the entire screen) */}
+                <div
+                  key={syncPulse}
+                  ref={previewRef}
+                  className={`wp-scene absolute inset-0 flex flex-col items-center justify-center ${syncPulse ? "animate-sync-pulse" : ""}`}
+                  style={{
+                    background: wallpaperThemeOf(wallpaperTheme, theme).bg,
+                    ["--ink" as string]: wallpaperThemeOf(wallpaperTheme, theme).bg,
+                    ["--on-ink" as string]: wallpaperThemeOf(wallpaperTheme, theme).fg,
+                    color: wallpaperThemeOf(wallpaperTheme, theme).fg,
+                  }}
+                >
+                  {/* Snapping Crosshairs */}
+                  {isDraggingWallpaper && (wallpaperGridStyle === "month" || wallpaperGridStyle === "year") && (
+                    <>
+                      <div className={`absolute top-0 bottom-0 left-1/2 w-[1px] -translate-x-1/2 z-0 transition-colors duration-200 ${wallpaperOffset.x === 0 ? "bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.8)]" : "bg-white/20"}`} />
+                      <div className={`absolute left-0 right-0 top-1/2 h-[1px] -translate-y-1/2 z-0 transition-colors duration-200 ${wallpaperOffset.y === 0 ? "bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.8)]" : "bg-white/20"}`} />
+                    </>
+                  )}
+
+                  {wallpaperTheme === "custom" && wallpaperCustomPhoto && (
+                    <>
+                      <img
+                        ref={wallpaperPhotoRef}
+                        src={wallpaperCustomPhoto}
+                        className="absolute inset-0 w-full h-full object-cover pointer-events-none transition-transform"
+                        style={{
+                          transform: `translate(${wallpaperPhotoOffset.x}px, ${wallpaperPhotoOffset.y}px) scale(${wallpaperPhotoScale})`
+                        }}
+                        alt=""
+                      />
+                      <div className="absolute inset-0 pointer-events-none bg-black transition-opacity" style={{ opacity: wallpaperPhotoOverlay }} />
+                    </>
+                  )}
+                  {/* Overlay hint */}
+                  <div className={`absolute top-[env(safe-area-inset-top,24px)] mt-24 left-0 right-0 flex justify-center pointer-events-none opacity-50 z-40 transition-opacity duration-300 ${isMovingPhoto ? "opacity-100" : ""}`}>
+                    <span className="bg-black/50 text-white px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest backdrop-blur-md">
+                      {isMovingPhoto ? "Drag to reposition photo · Pinch to resize" : "Drag to reposition · Pinch to resize"}
+                    </span>
+                  </div>
+
+                  {/* Draggable container */}
+                  <div
+                    ref={wallpaperGridRef}
+                    className="relative w-full h-full flex flex-col items-center justify-center cursor-move"
+                    style={{ transform: `translate(${wallpaperOffset.x}px, ${wallpaperOffset.y}px) scale(${wallpaperScale})`, touchAction: "none" }}
+                    onPointerDown={handlePointerDown}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onPointerCancel={handlePointerUp}
+                    onWheel={handleWheel}
+                  >
+                    {wallpaperGridStyle === "year" ? (
+                      /* ── Year Calendar View ── */
+                      (() => {
+                        const today = new Date();
+                        const year = today.getFullYear();
+                        const months = Array.from({ length: 12 }, (_, m) => {
+                          const monthName = new Date(year, m, 1).toLocaleString("default", { month: "short" });
+                          const daysInMonth = new Date(year, m + 1, 0).getDate();
+                          const firstDow = (new Date(year, m, 1).getDay() + 6) % 7; // 0=Mon
+                          return { m, monthName, daysInMonth, firstDow };
+                        });
+                        const totalDays = new Date(year, 12, 0).getDate() + (new Date(year, 0, 1).getDay());
+                        const daysInYear = (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) ? 366 : 365;
+                        const dayOfYear = Math.floor((today.getTime() - new Date(year, 0, 1).getTime()) / 86400000) + 1;
+                        const daysLeft = daysInYear - dayOfYear;
+                        const pct = Math.round((dayOfYear / daysInYear) * 100);
+                        const themeColors = wallpaperTokens(wallpaperTheme, gridColorTheme, theme);
+
+                        // Build a per-day completion map from heatmap
+                        // heatmap is 52 weeks × 7 days, starting from heatmapStartDate
+                        const startDate = new Date(today);
+                        startDate.setDate(startDate.getDate() - (52 * 7 - 1));
+                        const completionMap = new Map<string, number>();
+                        displayedHeatmap.forEach((col, ci) => {
+                          col.forEach((v, ri) => {
+                            const d = new Date(startDate);
+                            d.setDate(startDate.getDate() + ci * 7 + ri);
+                            const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+                            completionMap.set(key, v);
+                          });
+                        });
+
+                        return (
+                          <div className="w-full flex flex-col items-center justify-center -mt-8">
+                            <div className="grid gap-x-6 gap-y-7" style={{ gridTemplateColumns: "repeat(3, max-content)", justifyContent: "center" }}>
+                              {months.map(({ m, monthName, daysInMonth, firstDow }) => {
+                                const cells = [];
+                                // leading empty cells
+                                for (let e = 0; e < firstDow; e++) {
+                                  cells.push(<div key={`e-${e}`} style={{ width: 8, height: 8 }} />);
+                                }
+                                for (let d = 1; d <= daysInMonth; d++) {
+                                  const isToday = today.getFullYear() === year && today.getMonth() === m && today.getDate() === d;
+                                  const isFuture = new Date(year, m, d) > today;
+                                  const key = `${year}-${m}-${d}`;
+                                  const v = completionMap.get(key) ?? 0;
+                                  let bg: string;
+                                  if (isFuture) {
+                                    bg = "rgba(255,255,255,0.04)";
+                                  } else {
+                                    bg = v === 0 ? themeColors.empty : v === 1 ? themeColors.low : v === 2 ? themeColors.mid : themeColors.hi;
+                                  }
+                                  cells.push(
+                                    <div
+                                      key={d}
+                                      style={{
+                                        width: 8,
+                                        height: 8,
+                                        borderRadius: 2,
+                                        background: bg,
+                                        border: isToday ? `1px solid ${themeColors.accent}` : undefined,
+                                        boxShadow: isToday ? `0 0 6px ${themeColors.accent}40` : undefined,
+                                      }}
+                                    />
+                                  );
+                                }
+                                return (
+                                  <div key={m} className="flex flex-col gap-1.5">
+                                    <span style={{ fontSize: 9, opacity: 0.55, letterSpacing: "0.02em", fontWeight: 500, textTransform: "capitalize", paddingLeft: 1 }}>
+                                      {monthName}
+                                    </span>
+                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 8px)", gap: 3 }}>
+                                      {cells}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })()
+                    ) : wallpaperGridStyle === "month" ? (
+                      /* ── Month Calendar View (reference-style) ── */
+                      (() => {
+                        const today = new Date();
+                        const year = today.getFullYear();
+                        const month = today.getMonth();
+                        const monthName = today.toLocaleString("default", { month: "long" }).toUpperCase();
+                        const daysInMonth = new Date(year, month + 1, 0).getDate();
+                        const firstDow = (new Date(year, month, 1).getDay() + 6) % 7; // 0=Mon
+                        const fg = wallpaperThemeOf(wallpaperTheme, theme).fg;
+                        const themeColors = wallpaperTokens(wallpaperTheme, gridColorTheme, theme);
+
+                        // Build completion map
+                        const startDate = new Date(today);
+                        startDate.setDate(startDate.getDate() - (52 * 7 - 1));
+                        const completionMap = new Map<string, number>();
+                        displayedHeatmap.forEach((col, ci) => {
+                          col.forEach((v, ri) => {
+                            const d = new Date(startDate);
+                            d.setDate(startDate.getDate() + ci * 7 + ri);
+                            const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+                            completionMap.set(key, v);
+                          });
+                        });
+
+                        // Build calendar cells (leading blanks + day cells)
+                        const totalCells = firstDow + daysInMonth;
+                        const rows = Math.ceil(totalCells / 7);
+                        const cells: { day: number | null; isToday: boolean; isFuture: boolean; v: number }[] = [];
+                        for (let i = 0; i < rows * 7; i++) {
+                          const dayNum = i - firstDow + 1;
+                          if (dayNum < 1 || dayNum > daysInMonth) {
+                            cells.push({ day: null, isToday: false, isFuture: false, v: 0 });
+                          } else {
+                            const isToday = today.getDate() === dayNum;
+                            const isFuture = new Date(year, month, dayNum) > today;
+                            const key = `${year}-${month}-${dayNum}`;
+                            const v = completionMap.get(key) ?? 0;
+                            cells.push({ day: dayNum, isToday, isFuture, v });
+                          }
+                        }
+
+                        const DAY_HEADERS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+                        const CELL_SIZE = 42;
+                        const GAP = 2;
+
+                        return (
+                          <div className="w-full flex flex-col px-6" style={{ paddingTop: "72px" }}>
+                            {/* Month name */}
+                            <div className="text-center mb-6" style={{ fontSize: 13, fontWeight: 600, letterSpacing: "0.25em", color: fg, opacity: 0.7 }}>
+                              {monthName}
+                            </div>
+
+                            {/* Day headers */}
+                            <div style={{ display: "grid", gridTemplateColumns: `repeat(7, ${CELL_SIZE}px)`, gap: `${GAP}px`, marginBottom: 8 }}>
+                              {DAY_HEADERS.map((h) => (
+                                <div key={h} style={{ textAlign: "center", fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", color: fg, opacity: 0.4 }}>
+                                  {h}
+                                </div>
+                              ))}
+                            </div>
+
+                            {/* Day grid */}
+                            <div style={{ display: "grid", gridTemplateColumns: `repeat(7, ${CELL_SIZE}px)`, gap: `${GAP}px` }}>
+                              {cells.map((cell, idx) => {
+                                if (cell.day === null) {
+                                  return <div key={idx} style={{ width: CELL_SIZE, height: CELL_SIZE }} />;
+                                }
+                                const textOpacity = cell.isFuture ? 0.25 : cell.isToday ? 1 : 0.85;
+
+                                return (
+                                  <div
+                                    key={idx}
+                                    style={{
+                                      width: CELL_SIZE,
+                                      height: CELL_SIZE,
+                                      display: "flex",
+                                      flexDirection: "column",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      position: "relative",
+                                    }}
+                                  >
+                                    {/* Today circle ring */}
+                                    {cell.isToday && (
+                                      <div style={{
+                                        position: "absolute",
+                                        inset: 3,
+                                        borderRadius: "50%",
+                                        border: `1.5px solid ${themeColors.accent}`,
+                                        opacity: 0.9,
+                                      }} />
+                                    )}
+
+                                    {/* Day number */}
+                                    <span style={{
+                                      fontSize: 15,
+                                      fontWeight: cell.isToday ? 700 : 400,
+                                      color: fg,
+                                      opacity: textOpacity,
+                                      lineHeight: 1,
+                                      fontVariantNumeric: "tabular-nums",
+                                    }}>
+                                      {cell.day}
+                                    </span>
+
+                                    {/* Completion dot */}
+                                    {!cell.isFuture && (
+                                      <div style={{
+                                        width: 4,
+                                        height: 4,
+                                        borderRadius: "50%",
+                                        background: cell.isToday ? themeColors.accent : (cell.v === 0 ? themeColors.empty : cell.v === 1 ? themeColors.low : cell.v === 2 ? themeColors.mid : themeColors.hi),
+                                        marginTop: 3,
+                                      }} />
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })()
+                    ) : wallpaperGridStyle === "weeks" ? (
+                      /* ── Weeks Heatmap View (existing) ── */
+                      <div
+                        className={`grid mt-16 ${wallpaperSync ? "" : "opacity-60"}`}
+                        style={(() => {
+                          const N = previewWeeks * 7;
+                          const availW = typeof window !== "undefined" ? window.innerWidth - 48 : 342;
+                          const availH = typeof window !== "undefined" ? window.innerHeight - 240 : 600;
+                          const gapSize = previewWeeks > 26 ? 2 : 3;
+                          let bestSize = 6;
+                          let bestCols = 7;
+
+                          // Find the largest cell size that fits N cells into the screen.
+                          for (let s = 48; s >= 6; s--) {
+                            let c = Math.floor((availW + gapSize) / (s + gapSize));
+                            let r = Math.floor((availH + gapSize) / (s + gapSize));
+                            if (c * r >= N) {
+                              bestSize = s;
+                              bestCols = c;
+                              break;
+                            }
+                          }
+
+                          const borderRadius = bestSize > 12 ? 4 : 2;
+
+                          return {
+                            gridTemplateColumns: `repeat(${bestCols}, max-content)`,
+                            gridAutoFlow: "row",
+                            justifyContent: "center",
+                            alignContent: "center",
+                            gap: `${gapSize}px`,
+                            "--wp-cell-size": `${bestSize}px`,
+                            "--wp-cell-radius": `${borderRadius}px`
+                          } as any;
+                        })()}
+                      >
+                        {displayedHeatmap.slice(-previewWeeks).flatMap((col, ci) => {
+                          const absCi = 52 - previewWeeks + ci;
+                          return col.map((v, ri) => {
+                            const isToday = absCi === TODAY_COL && ri === TODAY_ROW;
+                            return (
+                              <div
+                                key={`${ci}-${ri}`}
+                                className={`${isToday ? "animate-cell-flash ring-2 ring-inset ring-[color:var(--wp-accent)]" : ""}`}
+                                style={{
+                                  width: "var(--wp-cell-size)",
+                                  height: "var(--wp-cell-size)",
+                                  borderRadius: "var(--wp-cell-radius)",
+                                  background:
+                                    v === 0
+                                      ? "var(--wp-empty)"
+                                      : v === 1
+                                        ? "var(--wp-low)"
+                                        : v === 2
+                                          ? "var(--wp-mid)"
+                                          : "var(--wp-hi)",
+                                }}
+                              />
+                            );
+                          });
+                        })}
+                      </div>
+                    ) : (
+                      /* ── Stacked Goals View ── */
+                      <div className={`flex flex-col items-center gap-12 mt-16 w-full ${wallpaperSync ? "" : "opacity-60"}`}>
+                        {stackedGoals.length === 0 ? (
+                          <div className="text-[14px] opacity-50 font-semibold uppercase tracking-widest text-center mt-20">
+                            No active goals
+                          </div>
+                        ) : (
+                          stackedGoals.map((sg) => (
+                            <div key={sg.id} className="flex flex-col items-center w-full">
+                              <div className="flex flex-wrap gap-1 justify-center px-4 mb-4 max-w-[320px] mx-auto">
+                                {sg.heatmap && sg.heatmap.flatMap(col => col).map((v: number, i: number) => (
+                                  <div
+                                    key={i}
+                                    className="h-2 w-2 rounded-[2px] transition-colors"
+                                    style={{
+                                      background:
+                                        v === 0
+                                          ? "rgba(255, 255, 255, 0.08)"
+                                          : v === 1
+                                            ? "var(--wp-low)"
+                                            : v === 2
+                                              ? "var(--wp-mid)"
+                                              : "var(--wp-hi)",
+                                    }}
+                                  />
+                                ))}
+                              </div>
+                              <div className="flex flex-col items-center gap-1">
+                                <span className="text-[12px] uppercase tracking-widest font-bold opacity-80">
+                                  {sg.title}
+                                </span>
+                                <span style={{ color: "rgba(255, 255, 255, 0.5)", fontWeight: 700, fontSize: "11px" }}>
+                                  {sg.currentStreak}d left - {sg.completionRate}%
+                                </span>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+
+                    {wallpaperHabitSet !== "none" && wallpaperGridStyle === "weeks" && (
+                      <div className="mt-12 flex flex-col items-center gap-2 opacity-80">
+                        {(HABIT_SETS.find(s => s.key === wallpaperHabitSet)?.habits || []).map((h, i) => (
+                          <span key={i} className="text-[12px] uppercase tracking-widest font-semibold">{h}</span>
+                        ))}
+                      </div>
+                    )}
+
+                    <div className={`mt-12 w-full px-12 text-[11px] font-semibold opacity-70 ${wallpaperStatsAlign === 'left' ? 'text-left' : wallpaperStatsAlign === 'right' ? 'text-right' : 'text-center'}`}>
+                      {activeGoalId && goals.some(g => g.id === activeGoalId) ? (
+                        <span style={{ color: "rgba(255, 255, 255, 0.5)", fontWeight: 700, letterSpacing: "0.02em", fontSize: "11px" }}>
+                          {displayedTotalStreak}d left - {displayedRate}%
+                        </span>
+                      ) : (
+                        <span>
+                          {displayedTotalStreak} day streak · {displayedRate}%
+                        </span>
+                      )}
+                      <br />
+                      <span className="opacity-50 mt-1 block">{wallpaperSync ? "LIVE SYNC ON" : "SNAPSHOT PAUSED"}</span>
+                    </div>
+
+                  </div> {/* End Draggable Container */}
+                </div>
+
+                {/* Controls overlay at bottom of Full Screen Preview */}
+                <div className="absolute bottom-28 left-0 right-0 flex flex-col items-center justify-end z-50 animate-fade-in-up px-4 pointer-events-none">
+                  {/* Live/Static Toggle moved to bottom */}
+                  <div className="flex items-center rounded-full border border-[color:var(--hairline-mid)] p-1 bg-canvas/85 backdrop-blur-xl shadow-lg pointer-events-auto">
+                    <button
+                      onClick={() => applyWallpaper(false)}
+                      className={`flex items-center gap-1.5 px-4 h-9 rounded-full text-[12px] font-bold transition-all ${!wallpaperSync ? "text-mute hover:text-ink" : "bg-ink text-on-ink shadow-sm"}`}
+                    >
+                      <div className={`w-2.5 h-2.5 rounded-full ${wallpaperSync ? "bg-green-400 animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.6)]" : "bg-[color:var(--hairline-mid)]"}`} /> Live
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setShowStaticTargetSelector(true);
+                      }}
+                      className={`flex items-center gap-1.5 px-4 h-9 rounded-full text-[12px] font-bold transition-all ${wallpaperSync ? "text-mute hover:text-ink" : "bg-ink text-on-ink shadow-sm"}`}
+                    >
+                      <div className={`w-2.5 h-2.5 rounded-full ${!wallpaperSync ? "bg-[color:var(--canvas-softer)]" : "bg-[color:var(--hairline-mid)]"}`} /> Static
+                    </button>
+                  </div>
+                </div>
+
+              </div>
             </div>
           </div>
 
@@ -2611,6 +2624,20 @@ export function Dashboard({ user }: { user?: any }) {
                           className="pill bg-canvas-soft px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-ink"
                         >
                           {theme === "dark" ? "Dark" : "Light"}
+                        </button>
+                      }
+                    />
+                    <Row
+                      label="Starter Packs & Walkthrough"
+                      action={
+                        <button
+                          onClick={() => {
+                            setSettingsOpen(false);
+                            setOnboardingOpen(true);
+                          }}
+                          className="pill bg-canvas-soft px-3 py-1.5 text-xs font-semibold text-ink hover:bg-ink/10 transition"
+                        >
+                          Explore
                         </button>
                       }
                     />
@@ -3226,6 +3253,28 @@ export function Dashboard({ user }: { user?: any }) {
               onShowToast={showToast}
             />
           )}
+
+          {weeklyReviewOpen && (
+            <WeeklyReviewModal
+              onClose={() => setWeeklyReviewOpen(false)}
+              habits={flatHabits}
+              completionsMap={completionsMap}
+              habitStreaks={habitStreaks}
+              onShowToast={showToast}
+            />
+          )}
+
+          {onboardingOpen && (
+            <OnboardingModal
+              onClose={() => setOnboardingOpen(false)}
+              onAddHabits={async (newHabits) => {
+                for (const h of newHabits) {
+                  await addHabit(h);
+                }
+                showToast(`Added ${newHabits.length} starter habits!`);
+              }}
+            />
+          )}
         </div>
       </div>
 
@@ -3784,7 +3833,7 @@ export const HabitRow = memo(function HabitRow({
   };
 
   if (isNumeric) {
-    const pct = Math.min(100, (h.value / (h.target || 1)) * 100);
+    const pct = Math.min(100, (((h.value ?? 0)) / (h.target || 1)) * 100);
     return (
       <div
         className="relative w-full rounded-[24px] liquid-glass overflow-hidden flex flex-col p-5 mb-2 cursor-pointer transition hover:bg-[color:var(--canvas-soft)]"
