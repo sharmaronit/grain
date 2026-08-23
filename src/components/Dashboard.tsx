@@ -1518,47 +1518,51 @@ export function Dashboard({ user }: { user?: any }) {
         >
 
           {/* Liquid drifting blobs — animated blur gradient ambient light for all non-consistency screens */}
-          {activeTab !== "consistency" && activeTab !== "wallpaper" && (
-            <div className="pointer-events-none absolute inset-0 overflow-hidden z-0">
-              <div
-                className="liquid-blob absolute -left-24 -top-24 h-72 w-72 rounded-full"
-                style={{ background: "color-mix(in oklab, var(--ink) 22%, transparent)" }}
-                aria-hidden
-              />
-              <div
-                className="liquid-blob absolute top-1/3 -right-24 h-80 w-80 rounded-full"
-                style={{
-                  background: "color-mix(in oklab, var(--ink) 14%, transparent)",
-                  animationDelay: "-5s",
-                }}
-                aria-hidden
-              />
-              <div
-                className="liquid-blob absolute -bottom-24 left-1/4 h-64 w-64 rounded-full"
-                style={{
-                  background: "color-mix(in oklab, var(--ink) 18%, transparent)",
-                  animationDelay: "-9s",
-                }}
-                aria-hidden
-              />
-            </div>
-          )}
+          <div
+            className={`pointer-events-none absolute inset-0 overflow-hidden z-0 transition-opacity duration-700 ease-in-out ${
+              activeTab === "consistency" || activeTab === "wallpaper" ? "opacity-0" : "opacity-100"
+            }`}
+          >
+            <div
+              className="liquid-blob absolute -left-24 -top-24 h-72 w-72 rounded-full"
+              style={{ background: "color-mix(in oklab, var(--ink) 22%, transparent)" }}
+              aria-hidden
+            />
+            <div
+              className="liquid-blob absolute top-1/3 -right-24 h-80 w-80 rounded-full"
+              style={{
+                background: "color-mix(in oklab, var(--ink) 14%, transparent)",
+                animationDelay: "-5s",
+              }}
+              aria-hidden
+            />
+            <div
+              className="liquid-blob absolute -bottom-24 left-1/4 h-64 w-64 rounded-full"
+              style={{
+                background: "color-mix(in oklab, var(--ink) 18%, transparent)",
+                animationDelay: "-9s",
+              }}
+              aria-hidden
+            />
+          </div>
 
-          {/* Photographic Trekking Peak Background — ONLY for Consistency Tab */}
-          {activeTab === "consistency" && (
-            <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
-              <img
-                src="/photo.jpg"
-                alt=""
-                className="w-full h-full object-cover opacity-25 grayscale"
-                style={{
-                  maskImage: "linear-gradient(to bottom, black 0%, black 75%, transparent 100%)",
-                  WebkitMaskImage: "linear-gradient(to bottom, black 0%, black 75%, transparent 100%)",
-                  objectPosition: "center top"
-                }}
-              />
-            </div>
-          )}
+          {/* Photographic Trekking Peak Background — Smoothly fades in ONLY for Consistency Tab */}
+          <div
+            className={`absolute inset-0 pointer-events-none z-0 overflow-hidden transition-all duration-700 ease-in-out ${
+              activeTab === "consistency" ? "opacity-100 scale-100" : "opacity-0 scale-105"
+            }`}
+          >
+            <img
+              src="/photo.jpg"
+              alt=""
+              className="w-full h-full object-cover opacity-25 grayscale transition-transform duration-1000 ease-out"
+              style={{
+                maskImage: "linear-gradient(to bottom, black 0%, black 75%, transparent 100%)",
+                WebkitMaskImage: "linear-gradient(to bottom, black 0%, black 75%, transparent 100%)",
+                objectPosition: "center top",
+              }}
+            />
+          </div>
 
           {/* Top-Center Brand Icon & Auto-Expanding Title Pill, plus Profile Button */}
           <div className="absolute top-4 left-0 right-0 z-40 flex items-center justify-between px-4 pointer-events-none">
