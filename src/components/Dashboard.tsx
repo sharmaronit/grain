@@ -1510,16 +1510,16 @@ export function Dashboard({ user }: { user?: any }) {
             </>
           )}
 
-          {/* Photographic Peak Background for Consistency Tab */}
-          {activeTab === "consistency" && (
+          {/* Photographic Peak Background for Dashboard Tabs */}
+          {activeTab !== "wallpaper" && (
             <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden">
               <img
                 src="/photo.jpg"
                 alt=""
-                className="w-full h-full object-cover opacity-20 grayscale"
+                className="w-full h-full object-cover opacity-25 grayscale"
                 style={{
-                  maskImage: "linear-gradient(to bottom, black 0%, black 70%, transparent 100%)",
-                  WebkitMaskImage: "linear-gradient(to bottom, black 0%, black 70%, transparent 100%)",
+                  maskImage: "linear-gradient(to bottom, black 0%, black 75%, transparent 100%)",
+                  WebkitMaskImage: "linear-gradient(to bottom, black 0%, black 75%, transparent 100%)",
                   objectPosition: "center top"
                 }}
               />
