@@ -52,6 +52,7 @@ import {
   ArrowUpRight,
   Eye,
   ImagePlus,
+  Move,
   Infinity
 } from "lucide-react";
 import { App as CapacitorApp } from "@capacitor/app";
@@ -404,6 +405,7 @@ export function Dashboard({ user }: { user?: any }) {
   const [wallpaperPhotoOffset, setWallpaperPhotoOffset] = useState({ x: 0, y: 0 });
   const [wallpaperPhotoScale, setWallpaperPhotoScale] = useState(1);
   const [isMovingPhoto, setIsMovingPhoto] = useState(false);
+  const [isRepositionMode, setIsRepositionMode] = useState(false);
   const [isDraggingWallpaper, setIsDraggingWallpaper] = useState(false);
   const [wallpaperScale, setWallpaperScale] = useState(1);
   const [remindersOn, setRemindersOn] = useState(true);
@@ -1220,6 +1222,7 @@ export function Dashboard({ user }: { user?: any }) {
   });
 
   const handlePointerDown = (e: React.PointerEvent) => {
+    if (!isRepositionMode && !isMovingPhoto) return;
     const state = dragState.current;
     state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
@@ -1230,7 +1233,7 @@ export function Dashboard({ user }: { user?: any }) {
       state.startY = e.clientY;
       state.initialOffset = { ...wallpaperOffset };
       state.initialPhotoOffset = { ...wallpaperPhotoOffset };
-      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { }
     } else if (state.pointers.size === 2) {
       const pts = Array.from(state.pointers.values());
       const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
@@ -1241,6 +1244,7 @@ export function Dashboard({ user }: { user?: any }) {
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
+    if (!isRepositionMode && !isMovingPhoto) return;
     const state = dragState.current;
     if (!state.pointers.has(e.pointerId)) return;
     state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -2059,18 +2063,57 @@ export function Dashboard({ user }: { user?: any }) {
                       type="button"
                       onClick={() => photoInputRef.current?.click()}
                       className="pointer-events-auto flex items-center justify-center h-10 w-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 text-white cursor-pointer active:scale-95 transition-all hover:bg-black/60 shadow-lg"
+                      aria-label="Upload custom wallpaper photo"
                     >
-                      <ImagePlus size={20} />
+                      <ImagePlus size={18} />
                     </button>
                     <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} onClick={(e) => e.stopPropagation()} />
+
                     {wallpaperTheme === "custom" && (
                       <button
                         type="button"
-                        onClick={() => setIsMovingPhoto(prev => !prev)}
-                        className={`pointer-events-auto flex items-center justify-center h-10 px-4 rounded-full backdrop-blur-md border border-white/20 text-white font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg ${isMovingPhoto ? "bg-white text-black" : "bg-black/40 hover:bg-black/60"
-                          }`}
+                        onClick={() => {
+                          try { navigator.vibrate?.(10); } catch { }
+                          setIsMovingPhoto(prev => !prev);
+                          if (!isMovingPhoto) setIsRepositionMode(false);
+                        }}
+                        className={`pointer-events-auto flex items-center gap-1.5 h-10 px-3.5 rounded-full backdrop-blur-md border border-white/20 text-white font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg ${
+                          isMovingPhoto ? "bg-white text-black shadow-white/30" : "bg-black/40 hover:bg-black/60"
+                        }`}
                       >
-                        {isMovingPhoto ? "Done Moving" : "Move Photo"}
+                        <Move size={14} />
+                        <span>{isMovingPhoto ? "Done Photo" : "Move Photo"}</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try { navigator.vibrate?.(10); } catch { }
+                        setIsRepositionMode(prev => !prev);
+                        if (!isRepositionMode) setIsMovingPhoto(false);
+                      }}
+                      className={`pointer-events-auto flex items-center gap-1.5 h-10 px-3.5 rounded-full backdrop-blur-md border border-white/20 text-white font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg ${
+                        isRepositionMode ? "bg-white text-black shadow-white/30" : "bg-black/40 hover:bg-black/60"
+                      }`}
+                    >
+                      <Move size={14} />
+                      <span>{isRepositionMode ? "Done" : "Reposition"}</span>
+                    </button>
+
+                    {(wallpaperOffset.x !== 0 || wallpaperOffset.y !== 0 || wallpaperScale !== 1) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          try { navigator.vibrate?.(10); } catch { }
+                          setWallpaperOffset({ x: 0, y: 0 });
+                          setWallpaperScale(1);
+                          showToast("Position reset");
+                        }}
+                        className="pointer-events-auto flex items-center justify-center h-10 w-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 text-white active:scale-95 transition-all hover:bg-black/60 shadow-lg"
+                        title="Reset position"
+                      >
+                        <RotateCcw size={16} />
                       </button>
                     )}
                   </div>
@@ -2089,7 +2132,7 @@ export function Dashboard({ user }: { user?: any }) {
                   }}
                 >
                   {/* Snapping Crosshairs */}
-                  {isDraggingWallpaper && (wallpaperGridStyle === "month" || wallpaperGridStyle === "year") && (
+                  {isDraggingWallpaper && isRepositionMode && (wallpaperGridStyle === "month" || wallpaperGridStyle === "year") && (
                     <>
                       <div className={`absolute top-0 bottom-0 left-1/2 w-[1px] -translate-x-1/2 z-0 transition-colors duration-200 ${wallpaperOffset.x === 0 ? "bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.8)]" : "bg-white/20"}`} />
                       <div className={`absolute left-0 right-0 top-1/2 h-[1px] -translate-y-1/2 z-0 transition-colors duration-200 ${wallpaperOffset.y === 0 ? "bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.8)]" : "bg-white/20"}`} />
@@ -2111,17 +2154,24 @@ export function Dashboard({ user }: { user?: any }) {
                     </>
                   )}
                   {/* Overlay hint */}
-                  <div className={`absolute top-[env(safe-area-inset-top,24px)] mt-24 left-0 right-0 flex justify-center pointer-events-none opacity-50 z-40 transition-opacity duration-300 ${isMovingPhoto ? "opacity-100" : ""}`}>
-                    <span className="bg-black/50 text-white px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest backdrop-blur-md">
-                      {isMovingPhoto ? "Drag to reposition photo · Pinch to resize" : "Drag to reposition · Pinch to resize"}
-                    </span>
-                  </div>
+                  {(isRepositionMode || isMovingPhoto) && (
+                    <div className="absolute top-[env(safe-area-inset-top,24px)] mt-24 left-0 right-0 flex justify-center pointer-events-none z-40 animate-fade-in">
+                      <span className="bg-black/70 text-white px-3.5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest backdrop-blur-md border border-white/20 shadow-lg">
+                        {isMovingPhoto ? "Drag to reposition photo · Pinch to resize" : "Drag to reposition grid · Pinch to resize"}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Draggable container */}
                   <div
                     ref={wallpaperGridRef}
-                    className="relative w-full h-full flex flex-col items-center justify-center cursor-move"
-                    style={{ transform: `translate(${wallpaperOffset.x}px, ${wallpaperOffset.y}px) scale(${wallpaperScale})`, touchAction: "none" }}
+                    className={`relative w-full h-full flex flex-col items-center justify-center ${
+                      isRepositionMode || isMovingPhoto ? "cursor-move pointer-events-auto" : "pointer-events-none"
+                    }`}
+                    style={{
+                      transform: `translate(${wallpaperOffset.x}px, ${wallpaperOffset.y}px) scale(${wallpaperScale})`,
+                      touchAction: isRepositionMode || isMovingPhoto ? "none" : "auto",
+                    }}
                     onPointerDown={handlePointerDown}
                     onPointerMove={handlePointerMove}
                     onPointerUp={handlePointerUp}
