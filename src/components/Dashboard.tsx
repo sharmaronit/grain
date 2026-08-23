@@ -307,6 +307,35 @@ export function Dashboard({ user }: { user?: any }) {
   const [toast, setToast] = useState<{ msg: string; action?: { label: string; onClick: () => void } } | null>(null);
   const toastTimerRef = useRef<number | null>(null);
 
+  // Multi-select & Bulk Delete state
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedHabitIds, setSelectedHabitIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteConfirmOpen, setBulkDeleteConfirmOpen] = useState(false);
+
+  const toggleSelectHabit = (habitId: string) => {
+    setSelectedHabitIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(habitId)) {
+        next.delete(habitId);
+        if (next.size === 0) {
+          setIsSelectionMode(false);
+        }
+      } else {
+        next.add(habitId);
+      }
+      return next;
+    });
+  };
+
+  const handleHabitLongPress = (habitId: string) => {
+    setIsSelectionMode(true);
+    setSelectedHabitIds((prev) => {
+      const next = new Set(prev);
+      next.add(habitId);
+      return next;
+    });
+  };
+
   // ── Real Firebase Hooks ─────────────────────────────────
   const {
     habits: rawHabits,
@@ -1850,6 +1879,10 @@ export function Dashboard({ user }: { user?: any }) {
                               setDetail({ q: quad, i: idx });
                               setNoteDraft("");
                             }}
+                            isSelectionMode={isSelectionMode}
+                            isSelected={selectedHabitIds.has(h.id)}
+                            onSelectToggle={toggleSelectHabit}
+                            onLongPress={handleHabitLongPress}
                           />
                         ))
                       )}
@@ -2454,40 +2487,102 @@ export function Dashboard({ user }: { user?: any }) {
             </div>
           </div>
 
-          {/* Liquid Glass Bottom Navigation Bar */}
-          <div className="absolute bottom-3 left-0 right-0 z-40 mx-4 pointer-events-none">
-            <nav className="pointer-events-auto mx-auto flex max-w-[360px] items-center justify-center gap-1 rounded-full border border-[color:var(--hairline)] bg-canvas/40 p-1.5 backdrop-blur-2xl shadow-2xl specular relative overflow-hidden">
-              {([
-                { id: "today", label: "Today", icon: Flame },
-                { id: "consistency", label: "Consistency", icon: CalendarDays },
-                { id: "myday", label: "My Day", icon: Sun },
-                { id: "goal", label: "Goals", icon: Target },
-                { id: "wallpaper", label: "Wallpaper", icon: Wallpaper },
-              ] as const).map((t) => {
-                const active = activeTab === t.id;
-                const Icon = t.icon;
-                return (
+          {/* Liquid Glass Bulk Action Bar (When selecting habits) */}
+          {isSelectionMode ? (
+            <div className="absolute bottom-4 left-0 right-0 z-40 mx-4 pointer-events-none animate-fade-in-up">
+              <nav className="pointer-events-auto mx-auto flex max-w-[380px] items-center justify-between gap-2 rounded-full border border-[color:color-mix(in_srgb,var(--hairline)_70%,transparent)] bg-[color:color-mix(in_srgb,var(--canvas)_85%,transparent)] p-1.5 backdrop-blur-2xl shadow-2xl specular">
+                <div className="flex items-center gap-1 pl-2">
                   <button
-                    key={t.id}
+                    type="button"
                     onClick={() => {
-                      switchTab(t.id as AppTab);
                       try { navigator.vibrate?.(10); } catch { }
+                      setIsSelectionMode(false);
+                      setSelectedHabitIds(new Set());
                     }}
-                    className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-full py-2 px-1 text-[11px] font-medium transition-all duration-200 ${active
-                      ? "bg-ink text-on-ink shadow-lg scale-105"
-                      : "text-body hover:text-ink active:scale-95"
-                      }`}
+                    className="flex h-7 w-7 items-center justify-center rounded-full bg-canvas-soft text-ink hover:bg-ink/10 active:scale-95 transition"
+                    aria-label="Cancel selection"
                   >
-                    <Icon className="h-4 w-4" strokeWidth={active ? 2.5 : 1.75} />
-                    <span className="text-[10px] leading-none">{t.label}</span>
+                    <X className="h-3.5 w-3.5" />
                   </button>
-                );
-              })}
-            </nav>
-          </div>
+                  <span className="text-[12px] font-bold text-ink tabular-nums ml-1">
+                    {selectedHabitIds.size} selected
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      try { navigator.vibrate?.(10); } catch { }
+                      const allIds = flatHabits.map(h => h.id).filter(Boolean);
+                      if (selectedHabitIds.size === allIds.length) {
+                        setSelectedHabitIds(new Set());
+                        setIsSelectionMode(false);
+                      } else {
+                        setSelectedHabitIds(new Set(allIds));
+                      }
+                    }}
+                    className="text-[11px] font-bold text-body hover:text-ink transition px-2.5 py-1.5 rounded-full hover:bg-ink/5"
+                  >
+                    {selectedHabitIds.size === flatHabits.length ? "Deselect all" : "Select all"}
+                  </button>
+
+                  <button
+                    type="button"
+                    disabled={selectedHabitIds.size === 0}
+                    onClick={() => {
+                      if (selectedHabitIds.size === 0) return;
+                      try { navigator.vibrate?.(15); } catch { }
+                      setBulkDeleteConfirmOpen(true);
+                    }}
+                    className={`flex items-center gap-1 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all shadow-md active:scale-95 ${
+                      selectedHabitIds.size > 0
+                        ? "bg-red-500 text-white hover:bg-red-600 shadow-red-500/30"
+                        : "bg-canvas-soft text-mute opacity-50 cursor-not-allowed"
+                    }`}
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Delete ({selectedHabitIds.size})</span>
+                  </button>
+                </div>
+              </nav>
+            </div>
+          ) : (
+            /* Liquid Glass Bottom Navigation Bar */
+            <div className="absolute bottom-3 left-0 right-0 z-40 mx-4 pointer-events-none">
+              <nav className="pointer-events-auto mx-auto flex max-w-[360px] items-center justify-center gap-1 rounded-full border border-[color:var(--hairline)] bg-canvas/40 p-1.5 backdrop-blur-2xl shadow-2xl specular relative overflow-hidden">
+                {([
+                  { id: "today", label: "Today", icon: Flame },
+                  { id: "consistency", label: "Consistency", icon: CalendarDays },
+                  { id: "myday", label: "My Day", icon: Sun },
+                  { id: "goal", label: "Goals", icon: Target },
+                  { id: "wallpaper", label: "Wallpaper", icon: Wallpaper },
+                ] as const).map((t) => {
+                  const active = activeTab === t.id;
+                  const Icon = t.icon;
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => {
+                        switchTab(t.id as AppTab);
+                        try { navigator.vibrate?.(10); } catch { }
+                      }}
+                      className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-full py-2 px-1 text-[11px] font-medium transition-all duration-200 ${active
+                        ? "bg-ink text-on-ink shadow-lg scale-105"
+                        : "text-body hover:text-ink active:scale-95"
+                        }`}
+                    >
+                      <Icon className="h-4 w-4" strokeWidth={active ? 2.5 : 1.75} />
+                      <span className="text-[10px] leading-none">{t.label}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+          )}
 
           {/* FAB */}
-          {activeTab === "today" && (
+          {!isSelectionMode && activeTab === "today" && (
             <button
               onClick={() => setModalOpen(true)}
               className="absolute bottom-20 right-5 z-30 mb-safe grid h-14 w-14 place-items-center rounded-full bg-ink text-on-ink shadow-[0_10px_30px_-5px_rgba(0,0,0,0.4)] transition active:scale-95 hover:scale-105"
@@ -2760,6 +2855,46 @@ export function Dashboard({ user }: { user?: any }) {
                 </div>
               </div>
             </div>
+          )}
+
+          {bulkDeleteConfirmOpen && (
+            <ConfirmDialog
+              onClose={() => setBulkDeleteConfirmOpen(false)}
+              icon={<Trash2 className="h-5 w-5 text-red-500" />}
+              title={`Delete ${selectedHabitIds.size} habit${selectedHabitIds.size > 1 ? "s" : ""}?`}
+              description={`This will permanently remove ${selectedHabitIds.size === 1 ? "this habit" : "these habits"} and reset ${selectedHabitIds.size === 1 ? "its" : "their"} streak history.`}
+              confirmLabel={`Delete (${selectedHabitIds.size})`}
+              destructive
+              onConfirm={async () => {
+                try { navigator.vibrate?.([30, 80, 50]); } catch { }
+                const idsToDelete = Array.from(selectedHabitIds);
+                const removedDocs: any[] = [];
+
+                for (const habitId of idsToDelete) {
+                  const removed = await removeHabitDoc(habitId);
+                  if (removed) removedDocs.push(removed);
+                }
+
+                setBulkDeleteConfirmOpen(false);
+                setIsSelectionMode(false);
+                setSelectedHabitIds(new Set());
+
+                showToast(
+                  `Deleted ${removedDocs.length} habit${removedDocs.length > 1 ? "s" : ""}`,
+                  {
+                    label: "Undo",
+                    onClick: async () => {
+                      try { navigator.vibrate?.(10); } catch { }
+                      for (const doc of removedDocs) {
+                        await restoreHabitDoc(doc);
+                      }
+                      showToast(`Restored ${removedDocs.length} habit${removedDocs.length > 1 ? "s" : ""}`);
+                    },
+                  },
+                  6000
+                );
+              }}
+            />
           )}
 
           {signOutOpen && (
