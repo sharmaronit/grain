@@ -221,6 +221,9 @@ export function Dashboard({ user }: { user?: any }) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
 
+  const swipeContainerRef = useRef<HTMLDivElement | null>(null);
+  const isNavigatingRef = useRef(false);
+
   const switchTab = (tab: AppTab) => {
     if (activeTab === tab) return;
     const currentIdx = TAB_ORDER.indexOf(activeTab);
@@ -229,7 +232,47 @@ export function Dashboard({ user }: { user?: any }) {
     startTransition(() => {
       setActiveTab(tab);
     });
+
+    if (swipeContainerRef.current) {
+      const targetElement = swipeContainerRef.current.querySelector(`[data-tab-id="${tab}"]`);
+      if (targetElement) {
+        isNavigatingRef.current = true;
+        targetElement.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
+        setTimeout(() => {
+          isNavigatingRef.current = false;
+        }, 600);
+      }
+    }
   };
+
+  useEffect(() => {
+    const container = swipeContainerRef.current;
+    if (!container) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (isNavigatingRef.current) return;
+        
+        entries.forEach(entry => {
+          if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
+            const tabId = entry.target.getAttribute("data-tab-id") as AppTab;
+            if (tabId && tabId !== activeTab) {
+              startTransition(() => setActiveTab(tabId));
+            }
+          }
+        });
+      },
+      {
+        root: container,
+        threshold: 0.5,
+      }
+    );
+
+    const tabs = container.querySelectorAll("[data-tab-id]");
+    tabs.forEach(tab => observer.observe(tab));
+
+    return () => observer.disconnect();
+  }, [activeTab]);
 
   const { goals } = useGoals(userId);
   const activeGoalId = useStore((s) => s.activeGoalId);
@@ -2071,16 +2114,20 @@ export function Dashboard({ user }: { user?: any }) {
           )}
 
           <div
-            ref={scrollRef}
-            className="relative flex-1 overflow-y-auto overflow-x-hidden scrollbar-none pb-28"
-            style={{ willChange: "scroll-position", transform: "translateZ(0)" }}
+            ref={swipeContainerRef}
+            className="relative flex flex-1 w-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory scrollbar-none"
+            style={{ touchAction: "pan-y", scrollBehavior: "smooth" }}
           >
 
 
 
             {/* TAB 1: TODAY */}
-            {activeTab === "today" && (
-              <div className={`space-y-4 pt-16 ${tabDirection === "left" ? "animate-tab-slide-left" : "animate-tab-slide-right"}`}>
+            <div
+              data-tab-id="today"
+              className="w-full h-full flex-shrink-0 snap-start snap-always overflow-y-auto overflow-x-hidden relative scrollbar-none pb-28"
+              ref={activeTab === "today" ? scrollRef : undefined}
+            >
+              <div className="space-y-4 pt-16">
 
                 <div className="flex justify-start px-5">
                   <button
@@ -2235,11 +2282,15 @@ export function Dashboard({ user }: { user?: any }) {
                   )}
                 </section>
               </div>
-            )}
+            </div>
 
             {/* TAB 2: CONSISTENCY */}
-            {activeTab === "consistency" && (
-              <div className={tabDirection === "left" ? "animate-tab-slide-left" : "animate-tab-slide-right"}>
+            <div
+              data-tab-id="consistency"
+              className="w-full h-full flex-shrink-0 snap-start snap-always overflow-y-auto overflow-x-hidden relative scrollbar-none pb-28"
+              ref={activeTab === "consistency" ? scrollRef : undefined}
+            >
+              <div>
                 <ConsistencyTab
                   heatmap={heatmap}
                   selectedHabit={selectedHabit}
@@ -2252,11 +2303,15 @@ export function Dashboard({ user }: { user?: any }) {
                   showToast={showToast}
                 />
               </div>
-            )}
+            </div>
 
             {/* TAB 3: MY DAY */}
-            {activeTab === "myday" && (
-              <div className={`pt-16 pb-32 ${tabDirection === "left" ? "animate-tab-slide-left" : "animate-tab-slide-right"}`}>
+            <div
+              data-tab-id="myday"
+              className="w-full h-full flex-shrink-0 snap-start snap-always overflow-y-auto overflow-x-hidden relative scrollbar-none pb-28"
+              ref={activeTab === "myday" ? scrollRef : undefined}
+            >
+              <div className="pt-16 pb-32">
                 <section className="px-5">
                   {totalCount === 0 ? (
                     <div className="liquid-glass specular flex flex-col items-center justify-center gap-3 px-5 py-10 text-center rounded-3xl">
@@ -2343,15 +2398,18 @@ export function Dashboard({ user }: { user?: any }) {
                   )}
                 </section>
               </div>
-            )}
+            </div>
 
             <div className="h-6" />
-          </div>
 
-          {/* Goal Tab */}
-          {activeTab === "goal" && (
-            <div className={`absolute inset-0 z-10 ${tabDirection === "left" ? "animate-tab-slide-left" : "animate-tab-slide-right"}`}>
-              <GoalTab
+            {/* Goal Tab */}
+            <div
+              data-tab-id="goal"
+              className="w-full h-full flex-shrink-0 snap-start snap-always overflow-y-auto overflow-x-hidden relative scrollbar-none pb-28"
+              ref={activeTab === "goal" ? scrollRef : undefined}
+            >
+              <div className="pt-16 pb-32">
+                <GoalTab
                 goals={goals}
                 onDelete={async (id) => {
                   if (id === activeGoalId) {
@@ -2374,7 +2432,8 @@ export function Dashboard({ user }: { user?: any }) {
                 }}
               />
             </div>
-          )}
+            </div>
+          </div>
 
           {/* Liquid Glass Bottom Navigation Bar */}
           <div className="absolute bottom-3 left-0 right-0 z-40 mx-4 pointer-events-none">
