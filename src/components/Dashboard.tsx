@@ -920,7 +920,7 @@ export function Dashboard({ user }: { user?: any }) {
       const set = HABIT_SETS.find(s => s.key === wallpaperHabitSet);
       if (set?.habits?.length) return [...set.habits.slice(0, 3)];
     }
-    const activeHabitNames = flatHabits.filter(h => !h.archived).slice(0, 3).map(h => h.name);
+    const activeHabitNames = flatHabits.slice(0, 3).map(h => h.name);
     return activeHabitNames.length > 0 ? activeHabitNames : ["Focus", "Consistency", "Growth"];
   }, [wallpaperHabitSet, flatHabits]);
 
