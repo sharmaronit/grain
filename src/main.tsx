@@ -15,16 +15,20 @@ SafeArea.getSafeAreaInsets().then(({ insets }) => {
   document.documentElement.style.setProperty("--sa-bottom", `${insets.bottom}px`);
 }).catch(e => console.error("SafeArea error:", e));
 
+import { ErrorBoundary } from "./components/ErrorBoundary";
+
 const rootElement = document.getElementById("root");
 if (rootElement) {
   const root = ReactDOM.createRoot(rootElement);
   root.render(
     <React.StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <AuthGate>
-          {(user) => <Dashboard key={user.uid} user={user} />}
-        </AuthGate>
-      </QueryClientProvider>
+      <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <AuthGate>
+            {(user) => <Dashboard key={user.uid} user={user} />}
+          </AuthGate>
+        </QueryClientProvider>
+      </ErrorBoundary>
     </React.StrictMode>
   );
 }

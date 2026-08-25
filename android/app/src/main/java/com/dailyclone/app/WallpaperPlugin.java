@@ -191,9 +191,32 @@ public class WallpaperPlugin extends Plugin {
 
                 byte[] bytes = Base64.decode(b64, Base64.DEFAULT);
                 File photoFile = new File(getContext().getFilesDir(), "grain_wallpaper_photo.jpg");
-                FileOutputStream fos = new FileOutputStream(photoFile);
-                fos.write(bytes);
-                fos.close();
+                
+                // Downsample & write clean JPEG to avoid storing massive raw bitmaps on disk
+                BitmapFactory.Options opts = new BitmapFactory.Options();
+                opts.inJustDecodeBounds = true;
+                BitmapFactory.decodeByteArray(bytes, 0, bytes.length, opts);
+
+                int inSampleSize = 1;
+                while ((opts.outHeight / inSampleSize) > 1920 || (opts.outWidth / inSampleSize) > 1080) {
+                    inSampleSize *= 2;
+                }
+                opts.inSampleSize = Math.max(1, inSampleSize);
+                opts.inJustDecodeBounds = false;
+                opts.inPreferredConfig = Bitmap.Config.RGB_565;
+
+                Bitmap decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.length, opts);
+                if (decoded != null) {
+                    FileOutputStream fos = new FileOutputStream(photoFile);
+                    decoded.compress(Bitmap.CompressFormat.JPEG, 85, fos);
+                    fos.flush();
+                    fos.close();
+                    decoded.recycle();
+                } else {
+                    FileOutputStream fos = new FileOutputStream(photoFile);
+                    fos.write(bytes);
+                    fos.close();
+                }
 
                 // Store the path so GrainWallpaperService can read it
                 SharedPreferences prefs = getContext()
@@ -202,8 +225,8 @@ public class WallpaperPlugin extends Plugin {
                      .putString(GrainWallpaperService.KEY_PHOTO_PATH, photoFile.getAbsolutePath())
                      .apply();
             }
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (Throwable t) {
+            t.printStackTrace();
         } finally {
             // Always remove the base64 blob before writing to GRAIN_LIVE_DATA
             data.remove("customPhotoBase64");
@@ -218,7 +241,7 @@ public class WallpaperPlugin extends Plugin {
                 GrainWallpaperService.WallpaperData.fromJson(jsonStr);
             DisplayMetrics metrics = getContext().getResources().getDisplayMetrics();
             bitmap = Bitmap.createBitmap(metrics.widthPixels, metrics.heightPixels,
-                                         Bitmap.Config.ARGB_8888);
+                                         Bitmap.Config.RGB_565);
             Canvas canvas = new Canvas(bitmap);
             GrainWallpaperService.drawHeatmapToCanvas(
                 getContext(), canvas, metrics.widthPixels, metrics.heightPixels, parsed);
@@ -239,8 +262,8 @@ public class WallpaperPlugin extends Plugin {
                 true,
                 flags
             );
-        } catch (Exception e) {
-            e.printStackTrace();
+        } catch (Throwable t) {
+            t.printStackTrace();
         } finally {
             if (bitmap != null) bitmap.recycle();
         }

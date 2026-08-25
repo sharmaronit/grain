@@ -21,15 +21,19 @@ const queryClient = new QueryClient({
   },
 });
 
+import { ErrorBoundary } from "./components/ErrorBoundary";
+
 const rootEl = document.getElementById("root");
 if (rootEl) {
   ReactDOM.createRoot(rootEl).render(
     <React.StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <AuthGate>
-          {(user) => <Dashboard key={user.uid} user={user} />}
-        </AuthGate>
-      </QueryClientProvider>
+      <ErrorBoundary>
+        <QueryClientProvider client={queryClient}>
+          <AuthGate>
+            {(user) => <Dashboard key={user.uid} user={user} />}
+          </AuthGate>
+        </QueryClientProvider>
+      </ErrorBoundary>
     </React.StrictMode>
   );
 }

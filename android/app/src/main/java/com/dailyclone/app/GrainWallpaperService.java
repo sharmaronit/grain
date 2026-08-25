@@ -329,12 +329,12 @@ public class GrainWallpaperService extends WallpaperService {
 
         boolean drewPhoto = false;
         if ("custom".equals(adjusted.themeKey)) {
-            // Load saved photo from filesystem (saved by WallpaperPlugin, NOT from base64 in JSON)
+            // Load saved photo safely with downsampling to prevent OutOfMemory crashes
             SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
             String photoPath = prefs.getString(KEY_PHOTO_PATH, null);
             if (photoPath != null) {
                 try {
-                    Bitmap photo = BitmapFactory.decodeFile(photoPath);
+                    Bitmap photo = decodeSampledBitmapFromFile(photoPath, width, height);
                     if (photo != null) {
                         // Center-crop to fill
                         float scaleX = (float) width  / photo.getWidth();
@@ -355,8 +355,8 @@ public class GrainWallpaperService extends WallpaperService {
                         canvas.drawARGB(alpha, 0, 0, 0);
                         drewPhoto = true;
                     }
-                } catch (Exception e) {
-                    e.printStackTrace();
+                } catch (Throwable t) {
+                    t.printStackTrace();
                 }
             }
             if (!drewPhoto) canvas.drawColor(Color.BLACK);
@@ -1100,6 +1100,40 @@ public class GrainWallpaperService extends WallpaperService {
 
     // ── Utility ─────────────────────────────────────────────────────────
 
+    public static Bitmap decodeSampledBitmapFromFile(String path, int reqWidth, int reqHeight) {
+        try {
+            if (path == null) return null;
+            File file = new File(path);
+            if (!file.exists() || file.length() == 0) return null;
+
+            final BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inJustDecodeBounds = true;
+            BitmapFactory.decodeFile(path, options);
+
+            int targetW = reqWidth > 0 ? reqWidth : 1080;
+            int targetH = reqHeight > 0 ? reqHeight : 1920;
+
+            int inSampleSize = 1;
+            if (options.outHeight > targetH || options.outWidth > targetW) {
+                final int halfHeight = options.outHeight / 2;
+                final int halfWidth = options.outWidth / 2;
+                while ((halfHeight / inSampleSize) >= targetH && (halfWidth / inSampleSize) >= targetW) {
+                    inSampleSize *= 2;
+                }
+            }
+
+            options.inSampleSize = Math.max(1, inSampleSize);
+            options.inJustDecodeBounds = false;
+            options.inPreferredConfig = Bitmap.Config.RGB_565; // Uses half RAM of ARGB_8888
+            options.inDither = true;
+
+            return BitmapFactory.decodeFile(path, options);
+        } catch (Throwable t) {
+            t.printStackTrace();
+            return null;
+        }
+    }
+
     private static int clamp(int level) {
         return Math.max(0, Math.min(3, level));
     }
@@ -1129,17 +1163,17 @@ public class GrainWallpaperService extends WallpaperService {
         @Override
         public void onCreate(SurfaceHolder s) {
             super.onCreate(s);
-            SharedPreferences p = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-            p.registerOnSharedPreferenceChangeListener(this);
-
-            IntentFilter filter = new IntentFilter();
-            filter.addAction(Intent.ACTION_DATE_CHANGED);
-            filter.addAction(Intent.ACTION_TIME_CHANGED);
-            filter.addAction(Intent.ACTION_TIMEZONE_CHANGED);
             try {
+                SharedPreferences p = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                p.registerOnSharedPreferenceChangeListener(this);
+
+                IntentFilter filter = new IntentFilter();
+                filter.addAction(Intent.ACTION_DATE_CHANGED);
+                filter.addAction(Intent.ACTION_TIME_CHANGED);
+                filter.addAction(Intent.ACTION_TIMEZONE_CHANGED);
                 registerReceiver(timeChangedReceiver, filter);
-            } catch (Exception e) {
-                e.printStackTrace();
+            } catch (Throwable t) {
+                t.printStackTrace();
             }
 
             reloadData();
@@ -1151,9 +1185,11 @@ public class GrainWallpaperService extends WallpaperService {
             handler.removeCallbacks(drawRunner);
             try {
                 unregisterReceiver(timeChangedReceiver);
-            } catch (Exception ignored) {}
-            SharedPreferences p = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-            p.unregisterOnSharedPreferenceChangeListener(this);
+            } catch (Throwable ignored) {}
+            try {
+                SharedPreferences p = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                p.unregisterOnSharedPreferenceChangeListener(this);
+            } catch (Throwable ignored) {}
         }
 
         @Override
@@ -1186,30 +1222,40 @@ public class GrainWallpaperService extends WallpaperService {
         }
 
         private void reloadData() {
-            SharedPreferences p = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-            cachedData = WallpaperData.fromJson(p.getString(KEY_LIVE_DATA, null));
+            try {
+                SharedPreferences p = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+                cachedData = WallpaperData.fromJson(p.getString(KEY_LIVE_DATA, null));
+            } catch (Throwable t) {
+                t.printStackTrace();
+            }
         }
 
         private void draw() {
             SurfaceHolder holder = getSurfaceHolder();
+            if (holder == null) return;
             Canvas canvas = null;
             try {
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                    canvas = holder.lockHardwareCanvas();
+                    try {
+                        canvas = holder.lockHardwareCanvas();
+                    } catch (Throwable fallback) {
+                        canvas = holder.lockCanvas();
+                    }
                 } else {
                     canvas = holder.lockCanvas();
                 }
-                if (canvas != null)
+                if (canvas != null) {
                     drawHeatmapToCanvas(GrainWallpaperService.this, canvas,
                                         canvas.getWidth(), canvas.getHeight(), cachedData);
-            } catch (Exception e) {
-                e.printStackTrace();
+                }
+            } catch (Throwable t) {
+                t.printStackTrace();
             } finally {
                 if (canvas != null) {
                     try {
                         holder.unlockCanvasAndPost(canvas);
-                    } catch (Exception e) {
-                        e.printStackTrace();
+                    } catch (Throwable t) {
+                        t.printStackTrace();
                     }
                 }
             }
