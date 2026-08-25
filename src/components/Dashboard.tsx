@@ -408,6 +408,33 @@ export function Dashboard({ user }: { user?: any }) {
   const [isRepositionMode, setIsRepositionMode] = useState(false);
   const [isDraggingWallpaper, setIsDraggingWallpaper] = useState(false);
   const [wallpaperScale, setWallpaperScale] = useState(1);
+  const [appliedWallpaper, setAppliedWallpaper] = useState<{
+    theme: string;
+    gridColorTheme: string;
+    wallpaperHabitSet: string;
+    wallpaperGridStyle: "weeks" | "year" | "month" | "goals" | "widget";
+    wallpaperCustomPhoto: string | null;
+    wallpaperPhotoOverlay: number;
+    wallpaperStatsAlign: "left" | "center" | "right";
+    wallpaperOffset: { x: number; y: number };
+    wallpaperPhotoOffset: { x: number; y: number };
+    wallpaperPhotoScale: number;
+    wallpaperScale: number;
+    previewWeeks: number;
+  }>({
+    theme: "auto",
+    gridColorTheme: "emerald",
+    wallpaperHabitSet: "none",
+    wallpaperGridStyle: "weeks",
+    wallpaperCustomPhoto: null,
+    wallpaperPhotoOverlay: 0.4,
+    wallpaperStatsAlign: "center",
+    wallpaperOffset: { x: 0, y: 0 },
+    wallpaperPhotoOffset: { x: 0, y: 0 },
+    wallpaperPhotoScale: 1,
+    wallpaperScale: 1,
+    previewWeeks: 26,
+  });
   const [remindersOn, setRemindersOn] = useState(true);
   const [detail, setDetail] = useState<{ q: Quadrant; i: number } | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
@@ -513,10 +540,26 @@ export function Dashboard({ user }: { user?: any }) {
         if (docData.theme) setTheme(docData.theme as Theme);
         const prefs = (docData as any).prefs;
         if (prefs) {
-          setWallpaperTheme(prefs.wallpaperTheme ?? "auto");
-          setGridColorTheme(prefs.gridColorTheme ?? "emerald");
-          setWallpaperHabitSet(prefs.wallpaperHabitSet ?? "none");
-          setWallpaperGridStyle(prefs.wallpaperGridStyle as any ?? "weeks");
+          const loadedApplied = {
+            theme: prefs.wallpaperTheme ?? "auto",
+            gridColorTheme: prefs.gridColorTheme ?? "emerald",
+            wallpaperHabitSet: prefs.wallpaperHabitSet ?? "none",
+            wallpaperGridStyle: (prefs.wallpaperGridStyle as any) ?? "weeks",
+            wallpaperCustomPhoto: prefs.wallpaperCustomPhoto ?? null,
+            wallpaperPhotoOverlay: typeof prefs.wallpaperPhotoOverlay === "number" ? prefs.wallpaperPhotoOverlay : 0.4,
+            wallpaperStatsAlign: prefs.wallpaperStatsAlign ?? "center",
+            wallpaperOffset: prefs.wallpaperOffset ?? { x: 0, y: 0 },
+            wallpaperPhotoOffset: prefs.wallpaperPhotoOffset ?? { x: 0, y: 0 },
+            wallpaperPhotoScale: typeof prefs.wallpaperPhotoScale === "number" ? prefs.wallpaperPhotoScale : 1,
+            wallpaperScale: typeof prefs.wallpaperScale === "number" ? prefs.wallpaperScale : 1,
+            previewWeeks: typeof prefs.previewWeeks === "number" ? prefs.previewWeeks : 26,
+          };
+          setAppliedWallpaper(loadedApplied);
+
+          setWallpaperTheme(loadedApplied.theme);
+          setGridColorTheme(loadedApplied.gridColorTheme);
+          setWallpaperHabitSet(loadedApplied.wallpaperHabitSet);
+          setWallpaperGridStyle(loadedApplied.wallpaperGridStyle);
           if (prefs.activeGoalId) setActiveGoalId(prefs.activeGoalId);
           if (prefs.wallpaperOffset) {
             setWallpaperOffset(prefs.wallpaperOffset);
@@ -930,35 +973,81 @@ export function Dashboard({ user }: { user?: any }) {
     return HABIT_SETS.find(s => s.key === wallpaperHabitSet)?.habits as string[] | undefined;
   }, [wallpaperHabitSet, wallpaperGridStyle, topHabitNames]);
 
+  const appliedHabitTextLines = useMemo(() => {
+    if (appliedWallpaper.wallpaperGridStyle === "widget") return topHabitNames;
+    if (appliedWallpaper.wallpaperHabitSet === "none" || appliedWallpaper.wallpaperGridStyle !== "weeks") return undefined;
+    return HABIT_SETS.find(s => s.key === appliedWallpaper.wallpaperHabitSet)?.habits as string[] | undefined;
+  }, [appliedWallpaper.wallpaperHabitSet, appliedWallpaper.wallpaperGridStyle, topHabitNames]);
+
   useWallpaperSync({
     heatmap: displayedHeatmap,
     heatmapStartMs: heatmapStartDate().getTime(),
     totalStreak: displayedTotalStreak,
     completionRate: displayedRate,
-    wallpaperTheme,
-    previewWeeks,
+    wallpaperTheme: appliedWallpaper.theme,
+    previewWeeks: appliedWallpaper.previewWeeks,
     wallpaperSync,
     isGoalActive: !!(activeGoalId && goals.some(g => g.id === activeGoalId)),
-    accentColor: wallpaperTokens(wallpaperTheme, gridColorTheme, theme).accent,
-    gridStyle: wallpaperGridStyle,
-    customPhotoBase64: wallpaperTheme === "custom" ? wallpaperCustomPhoto : null,
-    photoOverlay: wallpaperPhotoOverlay,
-    statsAlignment: wallpaperStatsAlign,
-    offsetY: typeof window !== "undefined" ? 50 + (wallpaperOffset.y / window.innerHeight) * 100 : 54,
-    offsetX: wallpaperOffset.x,
-    gridScale: wallpaperScale,
-    gridColorTheme: gridColorTheme,
-    photoOffsetX: wallpaperPhotoOffset.x,
-    photoOffsetY: wallpaperPhotoOffset.y,
-    photoScale: wallpaperPhotoScale,
+    accentColor: wallpaperTokens(appliedWallpaper.theme, appliedWallpaper.gridColorTheme, theme).accent,
+    gridStyle: appliedWallpaper.wallpaperGridStyle,
+    customPhotoBase64: appliedWallpaper.theme === "custom" ? appliedWallpaper.wallpaperCustomPhoto : null,
+    photoOverlay: appliedWallpaper.wallpaperPhotoOverlay,
+    statsAlignment: appliedWallpaper.wallpaperStatsAlign,
+    offsetY: typeof window !== "undefined" ? 50 + (appliedWallpaper.wallpaperOffset.y / window.innerHeight) * 100 : 54,
+    offsetX: appliedWallpaper.wallpaperOffset.x,
+    gridScale: appliedWallpaper.wallpaperScale,
+    gridColorTheme: appliedWallpaper.gridColorTheme,
+    photoOffsetX: appliedWallpaper.wallpaperPhotoOffset.x,
+    photoOffsetY: appliedWallpaper.wallpaperPhotoOffset.y,
+    photoScale: appliedWallpaper.wallpaperPhotoScale,
     stackedGoals: stackedGoals,
-    habitText: habitTextLines,
+    habitText: appliedHabitTextLines,
   });
 
   const applyWallpaper = async (forceStatic: boolean = false, screenTarget: string = "both") => {
     if (wallpaperState !== "idle") return;
     setWallpaperState("applying");
     try {
+      const currentApplied = {
+        theme: wallpaperTheme,
+        gridColorTheme,
+        wallpaperHabitSet,
+        wallpaperGridStyle,
+        wallpaperCustomPhoto,
+        wallpaperPhotoOverlay,
+        wallpaperStatsAlign,
+        wallpaperOffset,
+        wallpaperPhotoOffset,
+        wallpaperPhotoScale,
+        wallpaperScale,
+        previewWeeks,
+      };
+      setAppliedWallpaper(currentApplied);
+
+      if (user?.uid) {
+        updateUserProfile(user.uid, {
+          prefs: {
+            wallpaperTheme,
+            gridColorTheme,
+            wallpaperHabitSet,
+            wallpaperGridStyle,
+            wallpaperScale,
+            wallpaperPhotoOverlay,
+            wallpaperStatsAlign,
+            wallpaperSync,
+            remindersOn,
+            timeFilter,
+            theme,
+            previewWeeks,
+            activeGoalId,
+            wallpaperOffset,
+            wallpaperPhotoOffset,
+            wallpaperPhotoScale,
+            wallpaperCustomPhoto,
+          }
+        } as any).catch(err => console.error("Failed to save wallpaper prefs", err));
+      }
+
       if (typeof window !== "undefined" && (window as any).Capacitor?.isNativePlatform()) {
         const { supported } = await WallpaperNative.isLiveWallpaperSupported();
         if (supported && !forceStatic) {
