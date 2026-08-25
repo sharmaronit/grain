@@ -2095,11 +2095,11 @@ export function Dashboard({ user }: { user?: any }) {
                         }}
                         className={`pointer-events-auto flex items-center gap-1.5 h-9 px-3.5 rounded-full backdrop-blur-xl border font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg ${
                           isMovingPhoto
-                            ? "bg-[color:color-mix(in_srgb,var(--wp-accent)_20%,rgba(0,0,0,0.6))] border-[color:var(--wp-accent)] text-[color:var(--wp-accent)] shadow-[0_0_15px_color-mix(in_srgb,var(--wp-accent)_35%,transparent)]"
-                            : "bg-black/40 border-white/15 text-white/80 hover:text-white hover:bg-black/60"
+                            ? "bg-white/25 border-white/50 text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)] ring-1 ring-white/30"
+                            : "bg-black/40 border-white/15 text-white/70 hover:text-white hover:bg-black/60"
                         }`}
                       >
-                        <Move size={13} className={isMovingPhoto ? "animate-pulse" : ""} />
+                        <Move size={13} className={isMovingPhoto ? "text-white animate-pulse" : ""} />
                         <span>{isMovingPhoto ? "Done Photo" : "Move Photo"}</span>
                       </button>
                     )}
@@ -2113,11 +2113,11 @@ export function Dashboard({ user }: { user?: any }) {
                       }}
                       className={`pointer-events-auto flex items-center gap-1.5 h-9 px-3.5 rounded-full backdrop-blur-xl border font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg ${
                         isRepositionMode
-                          ? "bg-[color:color-mix(in_srgb,var(--wp-accent)_20%,rgba(0,0,0,0.6))] border-[color:var(--wp-accent)] text-[color:var(--wp-accent)] shadow-[0_0_15px_color-mix(in_srgb,var(--wp-accent)_35%,transparent)]"
-                          : "bg-black/40 border-white/15 text-white/80 hover:text-white hover:bg-black/60"
+                          ? "bg-white/25 border-white/50 text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)] ring-1 ring-white/30"
+                          : "bg-black/40 border-white/15 text-white/70 hover:text-white hover:bg-black/60"
                       }`}
                     >
-                      <Move size={13} className={isRepositionMode ? "animate-pulse" : ""} />
+                      <Move size={13} className={isRepositionMode ? "text-white animate-pulse" : ""} />
                       <span>{isRepositionMode ? "Done" : "Reposition"}</span>
                     </button>
 
@@ -2130,7 +2130,7 @@ export function Dashboard({ user }: { user?: any }) {
                           setWallpaperScale(1);
                           showToast("Position reset");
                         }}
-                        className="pointer-events-auto flex items-center justify-center h-9 w-9 rounded-full bg-black/40 backdrop-blur-xl border border-white/15 text-white/80 active:scale-95 transition-all hover:bg-black/60 hover:text-white shadow-lg"
+                        className="pointer-events-auto flex items-center justify-center h-9 w-9 rounded-full bg-black/40 backdrop-blur-xl border border-white/15 text-white/70 active:scale-95 transition-all hover:bg-black/60 hover:text-white shadow-lg"
                         title="Reset position"
                       >
                         <RotateCcw size={15} />
