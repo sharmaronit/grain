@@ -217,8 +217,9 @@ export function Dashboard({ user }: { user?: any }) {
   const [dateStyle, setDateStyle] = useState<"underline" | "block" | "mono">("underline");
   const [dateDropdownOpen, setDateDropdownOpen] = useState(false);
 
-  const TAB_ORDER: AppTab[] = ["today", "consistency", "myday", "goal", "wallpaper"];
+  const TAB_ORDER: AppTab[] = ["today", "consistency", "myday", "goal"];
   const [activeTab, setActiveTab] = useState<AppTab>("today");
+  const [wallpaperEditorOpen, setWallpaperEditorOpen] = useState(false);
   const [tabDirection, setTabDirection] = useState<"left" | "right">("left");
   const [swipeMode, setSwipeMode] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -1620,7 +1621,7 @@ export function Dashboard({ user }: { user?: any }) {
           {/* Liquid drifting blobs — animated blur gradient ambient light for all non-consistency screens */}
           <div
             className={`pointer-events-none absolute inset-0 overflow-hidden z-0 transition-opacity duration-700 ease-in-out ${
-              activeTab === "consistency" || activeTab === "wallpaper" ? "opacity-0" : "opacity-100"
+              activeTab === "consistency" ? "opacity-0" : "opacity-100"
             }`}
           >
             <div
@@ -1669,68 +1670,6 @@ export function Dashboard({ user }: { user?: any }) {
             {/* Spacer to maintain true center */}
             <div className="w-9" />
 
-            {/* Themes Window (Only visible in wallpaper tab, positioned at the top) */}
-            {activeTab === "wallpaper" && (
-              <div className="absolute top-[60px] left-0 right-0 flex justify-center z-30 pointer-events-none px-4">
-                {(() => {
-                  const wt = wallpaperThemeOf(wallpaperTheme, theme);
-                  const isBrightTheme = wt.bg === "#f5f5f5" || (wt.bg as string) === "#ffffff";
-                  return (
-                    <div
-                      className={`w-full max-w-[500px] pointer-events-auto liquid-glass rounded-[32px] shadow-2xl transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] flex flex-col items-center overflow-hidden ${drawerOpen ? "max-h-[240px]" : "max-h-[48px]"
-                        }`}
-                    >
-                      {/* Content (First, so it expands downwards from the top) */}
-                      <div className={`w-full overflow-x-auto hide-scrollbar snap-x transition-opacity duration-300 ${drawerOpen ? "opacity-100 p-4 pt-6" : "opacity-0 h-0"}`}>
-                        <div className={`flex min-w-max gap-6 items-start px-2 ${isBrightTheme
-                            ? "[&_*]:!text-black [&_[role=slider]]:!border-black/30"
-                            : "[&_*]:!text-white [&_[role=slider]]:!border-white/30"
-                          }`}>
-                          {renderSettingsMenu()}
-                        </div>
-                      </div>
-
-                      {/* Handle (At the bottom of the drawer) */}
-                      <div
-                        className={`w-full flex justify-center items-center shrink-0 transition-all duration-500 cursor-pointer ${drawerOpen ? "h-6 pb-3" : (isBrightTheme ? "h-12 hover:bg-white/70" : "h-12 hover:bg-black/70")
-                          }`}
-                        onPointerDown={(e) => {
-                          toolbarDragStartY.current = e.clientY;
-                          try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { }
-                        }}
-                        onPointerMove={(e) => {
-                          if (toolbarDragStartY.current === null) return;
-                          const dy = e.clientY - toolbarDragStartY.current;
-                          // Inverted drag logic: drag DOWN to open, drag UP to close
-                          if (drawerOpen && dy < -40) {
-                            setDrawerOpen(false);
-                            toolbarDragStartY.current = null;
-                          } else if (!drawerOpen && dy > 40) {
-                            setDrawerOpen(true);
-                            toolbarDragStartY.current = null;
-                          }
-                        }}
-                        onPointerUp={(e) => {
-                          if (toolbarDragStartY.current !== null) {
-                            const dy = e.clientY - toolbarDragStartY.current;
-                            if (Math.abs(dy) < 10 && !drawerOpen) {
-                              setDrawerOpen(true);
-                            } else if (Math.abs(dy) < 10 && drawerOpen) {
-                              setDrawerOpen(false);
-                            }
-                            toolbarDragStartY.current = null;
-                          }
-                          try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { }
-                        }}
-                      >
-                        <div className={`w-14 h-1.5 rounded-full ${isBrightTheme ? "bg-black/30" : "bg-white/30"}`} />
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            )}
-
             <button
               type="button"
               onClick={() => {
@@ -1753,7 +1692,7 @@ export function Dashboard({ user }: { user?: any }) {
               }}
               className={`pointer-events-auto flex items-center justify-center rounded-full border border-[color:var(--hairline-mid)] p-1 pl-1 text-xs font-semibold text-ink backdrop-blur-xl shadow-lg transition-all duration-500 ease-out active:scale-95 ${
                 showTitlePill ? "gap-2 pr-3.5 bg-canvas text-ink ring-1 ring-ink/10" : "gap-0 pr-1 bg-canvas/85"
-              } ${activeTab === "wallpaper" ? "opacity-0 pointer-events-none scale-75" : "opacity-100 scale-100"}`}
+              } opacity-100 scale-100`}
               aria-label="App logo and section title"
             >
               <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full overflow-hidden relative">
@@ -2152,603 +2091,6 @@ export function Dashboard({ user }: { user?: any }) {
               />
             </div>
             </div>
-
-            {/* TAB 5: WALLPAPER */}
-            <div
-              data-tab-id="wallpaper"
-              className="w-full h-full flex-shrink-0 snap-start snap-always overflow-hidden relative"
-              ref={activeTab === "wallpaper" ? scrollRef : undefined}
-            >
-              <div className="absolute inset-0 z-10 flex flex-col bg-black pointer-events-auto">
-
-                {/* Controls overlay at top of Full Screen Preview */}
-                <div className="absolute top-[env(safe-area-inset-top,24px)] mt-4 left-0 right-0 flex items-center justify-between px-6 z-50 pointer-events-none">
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => photoInputRef.current?.click()}
-                      className="pointer-events-auto flex items-center justify-center h-9 w-9 rounded-full bg-black/40 backdrop-blur-xl border border-white/15 text-white/80 cursor-pointer active:scale-95 transition-all hover:bg-black/60 hover:text-white shadow-lg"
-                      aria-label="Upload custom wallpaper photo"
-                    >
-                      <ImagePlus size={16} />
-                    </button>
-                    <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} onClick={(e) => e.stopPropagation()} />
-
-                    {wallpaperTheme === "custom" && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          try { navigator.vibrate?.(10); } catch { }
-                          setIsMovingPhoto(prev => !prev);
-                          if (!isMovingPhoto) setIsRepositionMode(false);
-                        }}
-                        className={`pointer-events-auto flex items-center gap-1.5 h-9 px-3.5 rounded-full backdrop-blur-xl border font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg ${
-                          isMovingPhoto
-                            ? "bg-white/25 border-white/50 text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)] ring-1 ring-white/30"
-                            : "bg-black/40 border-white/15 text-white/70 hover:text-white hover:bg-black/60"
-                        }`}
-                      >
-                        <Move size={13} className={isMovingPhoto ? "text-white animate-pulse" : ""} />
-                        <span>{isMovingPhoto ? "Done Photo" : "Move Photo"}</span>
-                      </button>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        try { navigator.vibrate?.(10); } catch { }
-                        setIsRepositionMode(prev => !prev);
-                        if (!isRepositionMode) setIsMovingPhoto(false);
-                      }}
-                      className={`pointer-events-auto flex items-center gap-1.5 h-9 px-3.5 rounded-full backdrop-blur-xl border font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg ${
-                        isRepositionMode
-                          ? "bg-white/25 border-white/50 text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)] ring-1 ring-white/30"
-                          : "bg-black/40 border-white/15 text-white/70 hover:text-white hover:bg-black/60"
-                      }`}
-                    >
-                      <Move size={13} className={isRepositionMode ? "text-white animate-pulse" : ""} />
-                      <span>{isRepositionMode ? "Done" : "Reposition"}</span>
-                    </button>
-
-                    {(wallpaperOffset.x !== 0 || wallpaperOffset.y !== 0 || wallpaperScale !== 1) && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          try { navigator.vibrate?.(10); } catch { }
-                          setWallpaperOffset({ x: 0, y: 0 });
-                          setWallpaperScale(1);
-                          showToast("Position reset");
-                        }}
-                        className="pointer-events-auto flex items-center justify-center h-9 w-9 rounded-full bg-black/40 backdrop-blur-xl border border-white/15 text-white/70 active:scale-95 transition-all hover:bg-black/60 hover:text-white shadow-lg"
-                        title="Reset position"
-                      >
-                        <RotateCcw size={15} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Live Wallpaper Scene (Fills the entire screen) */}
-                <div
-                  key={syncPulse}
-                  ref={previewRef}
-                  className={`wp-scene absolute inset-0 flex flex-col items-center justify-center ${syncPulse ? "animate-sync-pulse" : ""}`}
-                  style={{
-                    background: wallpaperThemeOf(wallpaperTheme, theme).bg,
-                    ["--ink" as string]: wallpaperThemeOf(wallpaperTheme, theme).bg,
-                    ["--on-ink" as string]: wallpaperThemeOf(wallpaperTheme, theme).fg,
-                    color: wallpaperThemeOf(wallpaperTheme, theme).fg,
-                  }}
-                >
-                  {/* Snapping Crosshairs */}
-                  {isDraggingWallpaper && isRepositionMode && (wallpaperGridStyle === "month" || wallpaperGridStyle === "year" || wallpaperGridStyle === "weeks" || wallpaperGridStyle === "widget") && (
-                    <>
-                      <div className={`absolute top-0 bottom-0 left-1/2 w-[1px] -translate-x-1/2 z-0 transition-colors duration-200 ${wallpaperOffset.x === 0 ? "bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.8)]" : "bg-white/20"}`} />
-                      <div className={`absolute left-0 right-0 top-1/2 h-[1px] -translate-y-1/2 z-0 transition-colors duration-200 ${wallpaperOffset.y === 0 ? "bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.8)]" : "bg-white/20"}`} />
-                    </>
-                  )}
-
-                  {wallpaperTheme === "custom" && wallpaperCustomPhoto && (
-                    <>
-                      <img
-                        ref={wallpaperPhotoRef}
-                        src={wallpaperCustomPhoto}
-                        className="absolute inset-0 w-full h-full object-cover pointer-events-none transition-transform"
-                        style={{
-                          transform: `translate(${wallpaperPhotoOffset.x}px, ${wallpaperPhotoOffset.y}px) scale(${wallpaperPhotoScale})`
-                        }}
-                        alt=""
-                      />
-                      <div className="absolute inset-0 pointer-events-none bg-black transition-opacity" style={{ opacity: wallpaperPhotoOverlay }} />
-                    </>
-                  )}
-                  {/* Overlay hint */}
-                  {(isRepositionMode || isMovingPhoto) && (
-                    <div className="absolute top-[env(safe-area-inset-top,24px)] mt-24 left-0 right-0 flex justify-center pointer-events-none z-40 animate-fade-in">
-                      <span className="bg-black/70 text-white px-3.5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest backdrop-blur-md border border-white/20 shadow-lg">
-                        {isMovingPhoto ? "Drag to reposition photo · Pinch to resize" : "Drag to reposition grid · Pinch to resize"}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Draggable container */}
-                  <div
-                    ref={wallpaperGridRef}
-                    className={`relative w-full h-full flex flex-col items-center justify-center ${
-                      isRepositionMode || isMovingPhoto ? "cursor-move pointer-events-auto" : "pointer-events-none"
-                    }`}
-                    style={{
-                      transform: `translate(${wallpaperOffset.x}px, ${wallpaperOffset.y}px) scale(${wallpaperScale})`,
-                      touchAction: isRepositionMode || isMovingPhoto ? "none" : "auto",
-                    }}
-                    onPointerDown={handlePointerDown}
-                    onPointerMove={handlePointerMove}
-                    onPointerUp={handlePointerUp}
-                    onPointerCancel={handlePointerUp}
-                    onWheel={handleWheel}
-                  >
-                    {wallpaperGridStyle === "year" ? (
-                      /* ── Year Calendar View ── */
-                      (() => {
-                        const today = new Date();
-                        const year = today.getFullYear();
-                        const months = Array.from({ length: 12 }, (_, m) => {
-                          const monthName = new Date(year, m, 1).toLocaleString("default", { month: "short" });
-                          const daysInMonth = new Date(year, m + 1, 0).getDate();
-                          const firstDow = (new Date(year, m, 1).getDay() + 6) % 7; // 0=Mon
-                          return { m, monthName, daysInMonth, firstDow };
-                        });
-                        const totalDays = new Date(year, 12, 0).getDate() + (new Date(year, 0, 1).getDay());
-                        const daysInYear = (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) ? 366 : 365;
-                        const dayOfYear = Math.floor((today.getTime() - new Date(year, 0, 1).getTime()) / 86400000) + 1;
-                        const daysLeft = daysInYear - dayOfYear;
-                        const pct = Math.round((dayOfYear / daysInYear) * 100);
-                        const themeColors = wallpaperTokens(wallpaperTheme, gridColorTheme, theme);
-
-                        // Build a per-day completion map from heatmap
-                        // heatmap is 52 weeks × 7 days, starting from heatmapStartDate
-                        const startDate = new Date(today);
-                        startDate.setDate(startDate.getDate() - (52 * 7 - 1));
-                        const completionMap = new Map<string, number>();
-                        displayedHeatmap.forEach((col, ci) => {
-                          col.forEach((v, ri) => {
-                            const d = new Date(startDate);
-                            d.setDate(startDate.getDate() + ci * 7 + ri);
-                            const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-                            completionMap.set(key, v);
-                          });
-                        });
-
-                        return (
-                          <div className="w-full flex flex-col items-center justify-center -mt-8">
-                            <div className="grid gap-x-6 gap-y-7" style={{ gridTemplateColumns: "repeat(3, max-content)", justifyContent: "center" }}>
-                              {months.map(({ m, monthName, daysInMonth, firstDow }) => {
-                                const cells = [];
-                                // leading empty cells
-                                for (let e = 0; e < firstDow; e++) {
-                                  cells.push(<div key={`e-${e}`} style={{ width: 8, height: 8 }} />);
-                                }
-                                for (let d = 1; d <= daysInMonth; d++) {
-                                  const isToday = today.getFullYear() === year && today.getMonth() === m && today.getDate() === d;
-                                  const isFuture = new Date(year, m, d) > today;
-                                  const key = `${year}-${m}-${d}`;
-                                  const v = completionMap.get(key) ?? 0;
-                                  let bg: string;
-                                  if (isFuture) {
-                                    bg = "rgba(255,255,255,0.04)";
-                                  } else {
-                                    bg = v === 0 ? themeColors.empty : v === 1 ? themeColors.low : v === 2 ? themeColors.mid : themeColors.hi;
-                                  }
-                                  cells.push(
-                                    <div
-                                      key={d}
-                                      style={{
-                                        width: 8,
-                                        height: 8,
-                                        borderRadius: 2,
-                                        background: bg,
-                                        border: isToday ? `1px solid ${themeColors.accent}` : undefined,
-                                        boxShadow: isToday ? `0 0 6px ${themeColors.accent}40` : undefined,
-                                      }}
-                                    />
-                                  );
-                                }
-                                return (
-                                  <div key={m} className="flex flex-col gap-1.5">
-                                    <span style={{ fontSize: 9, opacity: 0.55, letterSpacing: "0.02em", fontWeight: 500, textTransform: "capitalize", paddingLeft: 1 }}>
-                                      {monthName}
-                                    </span>
-                                    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 8px)", gap: 3 }}>
-                                      {cells}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })()
-                    ) : wallpaperGridStyle === "month" ? (
-                      /* ── Month Calendar View (reference-style) ── */
-                      (() => {
-                        const today = new Date();
-                        const year = today.getFullYear();
-                        const month = today.getMonth();
-                        const monthName = today.toLocaleString("default", { month: "long" }).toUpperCase();
-                        const daysInMonth = new Date(year, month + 1, 0).getDate();
-                        const firstDow = (new Date(year, month, 1).getDay() + 6) % 7; // 0=Mon
-                        const fg = wallpaperThemeOf(wallpaperTheme, theme).fg;
-                        const themeColors = wallpaperTokens(wallpaperTheme, gridColorTheme, theme);
-
-                        // Build completion map
-                        const startDate = new Date(today);
-                        startDate.setDate(startDate.getDate() - (52 * 7 - 1));
-                        const completionMap = new Map<string, number>();
-                        displayedHeatmap.forEach((col, ci) => {
-                          col.forEach((v, ri) => {
-                            const d = new Date(startDate);
-                            d.setDate(startDate.getDate() + ci * 7 + ri);
-                            const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-                            completionMap.set(key, v);
-                          });
-                        });
-
-                        // Build calendar cells (leading blanks + day cells)
-                        const totalCells = firstDow + daysInMonth;
-                        const rows = Math.ceil(totalCells / 7);
-                        const cells: { day: number | null; isToday: boolean; isFuture: boolean; v: number }[] = [];
-                        for (let i = 0; i < rows * 7; i++) {
-                          const dayNum = i - firstDow + 1;
-                          if (dayNum < 1 || dayNum > daysInMonth) {
-                            cells.push({ day: null, isToday: false, isFuture: false, v: 0 });
-                          } else {
-                            const isToday = today.getDate() === dayNum;
-                            const isFuture = new Date(year, month, dayNum) > today;
-                            const key = `${year}-${month}-${dayNum}`;
-                            const v = completionMap.get(key) ?? 0;
-                            cells.push({ day: dayNum, isToday, isFuture, v });
-                          }
-                        }
-
-                        const DAY_HEADERS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
-                        const CELL_SIZE = 42;
-                        const GAP = 2;
-
-                        return (
-                          <div className="w-full flex flex-col px-6" style={{ paddingTop: "72px" }}>
-                            {/* Month name */}
-                            <div className="text-center mb-6" style={{ fontSize: 13, fontWeight: 600, letterSpacing: "0.25em", color: fg, opacity: 0.7 }}>
-                              {monthName}
-                            </div>
-
-                            {/* Day headers */}
-                            <div style={{ display: "grid", gridTemplateColumns: `repeat(7, ${CELL_SIZE}px)`, gap: `${GAP}px`, marginBottom: 8 }}>
-                              {DAY_HEADERS.map((h) => (
-                                <div key={h} style={{ textAlign: "center", fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", color: fg, opacity: 0.4 }}>
-                                  {h}
-                                </div>
-                              ))}
-                            </div>
-
-                            {/* Day grid */}
-                            <div style={{ display: "grid", gridTemplateColumns: `repeat(7, ${CELL_SIZE}px)`, gap: `${GAP}px` }}>
-                              {cells.map((cell, idx) => {
-                                if (cell.day === null) {
-                                  return <div key={idx} style={{ width: CELL_SIZE, height: CELL_SIZE }} />;
-                                }
-                                const textOpacity = cell.isFuture ? 0.25 : cell.isToday ? 1 : 0.85;
-
-                                return (
-                                  <div
-                                    key={idx}
-                                    style={{
-                                      width: CELL_SIZE,
-                                      height: CELL_SIZE,
-                                      display: "flex",
-                                      flexDirection: "column",
-                                      alignItems: "center",
-                                      justifyContent: "center",
-                                      position: "relative",
-                                    }}
-                                  >
-                                    {/* Today circle ring */}
-                                    {cell.isToday && (
-                                      <div style={{
-                                        position: "absolute",
-                                        inset: 3,
-                                        borderRadius: "50%",
-                                        border: `1.5px solid ${themeColors.accent}`,
-                                        opacity: 0.9,
-                                      }} />
-                                    )}
-
-                                    {/* Day number */}
-                                    <span style={{
-                                      fontSize: 15,
-                                      fontWeight: cell.isToday ? 700 : 400,
-                                      color: fg,
-                                      opacity: textOpacity,
-                                      lineHeight: 1,
-                                      fontVariantNumeric: "tabular-nums",
-                                    }}>
-                                      {cell.day}
-                                    </span>
-
-                                    {/* Completion dot */}
-                                    {!cell.isFuture && (
-                                      <div style={{
-                                        width: 4,
-                                        height: 4,
-                                        borderRadius: "50%",
-                                        background: cell.isToday ? themeColors.accent : (cell.v === 0 ? themeColors.empty : cell.v === 1 ? themeColors.low : cell.v === 2 ? themeColors.mid : themeColors.hi),
-                                        marginTop: 3,
-                                      }} />
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })()
-                    ) : wallpaperGridStyle === "weeks" ? (
-                      /* ── Weeks Portrait 7-Day Calendar Grid ── */
-                      <div className={`flex flex-col items-center mt-6 ${wallpaperSync ? "" : "opacity-60"}`}>
-                        {/* Day headers: M T W T F S S */}
-                        <div className="flex items-center mb-2" style={{ gap: "4px" }}>
-                          <div className="w-7 shrink-0" /> {/* Spacer for month label column */}
-                          {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
-                            <div
-                              key={i}
-                              className="text-[10px] font-bold text-center opacity-40 uppercase"
-                              style={(() => {
-                                const cellSize = previewWeeks > 32 ? 10 : previewWeeks > 20 ? 14 : previewWeeks > 12 ? 18 : 24;
-                                return { width: `${cellSize}px` };
-                              })()}
-                            >
-                              {d}
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Weeks rows */}
-                        <div className="flex flex-col" style={{ gap: "4px" }}>
-                          {displayedHeatmap.slice(-previewWeeks).map((col, ci) => {
-                            const absCi = 52 - previewWeeks + ci;
-                            const weekStartDate = new Date(heatmapStartDate().getTime() + (absCi * 7) * 86400000);
-                            const prevWeekStartDate = ci > 0 ? new Date(heatmapStartDate().getTime() + ((absCi - 1) * 7) * 86400000) : null;
-                            const isNewMonth = ci === 0 || (prevWeekStartDate && weekStartDate.getMonth() !== prevWeekStartDate.getMonth());
-                            const monthName = weekStartDate.toLocaleDateString("en-US", { month: "short" });
-                            const cellSize = previewWeeks > 32 ? 10 : previewWeeks > 20 ? 14 : previewWeeks > 12 ? 18 : 24;
-                            const radius = cellSize > 16 ? 5 : 3;
-
-                            return (
-                              <div key={ci} className="flex items-center" style={{ gap: "4px" }}>
-                                {/* Month Label (left side) */}
-                                <div className="w-7 text-[9px] font-bold uppercase tracking-wider text-right pr-1.5 opacity-60 shrink-0 select-none">
-                                  {isNewMonth ? monthName : ""}
-                                </div>
-
-                                {/* 7 Day Squares in this week */}
-                                {col.map((v, ri) => {
-                                  const isToday = absCi === TODAY_COL && ri === TODAY_ROW;
-                                  const isFuture = absCi === TODAY_COL && ri > TODAY_ROW;
-
-                                  return (
-                                    <div
-                                      key={`${ci}-${ri}`}
-                                      className={`relative ${isToday ? "animate-cell-flash ring-2 ring-inset ring-[color:var(--wp-accent)]" : ""}`}
-                                      style={{
-                                        width: `${cellSize}px`,
-                                        height: `${cellSize}px`,
-                                        borderRadius: `${radius}px`,
-                                        background: isFuture
-                                          ? "color-mix(in srgb, var(--wp-empty) 40%, transparent)"
-                                          : v === 0
-                                            ? "var(--wp-empty)"
-                                            : v === 1
-                                              ? "var(--wp-low)"
-                                              : v === 2
-                                                ? "var(--wp-mid)"
-                                                : "var(--wp-hi)",
-                                        opacity: isFuture ? 0.3 : 1,
-                                      }}
-                                    />
-                                  );
-                                })}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : wallpaperGridStyle === "widget" ? (
-                      /* ── Frosted Liquid-Glass Widget Card ── */
-                      <div
-                        className={`w-full max-w-[320px] mx-auto rounded-[28px] p-5 backdrop-blur-2xl border shadow-2xl flex flex-col gap-3.5 mt-8 ${wallpaperSync ? "" : "opacity-60"}`}
-                        style={{
-                          background: "color-mix(in srgb, var(--wp-bg) 65%, transparent)",
-                          borderColor: "color-mix(in srgb, var(--wp-accent) 25%, rgba(255, 255, 255, 0.12))",
-                          boxShadow: "0 20px 45px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.15)",
-                        }}
-                      >
-                        {/* Widget Header: Streak Flame + Completion Rate */}
-                        <div className="flex items-center justify-between px-1">
-                          <div className="flex items-center gap-1.5 font-bold text-[13px] tracking-tight">
-                            <Flame className="w-4 h-4 text-[color:var(--wp-accent)]" />
-                            <span>{displayedTotalStreak}d Streak</span>
-                          </div>
-                          <div
-                            className="text-[11px] font-bold px-2.5 py-0.5 rounded-full"
-                            style={{
-                              background: "color-mix(in srgb, var(--wp-accent) 18%, transparent)",
-                              color: "var(--wp-accent)",
-                            }}
-                          >
-                            {displayedRate}% Done
-                          </div>
-                        </div>
-
-                        <div className="h-px w-full" style={{ background: "color-mix(in srgb, var(--wp-fg) 10%, transparent)" }} />
-
-                        {/* Widget Mini Heatmap Grid (7 columns × min(previewWeeks, 12) rows) */}
-                        <div className="flex flex-col items-center">
-                          {/* Mini Day Headers */}
-                          <div className="flex items-center mb-1.5" style={{ gap: "3px" }}>
-                            {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
-                              <div
-                                key={i}
-                                className="w-[14px] text-[9px] font-bold text-center opacity-40 uppercase"
-                              >
-                                {d}
-                              </div>
-                            ))}
-                          </div>
-
-                          {/* Mini Week Rows */}
-                          <div className="flex flex-col" style={{ gap: "3px" }}>
-                            {displayedHeatmap.slice(-Math.min(previewWeeks, 12)).map((col, ci) => {
-                              const absCi = 52 - Math.min(previewWeeks, 12) + ci;
-
-                              return (
-                                <div key={ci} className="flex items-center" style={{ gap: "3px" }}>
-                                  {col.map((v, ri) => {
-                                    const isToday = absCi === TODAY_COL && ri === TODAY_ROW;
-                                    const isFuture = absCi === TODAY_COL && ri > TODAY_ROW;
-
-                                    return (
-                                      <div
-                                        key={`${ci}-${ri}`}
-                                        className={`relative ${isToday ? "animate-cell-flash ring-1.5 ring-inset ring-[color:var(--wp-accent)]" : ""}`}
-                                        style={{
-                                          width: "14px",
-                                          height: "14px",
-                                          borderRadius: "3px",
-                                          background: isFuture
-                                            ? "color-mix(in srgb, var(--wp-empty) 40%, transparent)"
-                                            : v === 0
-                                              ? "var(--wp-empty)"
-                                              : v === 1
-                                                ? "var(--wp-low)"
-                                                : v === 2
-                                                  ? "var(--wp-mid)"
-                                                  : "var(--wp-hi)",
-                                          opacity: isFuture ? 0.3 : 1,
-                                        }}
-                                      />
-                                    );
-                                  })}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        <div className="h-px w-full" style={{ background: "color-mix(in srgb, var(--wp-fg) 10%, transparent)" }} />
-
-                        {/* Widget Habit Footer */}
-                        <div className="flex items-center justify-center gap-2 text-[10px] font-semibold tracking-wider uppercase opacity-75 px-1 truncate">
-                          {topHabitNames.map((name, i) => (
-                            <span key={i} className="flex items-center gap-2">
-                              {i > 0 && <span className="opacity-40">·</span>}
-                              <span className="truncate">{name}</span>
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      /* ── Stacked Goals View ── */
-                      <div className={`flex flex-col items-center gap-12 mt-16 w-full ${wallpaperSync ? "" : "opacity-60"}`}>
-                        {stackedGoals.length === 0 ? (
-                          <div className="text-[14px] opacity-50 font-semibold uppercase tracking-widest text-center mt-20">
-                            No active goals
-                          </div>
-                        ) : (
-                          stackedGoals.map((sg) => (
-                            <div key={sg.id} className="flex flex-col items-center w-full">
-                              <div className="flex flex-wrap gap-1 justify-center px-4 mb-4 max-w-[320px] mx-auto">
-                                {sg.heatmap && sg.heatmap.flatMap(col => col).map((v: number, i: number) => (
-                                  <div
-                                    key={i}
-                                    className="h-2 w-2 rounded-[2px] transition-colors"
-                                    style={{
-                                      background:
-                                        v === 0
-                                          ? "rgba(255, 255, 255, 0.08)"
-                                          : v === 1
-                                            ? "var(--wp-low)"
-                                            : v === 2
-                                              ? "var(--wp-mid)"
-                                              : "var(--wp-hi)",
-                                    }}
-                                  />
-                                ))}
-                              </div>
-                              <div className="flex flex-col items-center gap-1">
-                                <span className="text-[12px] uppercase tracking-widest font-bold opacity-80">
-                                  {sg.title}
-                                </span>
-                                <span style={{ color: "rgba(255, 255, 255, 0.5)", fontWeight: 700, fontSize: "11px" }}>
-                                  {sg.currentStreak}d left - {sg.completionRate}%
-                                </span>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    )}
-
-                    {wallpaperHabitSet !== "none" && wallpaperGridStyle === "weeks" && (
-                      <div className="mt-12 flex flex-col items-center gap-2 opacity-80">
-                        {(HABIT_SETS.find(s => s.key === wallpaperHabitSet)?.habits || []).map((h, i) => (
-                          <span key={i} className="text-[12px] uppercase tracking-widest font-semibold">{h}</span>
-                        ))}
-                      </div>
-                    )}
-
-                    {wallpaperGridStyle !== "widget" && (
-                      <div className={`mt-12 w-full px-12 text-[11px] font-semibold opacity-70 ${wallpaperStatsAlign === 'left' ? 'text-left' : wallpaperStatsAlign === 'right' ? 'text-right' : 'text-center'}`}>
-                        {activeGoalId && goals.some(g => g.id === activeGoalId) ? (
-                          <span style={{ color: "rgba(255, 255, 255, 0.5)", fontWeight: 700, letterSpacing: "0.02em", fontSize: "11px" }}>
-                            {displayedTotalStreak}d left - {displayedRate}%
-                          </span>
-                        ) : (
-                          <span>
-                            {displayedTotalStreak} day streak · {displayedRate}%
-                          </span>
-                        )}
-                        <br />
-                        <span className="opacity-50 mt-1 block">{wallpaperSync ? "LIVE SYNC ON" : "SNAPSHOT PAUSED"}</span>
-                      </div>
-                    )}
-
-                  </div> {/* End Draggable Container */}
-                </div>
-
-                {/* Controls overlay at bottom of Full Screen Preview */}
-                <div className="absolute bottom-28 left-0 right-0 flex flex-col items-center justify-end z-50 animate-fade-in-up px-4 pointer-events-none">
-                  {/* Live/Static Toggle moved to bottom */}
-                  <div className="flex items-center rounded-full border border-[color:var(--hairline-mid)] p-1 bg-canvas/85 backdrop-blur-xl shadow-lg pointer-events-auto">
-                    <button
-                      onClick={() => applyWallpaper(false)}
-                      className={`flex items-center gap-1.5 px-4 h-9 rounded-full text-[12px] font-bold transition-all ${!wallpaperSync ? "text-mute hover:text-ink" : "bg-ink text-on-ink shadow-sm"}`}
-                    >
-                      <div className={`w-2.5 h-2.5 rounded-full ${wallpaperSync ? "bg-green-400 animate-pulse shadow-[0_0_8px_rgba(74,222,128,0.6)]" : "bg-[color:var(--hairline-mid)]"}`} /> Live
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setShowStaticTargetSelector(true);
-                      }}
-                      className={`flex items-center gap-1.5 px-4 h-9 rounded-full text-[12px] font-bold transition-all ${wallpaperSync ? "text-mute hover:text-ink" : "bg-ink text-on-ink shadow-sm"}`}
-                    >
-                      <div className={`w-2.5 h-2.5 rounded-full ${!wallpaperSync ? "bg-[color:var(--canvas-softer)]" : "bg-[color:var(--hairline-mid)]"}`} /> Static
-                    </button>
-                  </div>
-                </div>
-
-              </div>
-            </div>
           </div>
 
           {/* Liquid Glass Bulk Action Bar (When selecting habits) */}
@@ -2814,13 +2156,12 @@ export function Dashboard({ user }: { user?: any }) {
           ) : (
             /* Liquid Glass Bottom Navigation Bar */
             <div className="absolute bottom-3 left-0 right-0 z-40 mx-4 pointer-events-none">
-              <nav className="pointer-events-auto mx-auto flex max-w-[360px] items-center justify-center gap-1 rounded-full border border-[color:var(--hairline)] bg-canvas/40 p-1.5 backdrop-blur-2xl shadow-2xl specular relative overflow-hidden">
+              <nav className="pointer-events-auto mx-auto flex max-w-[340px] items-center justify-center gap-1 rounded-full border border-[color:var(--hairline)] bg-canvas/40 p-1.5 backdrop-blur-2xl shadow-2xl specular relative overflow-hidden">
                 {([
                   { id: "today", label: "Today", icon: Flame },
                   { id: "consistency", label: "Consistency", icon: CalendarDays },
                   { id: "myday", label: "My Day", icon: Sun },
                   { id: "goal", label: "Goals", icon: Target },
-                  { id: "wallpaper", label: "Wallpaper", icon: Wallpaper },
                 ] as const).map((t) => {
                   const active = activeTab === t.id;
                   const Icon = t.icon;
@@ -3003,6 +2344,30 @@ export function Dashboard({ user }: { user?: any }) {
                           className="pill bg-canvas-soft px-3 py-1.5 text-xs font-semibold text-ink hover:bg-ink/10 transition"
                         >
                           Explore
+                        </button>
+                      }
+                    />
+                    <Row
+                      label={
+                        <div className="flex items-center gap-2.5">
+                          <Wallpaper className="h-4 w-4 text-ink" />
+                          <div className="text-left">
+                            <span className="font-semibold text-ink block text-xs">Lock Screen Wallpaper</span>
+                            <p className="text-[10px] text-mute font-medium">
+                              {wallpaperGridStyle.toUpperCase()} · {gridColorTheme.toUpperCase()}
+                            </p>
+                          </div>
+                        </div>
+                      }
+                      action={
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setWallpaperEditorOpen(true);
+                          }}
+                          className="pill bg-ink text-on-ink px-3.5 py-1.5 text-xs font-bold shadow-sm active:scale-95 transition"
+                        >
+                          Customize
                         </button>
                       }
                     />
@@ -3206,6 +2571,621 @@ export function Dashboard({ user }: { user?: any }) {
                 }
               }}
             />
+          )}
+
+          {/* Dedicated Full-Screen Wallpaper Customizer Modal */}
+          {wallpaperEditorOpen && (
+            <div className="fixed inset-0 z-50 flex flex-col bg-black text-white animate-fade-in-up select-none">
+              {/* Controls overlay at top of Full Screen Preview */}
+              <div className="absolute top-[env(safe-area-inset-top,24px)] mt-4 left-0 right-0 flex items-center justify-between px-6 z-50 pointer-events-none">
+                <div className="flex items-center gap-2 pointer-events-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      try { navigator.vibrate?.(10); } catch { }
+                      setWallpaperEditorOpen(false);
+                      setIsRepositionMode(false);
+                      setIsMovingPhoto(false);
+                    }}
+                    className="flex items-center justify-center h-9 w-9 rounded-full bg-black/50 backdrop-blur-xl border border-white/20 text-white active:scale-95 transition hover:bg-black/70 shadow-lg"
+                    aria-label="Close wallpaper customizer"
+                  >
+                    <X size={18} />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => photoInputRef.current?.click()}
+                    className="flex items-center justify-center h-9 w-9 rounded-full bg-black/40 backdrop-blur-xl border border-white/15 text-white/80 cursor-pointer active:scale-95 transition-all hover:bg-black/60 hover:text-white shadow-lg"
+                    aria-label="Upload custom wallpaper photo"
+                  >
+                    <ImagePlus size={16} />
+                  </button>
+                  <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} onClick={(e) => e.stopPropagation()} />
+
+                  {wallpaperTheme === "custom" && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try { navigator.vibrate?.(10); } catch { }
+                        setIsMovingPhoto(prev => !prev);
+                        if (!isMovingPhoto) setIsRepositionMode(false);
+                      }}
+                      className={`flex items-center gap-1.5 h-9 px-3.5 rounded-full backdrop-blur-xl border font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg ${
+                        isMovingPhoto
+                          ? "bg-white/25 border-white/50 text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)] ring-1 ring-white/30"
+                          : "bg-black/40 border-white/15 text-white/70 hover:text-white hover:bg-black/60"
+                      }`}
+                    >
+                      <Move size={13} className={isMovingPhoto ? "text-white animate-pulse" : ""} />
+                      <span>{isMovingPhoto ? "Done Photo" : "Move Photo"}</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      try { navigator.vibrate?.(10); } catch { }
+                      setIsRepositionMode(prev => !prev);
+                      if (!isRepositionMode) setIsMovingPhoto(false);
+                    }}
+                    className={`flex items-center gap-1.5 h-9 px-3.5 rounded-full backdrop-blur-xl border font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg ${
+                      isRepositionMode
+                        ? "bg-white/25 border-white/50 text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)] ring-1 ring-white/30"
+                        : "bg-black/40 border-white/15 text-white/70 hover:text-white hover:bg-black/60"
+                    }`}
+                  >
+                    <Move size={13} className={isRepositionMode ? "text-white animate-pulse" : ""} />
+                    <span>{isRepositionMode ? "Done" : "Reposition"}</span>
+                  </button>
+
+                  {(wallpaperOffset.x !== 0 || wallpaperOffset.y !== 0 || wallpaperScale !== 1) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try { navigator.vibrate?.(10); } catch { }
+                        setWallpaperOffset({ x: 0, y: 0 });
+                        setWallpaperScale(1);
+                        showToast("Position reset");
+                      }}
+                      className="flex items-center justify-center h-9 w-9 rounded-full bg-black/40 backdrop-blur-xl border border-white/15 text-white/70 active:scale-95 transition-all hover:bg-black/60 hover:text-white shadow-lg"
+                      title="Reset position"
+                    >
+                      <RotateCcw size={15} />
+                    </button>
+                  )}
+                </div>
+
+                <div className="pointer-events-auto">
+                  <span className="text-[10px] font-bold tracking-widest uppercase text-white/70 bg-black/40 backdrop-blur-xl px-3 py-1.5 rounded-full border border-white/15">
+                    Lock Screen Preview
+                  </span>
+                </div>
+              </div>
+
+              {/* Live Wallpaper Scene (Fills the entire screen) */}
+              <div
+                key={syncPulse}
+                ref={previewRef}
+                className={`wp-scene absolute inset-0 flex flex-col items-center justify-center ${syncPulse ? "animate-sync-pulse" : ""}`}
+                style={{
+                  background: wallpaperThemeOf(wallpaperTheme, theme).bg,
+                  ["--ink" as string]: wallpaperThemeOf(wallpaperTheme, theme).bg,
+                  ["--on-ink" as string]: wallpaperThemeOf(wallpaperTheme, theme).fg,
+                  color: wallpaperThemeOf(wallpaperTheme, theme).fg,
+                }}
+              >
+                {/* Snapping Crosshairs */}
+                {isDraggingWallpaper && isRepositionMode && (wallpaperGridStyle === "month" || wallpaperGridStyle === "year" || wallpaperGridStyle === "weeks" || wallpaperGridStyle === "widget") && (
+                  <>
+                    <div className={`absolute top-0 bottom-0 left-1/2 w-[1px] -translate-x-1/2 z-0 transition-colors duration-200 ${wallpaperOffset.x === 0 ? "bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.8)]" : "bg-white/20"}`} />
+                    <div className={`absolute left-0 right-0 top-1/2 h-[1px] -translate-y-1/2 z-0 transition-colors duration-200 ${wallpaperOffset.y === 0 ? "bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.8)]" : "bg-white/20"}`} />
+                  </>
+                )}
+
+                {wallpaperTheme === "custom" && wallpaperCustomPhoto && (
+                  <>
+                    <img
+                      ref={wallpaperPhotoRef}
+                      src={wallpaperCustomPhoto}
+                      className="absolute inset-0 w-full h-full object-cover pointer-events-none transition-transform"
+                      style={{
+                        transform: `translate(${wallpaperPhotoOffset.x}px, ${wallpaperPhotoOffset.y}px) scale(${wallpaperPhotoScale})`
+                      }}
+                      alt=""
+                    />
+                    <div className="absolute inset-0 pointer-events-none bg-black transition-opacity" style={{ opacity: wallpaperPhotoOverlay }} />
+                  </>
+                )}
+                {/* Overlay hint */}
+                {(isRepositionMode || isMovingPhoto) && (
+                  <div className="absolute top-[env(safe-area-inset-top,24px)] mt-24 left-0 right-0 flex justify-center pointer-events-none z-40 animate-fade-in">
+                    <span className="bg-black/70 text-white px-3.5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest backdrop-blur-md border border-white/20 shadow-lg">
+                      {isMovingPhoto ? "Drag to reposition photo · Pinch to resize" : "Drag to reposition grid · Pinch to resize"}
+                    </span>
+                  </div>
+                )}
+
+                {/* Draggable container */}
+                <div
+                  ref={wallpaperGridRef}
+                  className={`relative w-full h-full flex flex-col items-center justify-center ${
+                    isRepositionMode || isMovingPhoto ? "cursor-move pointer-events-auto" : "pointer-events-none"
+                  }`}
+                  style={{
+                    transform: `translate(${wallpaperOffset.x}px, ${wallpaperOffset.y}px) scale(${wallpaperScale})`,
+                    touchAction: isRepositionMode || isMovingPhoto ? "none" : "auto",
+                  }}
+                  onPointerDown={handlePointerDown}
+                  onPointerMove={handlePointerMove}
+                  onPointerUp={handlePointerUp}
+                  onPointerCancel={handlePointerUp}
+                  onWheel={handleWheel}
+                >
+                  {wallpaperGridStyle === "year" ? (
+                    /* ── Year Calendar View ── */
+                    (() => {
+                      const today = new Date();
+                      const year = today.getFullYear();
+                      const months = Array.from({ length: 12 }, (_, m) => {
+                        const monthName = new Date(year, m, 1).toLocaleString("default", { month: "short" });
+                        const daysInMonth = new Date(year, m + 1, 0).getDate();
+                        const firstDow = (new Date(year, m, 1).getDay() + 6) % 7; // 0=Mon
+                        return { m, monthName, daysInMonth, firstDow };
+                      });
+                      const totalDays = new Date(year, 12, 0).getDate() + (new Date(year, 0, 1).getDay());
+                      const daysInYear = (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) ? 366 : 365;
+                      const dayOfYear = Math.floor((today.getTime() - new Date(year, 0, 1).getTime()) / 86400000) + 1;
+                      const daysLeft = daysInYear - dayOfYear;
+                      const pct = Math.round((dayOfYear / daysInYear) * 100);
+                      const themeColors = wallpaperTokens(wallpaperTheme, gridColorTheme, theme);
+
+                      // Build a per-day completion map from heatmap
+                      const startDate = new Date(today);
+                      startDate.setDate(startDate.getDate() - (52 * 7 - 1));
+                      const completionMap = new Map<string, number>();
+                      displayedHeatmap.forEach((col, ci) => {
+                        col.forEach((v, ri) => {
+                          const d = new Date(startDate);
+                          d.setDate(startDate.getDate() + ci * 7 + ri);
+                          const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+                          completionMap.set(key, v);
+                        });
+                      });
+
+                      return (
+                        <div className="w-full flex flex-col items-center justify-center -mt-8">
+                          <div className="grid gap-x-6 gap-y-7" style={{ gridTemplateColumns: "repeat(3, max-content)", justifyContent: "center" }}>
+                            {months.map(({ m, monthName, daysInMonth, firstDow }) => {
+                              const cells = [];
+                              for (let e = 0; e < firstDow; e++) {
+                                cells.push(<div key={`e-${e}`} style={{ width: 8, height: 8 }} />);
+                              }
+                              for (let d = 1; d <= daysInMonth; d++) {
+                                const isToday = today.getFullYear() === year && today.getMonth() === m && today.getDate() === d;
+                                const isFuture = new Date(year, m, d) > today;
+                                const key = `${year}-${m}-${d}`;
+                                const v = completionMap.get(key) ?? 0;
+                                let bg: string;
+                                if (isFuture) {
+                                  bg = "rgba(255,255,255,0.04)";
+                                } else {
+                                  bg = v === 0 ? themeColors.empty : v === 1 ? themeColors.low : v === 2 ? themeColors.mid : themeColors.hi;
+                                }
+                                cells.push(
+                                  <div
+                                    key={d}
+                                    style={{
+                                      width: 8,
+                                      height: 8,
+                                      borderRadius: 2,
+                                      background: bg,
+                                      border: isToday ? `1px solid ${themeColors.accent}` : undefined,
+                                      boxShadow: isToday ? `0 0 6px ${themeColors.accent}` : undefined,
+                                      flexShrink: 0,
+                                    }}
+                                  />
+                                );
+                              }
+                              return (
+                                <div key={m} className="flex flex-col gap-1.5">
+                                  <span style={{ fontSize: 9, opacity: 0.55, letterSpacing: "0.02em", fontWeight: 500, textTransform: "capitalize", paddingLeft: 1 }}>
+                                    {monthName}
+                                  </span>
+                                  <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 8px)", gap: 3 }}>
+                                    {cells}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()
+                  ) : wallpaperGridStyle === "month" ? (
+                    /* ── Month Calendar View ── */
+                    (() => {
+                      const today = new Date();
+                      const year = today.getFullYear();
+                      const month = today.getMonth();
+                      const monthName = today.toLocaleString("default", { month: "long" }).toUpperCase();
+                      const daysInMonth = new Date(year, month + 1, 0).getDate();
+                      const firstDow = (new Date(year, month, 1).getDay() + 6) % 7; // 0=Mon
+                      const fg = wallpaperThemeOf(wallpaperTheme, theme).fg;
+                      const themeColors = wallpaperTokens(wallpaperTheme, gridColorTheme, theme);
+
+                      // Build completion map
+                      const startDate = new Date(today);
+                      startDate.setDate(startDate.getDate() - (52 * 7 - 1));
+                      const completionMap = new Map<string, number>();
+                      displayedHeatmap.forEach((col, ci) => {
+                        col.forEach((v, ri) => {
+                          const d = new Date(startDate);
+                          d.setDate(startDate.getDate() + ci * 7 + ri);
+                          const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+                          completionMap.set(key, v);
+                        });
+                      });
+
+                      // Build calendar cells (leading blanks + day cells)
+                      const totalCells = firstDow + daysInMonth;
+                      const rows = Math.ceil(totalCells / 7);
+                      const cells: { day: number | null; isToday: boolean; isFuture: boolean; v: number }[] = [];
+                      for (let i = 0; i < rows * 7; i++) {
+                        const dayNum = i - firstDow + 1;
+                        if (dayNum < 1 || dayNum > daysInMonth) {
+                          cells.push({ day: null, isToday: false, isFuture: false, v: 0 });
+                        } else {
+                          const isToday = today.getDate() === dayNum;
+                          const isFuture = new Date(year, month, dayNum) > today;
+                          const key = `${year}-${month}-${dayNum}`;
+                          const v = completionMap.get(key) ?? 0;
+                          cells.push({ day: dayNum, isToday, isFuture, v });
+                        }
+                      }
+
+                      const DAY_HEADERS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+                      const CELL_SIZE = 42;
+                      const GAP = 2;
+
+                      return (
+                        <div className="w-full flex flex-col px-6" style={{ paddingTop: "72px" }}>
+                          {/* Month name */}
+                          <div className="text-center mb-6" style={{ fontSize: 13, fontWeight: 600, letterSpacing: "0.25em", color: fg, opacity: 0.7 }}>
+                            {monthName}
+                          </div>
+
+                          {/* Day headers */}
+                          <div style={{ display: "grid", gridTemplateColumns: `repeat(7, ${CELL_SIZE}px)`, gap: `${GAP}px`, marginBottom: 8 }}>
+                            {DAY_HEADERS.map((h) => (
+                              <div key={h} style={{ textAlign: "center", fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", color: fg, opacity: 0.4 }}>
+                                {h}
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Day grid */}
+                          <div style={{ display: "grid", gridTemplateColumns: `repeat(7, ${CELL_SIZE}px)`, gap: `${GAP}px` }}>
+                            {cells.map((cell, idx) => {
+                              if (cell.day === null) {
+                                return <div key={idx} style={{ width: CELL_SIZE, height: CELL_SIZE }} />;
+                              }
+                              const textOpacity = cell.isFuture ? 0.25 : cell.isToday ? 1 : 0.85;
+
+                              return (
+                                <div
+                                  key={idx}
+                                  style={{
+                                    width: CELL_SIZE,
+                                    height: CELL_SIZE,
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    position: "relative",
+                                  }}
+                                >
+                                  {/* Today circle ring */}
+                                  {cell.isToday && (
+                                    <div style={{
+                                      position: "absolute",
+                                      inset: 3,
+                                      borderRadius: "50%",
+                                      border: `1.5px solid ${themeColors.accent}`,
+                                      opacity: 0.9,
+                                    }} />
+                                  )}
+
+                                  {/* Day number */}
+                                  <span style={{
+                                    fontSize: 15,
+                                    fontWeight: cell.isToday ? 700 : 400,
+                                    color: fg,
+                                    opacity: textOpacity,
+                                    lineHeight: 1,
+                                    fontVariantNumeric: "tabular-nums",
+                                  }}>
+                                    {cell.day}
+                                  </span>
+
+                                  {/* Completion dot */}
+                                  {!cell.isFuture && (
+                                    <div style={{
+                                      width: 4,
+                                      height: 4,
+                                      borderRadius: "50%",
+                                      background: cell.isToday ? themeColors.accent : (cell.v === 0 ? themeColors.empty : cell.v === 1 ? themeColors.low : cell.v === 2 ? themeColors.mid : themeColors.hi),
+                                      marginTop: 3,
+                                    }} />
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()
+                  ) : wallpaperGridStyle === "weeks" ? (
+                    /* ── Weeks Portrait 7-Day Calendar Grid ── */
+                    <div className={`flex flex-col items-center mt-6 ${wallpaperSync ? "" : "opacity-60"}`}>
+                      {/* Day headers: M T W T F S S */}
+                      <div className="flex items-center mb-2" style={{ gap: "4px" }}>
+                        <div className="w-7 shrink-0" />
+                        {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
+                          <div
+                            key={i}
+                            className="text-[10px] font-bold text-center opacity-40 uppercase"
+                            style={(() => {
+                              const cellSize = previewWeeks > 32 ? 10 : previewWeeks > 20 ? 14 : previewWeeks > 12 ? 18 : 24;
+                              return { width: `${cellSize}px` };
+                            })()}
+                          >
+                            {d}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Weeks rows */}
+                      <div className="flex flex-col" style={{ gap: "4px" }}>
+                        {displayedHeatmap.slice(-previewWeeks).map((col, ci) => {
+                          const absCi = 52 - previewWeeks + ci;
+                          const weekStartDate = new Date(heatmapStartDate().getTime() + (absCi * 7) * 86400000);
+                          const prevWeekStartDate = ci > 0 ? new Date(heatmapStartDate().getTime() + ((absCi - 1) * 7) * 86400000) : null;
+                          const isNewMonth = ci === 0 || (prevWeekStartDate && weekStartDate.getMonth() !== prevWeekStartDate.getMonth());
+                          const monthName = weekStartDate.toLocaleDateString("en-US", { month: "short" });
+                          const cellSize = previewWeeks > 32 ? 10 : previewWeeks > 20 ? 14 : previewWeeks > 12 ? 18 : 24;
+                          const radius = cellSize > 16 ? 5 : 3;
+                          const themeColors = wallpaperTokens(wallpaperTheme, gridColorTheme, theme);
+
+                          return (
+                            <div key={ci} className="flex items-center" style={{ gap: "4px" }}>
+                              {/* Month Label (left side) */}
+                              <div className="w-7 text-[9px] font-bold uppercase tracking-wider text-right pr-1.5 opacity-60 shrink-0 select-none">
+                                {isNewMonth ? monthName : ""}
+                              </div>
+
+                              {/* 7 Day Squares in this week */}
+                              {col.map((v, ri) => {
+                                const isToday = absCi === TODAY_COL && ri === TODAY_ROW;
+                                const isFuture = absCi === TODAY_COL && ri > TODAY_ROW;
+
+                                return (
+                                  <div
+                                    key={`${ci}-${ri}`}
+                                    className={`relative ${isToday ? "animate-cell-flash ring-2 ring-inset ring-[color:var(--wp-accent)]" : ""}`}
+                                    style={{
+                                      width: `${cellSize}px`,
+                                      height: `${cellSize}px`,
+                                      borderRadius: `${radius}px`,
+                                      background: isFuture
+                                        ? "color-mix(in srgb, var(--wp-empty) 40%, transparent)"
+                                        : v === 0
+                                          ? "var(--wp-empty)"
+                                          : v === 1
+                                            ? "var(--wp-low)"
+                                            : v === 2
+                                              ? "var(--wp-mid)"
+                                              : "var(--wp-hi)",
+                                      opacity: isFuture ? 0.3 : 1,
+                                    }}
+                                  />
+                                );
+                              })}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : wallpaperGridStyle === "widget" ? (
+                    /* ── Frosted Liquid-Glass Widget Card ── */
+                    <div
+                      className={`w-full max-w-[320px] mx-auto rounded-[28px] p-5 backdrop-blur-2xl border shadow-2xl flex flex-col gap-3.5 mt-8 ${wallpaperSync ? "" : "opacity-60"}`}
+                      style={{
+                        background: "color-mix(in srgb, var(--wp-bg) 65%, transparent)",
+                        borderColor: "color-mix(in srgb, var(--wp-accent) 25%, rgba(255, 255, 255, 0.12))",
+                        boxShadow: "0 20px 45px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.15)",
+                      }}
+                    >
+                      {/* Widget Header: Streak Flame + Completion Rate */}
+                      <div className="flex items-center justify-between px-1">
+                        <div className="flex items-center gap-1.5 font-bold text-[13px] tracking-tight">
+                          <Flame className="w-4 h-4 text-[color:var(--wp-accent)]" />
+                          <span>{displayedTotalStreak}d Streak</span>
+                        </div>
+                        <div
+                          className="text-[11px] font-bold px-2.5 py-0.5 rounded-full"
+                          style={{
+                            background: "color-mix(in srgb, var(--wp-accent) 18%, transparent)",
+                            color: "var(--wp-accent)",
+                          }}
+                        >
+                          {displayedRate}% Done
+                        </div>
+                      </div>
+
+                      <div className="h-px w-full" style={{ background: "color-mix(in srgb, var(--wp-fg) 10%, transparent)" }} />
+
+                      {/* Widget Mini Heatmap Grid (7 columns × min(previewWeeks, 12) rows) */}
+                      <div className="flex flex-col items-center">
+                        <div className="flex items-center mb-1.5" style={{ gap: "3px" }}>
+                          {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
+                            <div
+                              key={i}
+                              className="w-[14px] text-[9px] font-bold text-center opacity-40 uppercase"
+                            >
+                              {d}
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="flex flex-col" style={{ gap: "3px" }}>
+                          {displayedHeatmap.slice(-Math.min(previewWeeks, 12)).map((col, ci) => {
+                            const absCi = 52 - Math.min(previewWeeks, 12) + ci;
+
+                            return (
+                              <div key={ci} className="flex items-center" style={{ gap: "3px" }}>
+                                {col.map((v, ri) => {
+                                  const isToday = absCi === TODAY_COL && ri === TODAY_ROW;
+                                  const isFuture = absCi === TODAY_COL && ri > TODAY_ROW;
+
+                                  return (
+                                    <div
+                                      key={`${ci}-${ri}`}
+                                      className={`relative ${isToday ? "animate-cell-flash ring-1.5 ring-inset ring-[color:var(--wp-accent)]" : ""}`}
+                                      style={{
+                                        width: "14px",
+                                        height: "14px",
+                                        borderRadius: "3px",
+                                        background: isFuture
+                                          ? "color-mix(in srgb, var(--wp-empty) 40%, transparent)"
+                                          : v === 0
+                                            ? "var(--wp-empty)"
+                                            : v === 1
+                                              ? "var(--wp-low)"
+                                              : v === 2
+                                                ? "var(--wp-mid)"
+                                                : "var(--wp-hi)",
+                                        opacity: isFuture ? 0.3 : 1,
+                                      }}
+                                    />
+                                  );
+                                })}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="h-px w-full" style={{ background: "color-mix(in srgb, var(--wp-fg) 10%, transparent)" }} />
+
+                      {/* Widget Habit Footer */}
+                      <div className="flex items-center justify-center gap-2 text-[10px] font-semibold tracking-wider uppercase opacity-75 px-1 truncate">
+                        {topHabitNames.map((name, i) => (
+                          <span key={i} className="flex items-center gap-2">
+                            {i > 0 && <span className="opacity-40">·</span>}
+                            <span className="truncate">{name}</span>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    /* ── Stacked Goals View ── */
+                    <div className={`flex flex-col items-center gap-12 mt-16 w-full ${wallpaperSync ? "" : "opacity-60"}`}>
+                      {stackedGoals.length === 0 ? (
+                        <div className="text-[14px] opacity-50 font-semibold uppercase tracking-widest text-center mt-20">
+                          No active goals
+                        </div>
+                      ) : (
+                        stackedGoals.map((sg) => (
+                          <div key={sg.id} className="flex flex-col items-center w-full">
+                            <div className="flex flex-wrap gap-1 justify-center px-4 mb-4 max-w-[320px] mx-auto">
+                              {sg.heatmap && sg.heatmap.flatMap(col => col).map((v: number, i: number) => (
+                                <div
+                                  key={i}
+                                  className="h-2 w-2 rounded-[2px] transition-colors"
+                                  style={{
+                                    background:
+                                      v === 0
+                                        ? "rgba(255, 255, 255, 0.08)"
+                                        : v === 1
+                                          ? "var(--wp-low)"
+                                          : v === 2
+                                            ? "var(--wp-mid)"
+                                            : "var(--wp-hi)",
+                                  }}
+                                />
+                              ))}
+                            </div>
+                            <div className="flex flex-col items-center gap-1">
+                              <span className="text-[12px] uppercase tracking-widest font-bold opacity-80">
+                                {sg.title}
+                              </span>
+                              <span style={{ color: "rgba(255, 255, 255, 0.5)", fontWeight: 700, fontSize: "11px" }}>
+                                {sg.currentStreak}d left - {sg.completionRate}%
+                              </span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+
+                  {wallpaperHabitSet !== "none" && wallpaperGridStyle === "weeks" && (
+                    <div className="mt-12 flex flex-col items-center gap-2 opacity-80">
+                      {(HABIT_SETS.find(s => s.key === wallpaperHabitSet)?.habits || []).map((h, i) => (
+                        <span key={i} className="text-[12px] uppercase tracking-widest font-semibold">{h}</span>
+                      ))}
+                    </div>
+                  )}
+
+                  {wallpaperGridStyle !== "widget" && (
+                    <div className={`mt-12 w-full px-12 text-[11px] font-semibold opacity-70 ${wallpaperStatsAlign === 'left' ? 'text-left' : wallpaperStatsAlign === 'right' ? 'text-right' : 'text-center'}`}>
+                      {activeGoalId && goals.some(g => g.id === activeGoalId) ? (
+                        <span style={{ color: "rgba(255, 255, 255, 0.5)", fontWeight: 700, letterSpacing: "0.02em", fontSize: "11px" }}>
+                          {displayedTotalStreak}d left - {displayedRate}%
+                        </span>
+                      ) : (
+                        <span>
+                          {displayedTotalStreak} day streak · {displayedRate}%
+                        </span>
+                      )}
+                      <br />
+                      <span className="opacity-50 mt-1 block">{wallpaperSync ? "LIVE SYNC ON" : "SNAPSHOT PAUSED"}</span>
+                    </div>
+                  )}
+
+                </div> {/* End Draggable Container */}
+              </div>
+
+              {/* Floating Bottom Customizer & Apply Buttons */}
+              <div className="absolute bottom-6 left-0 right-0 flex flex-col items-center gap-3.5 z-50 animate-fade-in-up px-4 pointer-events-none pb-safe">
+                {/* Category Tabs & WheelPickers Card */}
+                <div className="w-full max-w-[420px] pointer-events-auto rounded-[28px] p-3.5 shadow-2xl border border-white/15 backdrop-blur-3xl bg-black/50">
+                  {renderSettingsMenu()}
+                </div>
+
+                {/* Apply Actions */}
+                <div className="flex items-center gap-2.5 pointer-events-auto">
+                  <button
+                    onClick={() => applyWallpaper(false)}
+                    className="flex items-center gap-2 px-6 h-11 rounded-full bg-white text-black font-bold text-xs uppercase tracking-wider shadow-2xl active:scale-95 transition hover:bg-neutral-200"
+                  >
+                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.8)]" />
+                    Apply Live Wallpaper
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setShowStaticTargetSelector(true);
+                    }}
+                    className="flex items-center gap-1.5 px-4 h-11 rounded-full bg-black/60 text-white font-bold text-xs uppercase tracking-wider border border-white/20 backdrop-blur-xl shadow-xl active:scale-95 transition hover:bg-black/80"
+                  >
+                    Set Static
+                  </button>
+                </div>
+              </div>
+            </div>
           )}
 
           {streakOpen && (
