@@ -2078,10 +2078,10 @@ export function Dashboard({ user }: { user?: any }) {
                     <button
                       type="button"
                       onClick={() => photoInputRef.current?.click()}
-                      className="pointer-events-auto flex items-center justify-center h-10 w-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 text-white cursor-pointer active:scale-95 transition-all hover:bg-black/60 shadow-lg"
+                      className="pointer-events-auto flex items-center justify-center h-9 w-9 rounded-full bg-black/40 backdrop-blur-xl border border-white/15 text-white/80 cursor-pointer active:scale-95 transition-all hover:bg-black/60 hover:text-white shadow-lg"
                       aria-label="Upload custom wallpaper photo"
                     >
-                      <ImagePlus size={18} />
+                      <ImagePlus size={16} />
                     </button>
                     <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} onClick={(e) => e.stopPropagation()} />
 
@@ -2093,11 +2093,13 @@ export function Dashboard({ user }: { user?: any }) {
                           setIsMovingPhoto(prev => !prev);
                           if (!isMovingPhoto) setIsRepositionMode(false);
                         }}
-                        className={`pointer-events-auto flex items-center gap-1.5 h-10 px-3.5 rounded-full backdrop-blur-md border border-white/20 text-white font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg ${
-                          isMovingPhoto ? "bg-white text-black shadow-white/30" : "bg-black/40 hover:bg-black/60"
+                        className={`pointer-events-auto flex items-center gap-1.5 h-9 px-3.5 rounded-full backdrop-blur-xl border font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg ${
+                          isMovingPhoto
+                            ? "bg-[color:color-mix(in_srgb,var(--wp-accent)_20%,rgba(0,0,0,0.6))] border-[color:var(--wp-accent)] text-[color:var(--wp-accent)] shadow-[0_0_15px_color-mix(in_srgb,var(--wp-accent)_35%,transparent)]"
+                            : "bg-black/40 border-white/15 text-white/80 hover:text-white hover:bg-black/60"
                         }`}
                       >
-                        <Move size={14} />
+                        <Move size={13} className={isMovingPhoto ? "animate-pulse" : ""} />
                         <span>{isMovingPhoto ? "Done Photo" : "Move Photo"}</span>
                       </button>
                     )}
@@ -2109,11 +2111,13 @@ export function Dashboard({ user }: { user?: any }) {
                         setIsRepositionMode(prev => !prev);
                         if (!isRepositionMode) setIsMovingPhoto(false);
                       }}
-                      className={`pointer-events-auto flex items-center gap-1.5 h-10 px-3.5 rounded-full backdrop-blur-md border border-white/20 text-white font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg ${
-                        isRepositionMode ? "bg-white text-black shadow-white/30" : "bg-black/40 hover:bg-black/60"
+                      className={`pointer-events-auto flex items-center gap-1.5 h-9 px-3.5 rounded-full backdrop-blur-xl border font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg ${
+                        isRepositionMode
+                          ? "bg-[color:color-mix(in_srgb,var(--wp-accent)_20%,rgba(0,0,0,0.6))] border-[color:var(--wp-accent)] text-[color:var(--wp-accent)] shadow-[0_0_15px_color-mix(in_srgb,var(--wp-accent)_35%,transparent)]"
+                          : "bg-black/40 border-white/15 text-white/80 hover:text-white hover:bg-black/60"
                       }`}
                     >
-                      <Move size={14} />
+                      <Move size={13} className={isRepositionMode ? "animate-pulse" : ""} />
                       <span>{isRepositionMode ? "Done" : "Reposition"}</span>
                     </button>
 
@@ -2126,10 +2130,10 @@ export function Dashboard({ user }: { user?: any }) {
                           setWallpaperScale(1);
                           showToast("Position reset");
                         }}
-                        className="pointer-events-auto flex items-center justify-center h-10 w-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 text-white active:scale-95 transition-all hover:bg-black/60 shadow-lg"
+                        className="pointer-events-auto flex items-center justify-center h-9 w-9 rounded-full bg-black/40 backdrop-blur-xl border border-white/15 text-white/80 active:scale-95 transition-all hover:bg-black/60 hover:text-white shadow-lg"
                         title="Reset position"
                       >
-                        <RotateCcw size={16} />
+                        <RotateCcw size={15} />
                       </button>
                     )}
                   </div>
