@@ -394,7 +394,7 @@ export function Dashboard({ user }: { user?: any }) {
   }, [wallpaperTheme]);
   const [gridColorTheme, setGridColorTheme] = useState<string>("emerald");
   const [wallpaperHabitSet, setWallpaperHabitSet] = useState<string>("none");
-  const [wallpaperGridStyle, setWallpaperGridStyle] = useState<"weeks" | "year" | "month" | "goals">("weeks");
+  const [wallpaperGridStyle, setWallpaperGridStyle] = useState<"weeks" | "year" | "month" | "goals" | "widget">("weeks");
   const [wallpaperCustomPhoto, setWallpaperCustomPhoto] = useState<string | null>(null);
   const [wallpaperPhotoOverlay, setWallpaperPhotoOverlay] = useState<number>(0.4);
   const [wallpaperStatsAlign, setWallpaperStatsAlign] = useState<"left" | "center" | "right">("center");
@@ -915,10 +915,20 @@ export function Dashboard({ user }: { user?: any }) {
     });
   }, [wallpaperGridStyle, goals]);
 
+  const topHabitNames = useMemo<string[]>(() => {
+    if (wallpaperHabitSet !== "none") {
+      const set = HABIT_SETS.find(s => s.key === wallpaperHabitSet);
+      if (set?.habits?.length) return [...set.habits.slice(0, 3)];
+    }
+    const activeHabitNames = flatHabits.filter(h => !h.archived).slice(0, 3).map(h => h.name);
+    return activeHabitNames.length > 0 ? activeHabitNames : ["Focus", "Consistency", "Growth"];
+  }, [wallpaperHabitSet, flatHabits]);
+
   const habitTextLines = useMemo(() => {
+    if (wallpaperGridStyle === "widget") return topHabitNames;
     if (wallpaperHabitSet === "none" || wallpaperGridStyle !== "weeks") return undefined;
     return HABIT_SETS.find(s => s.key === wallpaperHabitSet)?.habits as string[] | undefined;
-  }, [wallpaperHabitSet, wallpaperGridStyle]);
+  }, [wallpaperHabitSet, wallpaperGridStyle, topHabitNames]);
 
   useWallpaperSync({
     heatmap: displayedHeatmap,
@@ -1462,11 +1472,12 @@ export function Dashboard({ user }: { user?: any }) {
                   { key: "month", label: "Month Cal" },
                   { key: "year", label: "Year" },
                   { key: "goals", label: "Goals" },
+                  { key: "widget", label: "Widget" },
                 ]}
                 value={wallpaperGridStyle}
                 onChange={(v) => {
                   setWallpaperGridStyle(v as any);
-                  showToast(`${v === 'weeks' ? 'Weeks' : v === 'month' ? 'Month Cal' : v === 'year' ? 'Year' : 'Goals'} layout`);
+                  showToast(`${v === 'weeks' ? 'Weeks' : v === 'month' ? 'Month Cal' : v === 'year' ? 'Year' : v === 'goals' ? 'Goals' : 'Widget'} layout`);
                 }}
                 itemWidth={95}
                 fontSizeClass="text-[14px]"
@@ -1474,7 +1485,7 @@ export function Dashboard({ user }: { user?: any }) {
             </div>
           )}
 
-          {activeSettingTab === "size" && wallpaperGridStyle === "weeks" && (
+          {activeSettingTab === "size" && (wallpaperGridStyle === "weeks" || wallpaperGridStyle === "widget") && (
             <div className="w-full animate-fade-in-right">
               <WheelPicker
                 options={GRID_SIZES.map(w => ({ key: w, label: w }))}
@@ -2136,7 +2147,7 @@ export function Dashboard({ user }: { user?: any }) {
                   }}
                 >
                   {/* Snapping Crosshairs */}
-                  {isDraggingWallpaper && isRepositionMode && (wallpaperGridStyle === "month" || wallpaperGridStyle === "year") && (
+                  {isDraggingWallpaper && isRepositionMode && (wallpaperGridStyle === "month" || wallpaperGridStyle === "year" || wallpaperGridStyle === "weeks" || wallpaperGridStyle === "widget") && (
                     <>
                       <div className={`absolute top-0 bottom-0 left-1/2 w-[1px] -translate-x-1/2 z-0 transition-colors duration-200 ${wallpaperOffset.x === 0 ? "bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.8)]" : "bg-white/20"}`} />
                       <div className={`absolute left-0 right-0 top-1/2 h-[1px] -translate-y-1/2 z-0 transition-colors duration-200 ${wallpaperOffset.y === 0 ? "bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.8)]" : "bg-white/20"}`} />
@@ -2387,66 +2398,168 @@ export function Dashboard({ user }: { user?: any }) {
                         );
                       })()
                     ) : wallpaperGridStyle === "weeks" ? (
-                      /* ── Weeks Heatmap View (existing) ── */
-                      <div
-                        className={`grid mt-16 ${wallpaperSync ? "" : "opacity-60"}`}
-                        style={(() => {
-                          const N = previewWeeks * 7;
-                          const availW = typeof window !== "undefined" ? window.innerWidth - 48 : 342;
-                          const availH = typeof window !== "undefined" ? window.innerHeight - 240 : 600;
-                          const gapSize = previewWeeks > 26 ? 2 : 3;
-                          let bestSize = 6;
-                          let bestCols = 7;
+                      /* ── Weeks Portrait 7-Day Calendar Grid ── */
+                      <div className={`flex flex-col items-center mt-6 ${wallpaperSync ? "" : "opacity-60"}`}>
+                        {/* Day headers: M T W T F S S */}
+                        <div className="flex items-center mb-2" style={{ gap: "4px" }}>
+                          <div className="w-7 shrink-0" /> {/* Spacer for month label column */}
+                          {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
+                            <div
+                              key={i}
+                              className="text-[10px] font-bold text-center opacity-40 uppercase"
+                              style={(() => {
+                                const cellSize = previewWeeks > 32 ? 10 : previewWeeks > 20 ? 14 : previewWeeks > 12 ? 18 : 24;
+                                return { width: `${cellSize}px` };
+                              })()}
+                            >
+                              {d}
+                            </div>
+                          ))}
+                        </div>
 
-                          // Find the largest cell size that fits N cells into the screen.
-                          for (let s = 48; s >= 6; s--) {
-                            let c = Math.floor((availW + gapSize) / (s + gapSize));
-                            let r = Math.floor((availH + gapSize) / (s + gapSize));
-                            if (c * r >= N) {
-                              bestSize = s;
-                              bestCols = c;
-                              break;
-                            }
-                          }
+                        {/* Weeks rows */}
+                        <div className="flex flex-col" style={{ gap: "4px" }}>
+                          {displayedHeatmap.slice(-previewWeeks).map((col, ci) => {
+                            const absCi = 52 - previewWeeks + ci;
+                            const weekStartDate = new Date(heatmapStartDate().getTime() + (absCi * 7) * 86400000);
+                            const prevWeekStartDate = ci > 0 ? new Date(heatmapStartDate().getTime() + ((absCi - 1) * 7) * 86400000) : null;
+                            const isNewMonth = ci === 0 || (prevWeekStartDate && weekStartDate.getMonth() !== prevWeekStartDate.getMonth());
+                            const monthName = weekStartDate.toLocaleDateString("en-US", { month: "short" });
+                            const cellSize = previewWeeks > 32 ? 10 : previewWeeks > 20 ? 14 : previewWeeks > 12 ? 18 : 24;
+                            const radius = cellSize > 16 ? 5 : 3;
 
-                          const borderRadius = bestSize > 12 ? 4 : 2;
-
-                          return {
-                            gridTemplateColumns: `repeat(${bestCols}, max-content)`,
-                            gridAutoFlow: "row",
-                            justifyContent: "center",
-                            alignContent: "center",
-                            gap: `${gapSize}px`,
-                            "--wp-cell-size": `${bestSize}px`,
-                            "--wp-cell-radius": `${borderRadius}px`
-                          } as any;
-                        })()}
-                      >
-                        {displayedHeatmap.slice(-previewWeeks).flatMap((col, ci) => {
-                          const absCi = 52 - previewWeeks + ci;
-                          return col.map((v, ri) => {
-                            const isToday = absCi === TODAY_COL && ri === TODAY_ROW;
                             return (
-                              <div
-                                key={`${ci}-${ri}`}
-                                className={`${isToday ? "animate-cell-flash ring-2 ring-inset ring-[color:var(--wp-accent)]" : ""}`}
-                                style={{
-                                  width: "var(--wp-cell-size)",
-                                  height: "var(--wp-cell-size)",
-                                  borderRadius: "var(--wp-cell-radius)",
-                                  background:
-                                    v === 0
-                                      ? "var(--wp-empty)"
-                                      : v === 1
-                                        ? "var(--wp-low)"
-                                        : v === 2
-                                          ? "var(--wp-mid)"
-                                          : "var(--wp-hi)",
-                                }}
-                              />
+                              <div key={ci} className="flex items-center" style={{ gap: "4px" }}>
+                                {/* Month Label (left side) */}
+                                <div className="w-7 text-[9px] font-bold uppercase tracking-wider text-right pr-1.5 opacity-60 shrink-0 select-none">
+                                  {isNewMonth ? monthName : ""}
+                                </div>
+
+                                {/* 7 Day Squares in this week */}
+                                {col.map((v, ri) => {
+                                  const isToday = absCi === TODAY_COL && ri === TODAY_ROW;
+                                  const isFuture = absCi === TODAY_COL && ri > TODAY_ROW;
+
+                                  return (
+                                    <div
+                                      key={`${ci}-${ri}`}
+                                      className={`relative ${isToday ? "animate-cell-flash ring-2 ring-inset ring-[color:var(--wp-accent)]" : ""}`}
+                                      style={{
+                                        width: `${cellSize}px`,
+                                        height: `${cellSize}px`,
+                                        borderRadius: `${radius}px`,
+                                        background: isFuture
+                                          ? "color-mix(in srgb, var(--wp-empty) 40%, transparent)"
+                                          : v === 0
+                                            ? "var(--wp-empty)"
+                                            : v === 1
+                                              ? "var(--wp-low)"
+                                              : v === 2
+                                                ? "var(--wp-mid)"
+                                                : "var(--wp-hi)",
+                                        opacity: isFuture ? 0.3 : 1,
+                                      }}
+                                    />
+                                  );
+                                })}
+                              </div>
                             );
-                          });
-                        })}
+                          })}
+                        </div>
+                      </div>
+                    ) : wallpaperGridStyle === "widget" ? (
+                      /* ── Frosted Liquid-Glass Widget Card ── */
+                      <div
+                        className={`w-full max-w-[320px] mx-auto rounded-[28px] p-5 backdrop-blur-2xl border shadow-2xl flex flex-col gap-3.5 mt-8 ${wallpaperSync ? "" : "opacity-60"}`}
+                        style={{
+                          background: "color-mix(in srgb, var(--wp-bg) 65%, transparent)",
+                          borderColor: "color-mix(in srgb, var(--wp-accent) 25%, rgba(255, 255, 255, 0.12))",
+                          boxShadow: "0 20px 45px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.15)",
+                        }}
+                      >
+                        {/* Widget Header: Streak Flame + Completion Rate */}
+                        <div className="flex items-center justify-between px-1">
+                          <div className="flex items-center gap-1.5 font-bold text-[13px] tracking-tight">
+                            <Flame className="w-4 h-4 text-[color:var(--wp-accent)]" />
+                            <span>{displayedTotalStreak}d Streak</span>
+                          </div>
+                          <div
+                            className="text-[11px] font-bold px-2.5 py-0.5 rounded-full"
+                            style={{
+                              background: "color-mix(in srgb, var(--wp-accent) 18%, transparent)",
+                              color: "var(--wp-accent)",
+                            }}
+                          >
+                            {displayedRate}% Done
+                          </div>
+                        </div>
+
+                        <div className="h-px w-full" style={{ background: "color-mix(in srgb, var(--wp-fg) 10%, transparent)" }} />
+
+                        {/* Widget Mini Heatmap Grid (7 columns × min(previewWeeks, 12) rows) */}
+                        <div className="flex flex-col items-center">
+                          {/* Mini Day Headers */}
+                          <div className="flex items-center mb-1.5" style={{ gap: "3px" }}>
+                            {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
+                              <div
+                                key={i}
+                                className="w-[14px] text-[9px] font-bold text-center opacity-40 uppercase"
+                              >
+                                {d}
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Mini Week Rows */}
+                          <div className="flex flex-col" style={{ gap: "3px" }}>
+                            {displayedHeatmap.slice(-Math.min(previewWeeks, 12)).map((col, ci) => {
+                              const absCi = 52 - Math.min(previewWeeks, 12) + ci;
+
+                              return (
+                                <div key={ci} className="flex items-center" style={{ gap: "3px" }}>
+                                  {col.map((v, ri) => {
+                                    const isToday = absCi === TODAY_COL && ri === TODAY_ROW;
+                                    const isFuture = absCi === TODAY_COL && ri > TODAY_ROW;
+
+                                    return (
+                                      <div
+                                        key={`${ci}-${ri}`}
+                                        className={`relative ${isToday ? "animate-cell-flash ring-1.5 ring-inset ring-[color:var(--wp-accent)]" : ""}`}
+                                        style={{
+                                          width: "14px",
+                                          height: "14px",
+                                          borderRadius: "3px",
+                                          background: isFuture
+                                            ? "color-mix(in srgb, var(--wp-empty) 40%, transparent)"
+                                            : v === 0
+                                              ? "var(--wp-empty)"
+                                              : v === 1
+                                                ? "var(--wp-low)"
+                                                : v === 2
+                                                  ? "var(--wp-mid)"
+                                                  : "var(--wp-hi)",
+                                          opacity: isFuture ? 0.3 : 1,
+                                        }}
+                                      />
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="h-px w-full" style={{ background: "color-mix(in srgb, var(--wp-fg) 10%, transparent)" }} />
+
+                        {/* Widget Habit Footer */}
+                        <div className="flex items-center justify-center gap-2 text-[10px] font-semibold tracking-wider uppercase opacity-75 px-1 truncate">
+                          {topHabitNames.map((name, i) => (
+                            <span key={i} className="flex items-center gap-2">
+                              {i > 0 && <span className="opacity-40">·</span>}
+                              <span className="truncate">{name}</span>
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     ) : (
                       /* ── Stacked Goals View ── */
@@ -2498,19 +2611,21 @@ export function Dashboard({ user }: { user?: any }) {
                       </div>
                     )}
 
-                    <div className={`mt-12 w-full px-12 text-[11px] font-semibold opacity-70 ${wallpaperStatsAlign === 'left' ? 'text-left' : wallpaperStatsAlign === 'right' ? 'text-right' : 'text-center'}`}>
-                      {activeGoalId && goals.some(g => g.id === activeGoalId) ? (
-                        <span style={{ color: "rgba(255, 255, 255, 0.5)", fontWeight: 700, letterSpacing: "0.02em", fontSize: "11px" }}>
-                          {displayedTotalStreak}d left - {displayedRate}%
-                        </span>
-                      ) : (
-                        <span>
-                          {displayedTotalStreak} day streak · {displayedRate}%
-                        </span>
-                      )}
-                      <br />
-                      <span className="opacity-50 mt-1 block">{wallpaperSync ? "LIVE SYNC ON" : "SNAPSHOT PAUSED"}</span>
-                    </div>
+                    {wallpaperGridStyle !== "widget" && (
+                      <div className={`mt-12 w-full px-12 text-[11px] font-semibold opacity-70 ${wallpaperStatsAlign === 'left' ? 'text-left' : wallpaperStatsAlign === 'right' ? 'text-right' : 'text-center'}`}>
+                        {activeGoalId && goals.some(g => g.id === activeGoalId) ? (
+                          <span style={{ color: "rgba(255, 255, 255, 0.5)", fontWeight: 700, letterSpacing: "0.02em", fontSize: "11px" }}>
+                            {displayedTotalStreak}d left - {displayedRate}%
+                          </span>
+                        ) : (
+                          <span>
+                            {displayedTotalStreak} day streak · {displayedRate}%
+                          </span>
+                        )}
+                        <br />
+                        <span className="opacity-50 mt-1 block">{wallpaperSync ? "LIVE SYNC ON" : "SNAPSHOT PAUSED"}</span>
+                      </div>
+                    )}
 
                   </div> {/* End Draggable Container */}
                 </div>

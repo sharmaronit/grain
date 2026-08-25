@@ -391,6 +391,8 @@ public class GrainWallpaperService extends WallpaperService {
             drawMonthGrid(canvas, width, height, adjusted, paint, textPaint, fg, accent, ints, density);
         } else if ("goals".equals(adjusted.gridStyle)) {
             drawStackedGoals(canvas, width, height, adjusted, paint, textPaint, fg, accent, ints, density);
+        } else if ("widget".equals(adjusted.gridStyle)) {
+            drawWidgetCard(canvas, width, height, adjusted, paint, textPaint, fg, accent, ints, density);
         } else {
             drawWeeksGrid(canvas, width, height, adjusted, paint, textPaint, fg, accent, ints, density);
         }
@@ -405,91 +407,280 @@ public class GrainWallpaperService extends WallpaperService {
         return c;
     }
 
-    // ── Weeks grid ──────────────────────────────────────────────────────
+    // ── Weeks grid (Portrait 7-Day Calendar Layout) ──────────────────────
 
     private static void drawWeeksGrid(Canvas canvas, int w, int h, WallpaperData data,
                                       Paint paint, Paint tp,
                                       int[] fg, int[] accent, int[][] ints, float dp) {
-        int N = data.previewWeeks * 7;
-        float availW = w / dp - 48f;
-        float availH = h / dp - 240f;
-        float gapDp = data.previewWeeks > 26 ? 2f : 3f;
-        
-        int bestSize = 6;
-        int bestCols = 7;
-        
-        for (int s = 48; s >= 6; s--) {
-            int c = (int) Math.floor((availW + gapDp) / (s + gapDp));
-            int r = (int) Math.floor((availH + gapDp) / (s + gapDp));
-            if (c * r >= N) {
-                bestSize = s;
-                bestCols = c;
-                break;
-            }
-        }
-        
-        float sqDp = bestSize * data.gridScale;
-        float finalGapDp = gapDp * data.gridScale;
-        
-        float sq = sqDp * dp;
-        float gap = finalGapDp * dp;
-        float cr = bestSize > 12 ? 4f * dp : 2f * dp;
-        
-        int totalRows = (int) Math.ceil((float) N / bestCols);
-        
-        float gridW = bestCols * sq + Math.max(0, bestCols - 1) * gap;
-        float gridH = totalRows * sq + Math.max(0, totalRows - 1) * gap;
-        
+        int previewWeeks = Math.max(1, data.previewWeeks);
+        int cols = 7;
+        int rows = previewWeeks;
+
+        float baseCellSize = previewWeeks > 32 ? 10f : (previewWeeks > 20 ? 14f : (previewWeeks > 12 ? 18f : 24f));
+        float sq = baseCellSize * dp * data.gridScale;
+        float gap = 4f * dp * data.gridScale;
+        float cr = (sq > 16f * dp ? 5f : 3f) * dp;
+        float monthColW = 28f * dp * data.gridScale;
+        float headerH = 18f * dp * data.gridScale;
+
+        float gridW = monthColW + cols * sq + (cols - 1) * gap;
+        float gridH = headerH + rows * sq + (rows - 1) * gap;
+
         float startX = (w - gridW) / 2f + (data.offsetX * dp);
         float startY = h * data.offsetY - gridH / 2f;
-        
+
+        // Draw day headers: M T W T F S S
+        String[] dayLabels = {"M", "T", "W", "T", "F", "S", "S"};
+        tp.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+        tp.setTextSize(10f * dp * data.gridScale);
+        tp.setColor(fg[0]);
+        tp.setAlpha(100);
+        tp.setTextAlign(Paint.Align.CENTER);
+
+        float cellsStartX = startX + monthColW;
+        for (int c = 0; c < 7; c++) {
+            float cx = cellsStartX + c * (sq + gap) + sq / 2f;
+            canvas.drawText(dayLabels[c], cx, startY + 12f * dp * data.gridScale, tp);
+        }
+        tp.setAlpha(255);
+
+        Calendar todayCal = getMidnightCalendar();
+        int todayDow = (todayCal.get(Calendar.DAY_OF_WEEK) + 5) % 7; // Mon=0 .. Sun=6
+        long mondayThisWeekMs = todayCal.getTimeInMillis() - (todayDow * 86400000L);
+        long heatmapStartMs = data.heatmapStartMs > 0 ? data.heatmapStartMs : (mondayThisWeekMs - (51L * 7L * 86400000L));
+
         int heatmapLen = data.heatmap != null ? data.heatmap.length : 0;
-        int startCol = Math.max(0, heatmapLen - data.previewWeeks);
-        
-        Calendar cal     = Calendar.getInstance();
-        int dayOfWeek    = cal.get(Calendar.DAY_OF_WEEK);
-        int todayRow     = (dayOfWeek + 5) % 7;
-        int todayColIdx  = data.previewWeeks - 1;
-        int todayFlatIdx = todayColIdx * 7 + todayRow;
-        
-        for (int k = 0; k < N; k++) {
-            int colIdx = startCol + (k / 7);
-            int rowIdx = k % 7;
-            
-            int drawCol = k % bestCols;
-            int drawRow = k / bestCols;
-            
-            float x = startX + drawCol * (sq + gap);
-            float y = startY + drawRow * (sq + gap);
-            
-            int level = 0;
-            if (data.heatmap != null && colIdx >= 0 && colIdx < data.heatmap.length) {
-                level = clamp(data.heatmap[colIdx][rowIdx]);
+        int startCol = Math.max(0, heatmapLen - previewWeeks);
+        int todayColIdx = previewWeeks - 1;
+
+        String[] monthNames = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
+        int lastMonth = -1;
+
+        float rowsStartY = startY + headerH;
+
+        for (int r = 0; r < rows; r++) {
+            int colIdx = startCol + r;
+            long weekStartMs = heatmapStartMs + (colIdx * 7L * 86400000L);
+            Calendar weekCal = getMidnightCalendar();
+            weekCal.setTimeInMillis(weekStartMs);
+            int month = weekCal.get(Calendar.MONTH);
+
+            float rowY = rowsStartY + r * (sq + gap);
+
+            // Draw month label on the left if month changed
+            if (r == 0 || month != lastMonth) {
+                lastMonth = month;
+                tp.setTextSize(9f * dp * data.gridScale);
+                tp.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+                tp.setTextAlign(Paint.Align.RIGHT);
+                tp.setColor(fg[0]);
+                tp.setAlpha(150);
+                canvas.drawText(monthNames[month].toUpperCase(), startX + monthColW - 6f * dp, rowY + sq * 0.75f, tp);
+                tp.setAlpha(255);
             }
-            
-            paint.setColor(ints[0][level]);
-            if (level >= 2) paint.setShadowLayer(6f * dp, 0, 0, ints[0][level]);
-            else            paint.clearShadowLayer();
-            
-            RectF r = new RectF(x, y, x + sq, y + sq);
-            canvas.drawRoundRect(r, cr, cr, paint);
-            
-            if (k == todayFlatIdx) {
-                paint.clearShadowLayer();
-                paint.setStyle(Paint.Style.STROKE);
-                paint.setStrokeWidth(2f * dp);
-                paint.setColor(accent[0]);
-                
-                float inset = 1f * dp;
-                RectF innerRect = new RectF(x + inset, y + inset, x + sq - inset, y + sq - inset);
-                float innerCr = Math.max(0, cr - inset);
-                canvas.drawRoundRect(innerRect, innerCr, innerCr, paint);
-                paint.setStyle(Paint.Style.FILL);
+
+            // Draw 7 day squares in this week row
+            for (int c = 0; c < 7; c++) {
+                float x = cellsStartX + c * (sq + gap);
+                float y = rowY;
+
+                boolean isToday = (r == todayColIdx) && (c == todayDow);
+                boolean isFuture = (r == todayColIdx) && (c > todayDow);
+
+                int level = 0;
+                if (!isFuture && data.heatmap != null && colIdx >= 0 && colIdx < data.heatmap.length) {
+                    level = clamp(data.heatmap[colIdx][c]);
+                }
+
+                paint.setColor(isFuture ? Color.argb(20, 255, 255, 255) : ints[0][level]);
+                if (level >= 2 && !isFuture) {
+                    paint.setShadowLayer(6f * dp, 0, 0, ints[0][level]);
+                } else {
+                    paint.clearShadowLayer();
+                }
+
+                RectF rect = new RectF(x, y, x + sq, y + sq);
+                canvas.drawRoundRect(rect, cr, cr, paint);
+
+                if (isToday) {
+                    paint.clearShadowLayer();
+                    paint.setStyle(Paint.Style.STROKE);
+                    paint.setStrokeWidth(2f * dp);
+                    paint.setColor(accent[0]);
+
+                    float inset = 1f * dp;
+                    RectF innerRect = new RectF(x + inset, y + inset, x + sq - inset, y + sq - inset);
+                    float innerCr = Math.max(0, cr - inset);
+                    canvas.drawRoundRect(innerRect, innerCr, innerCr, paint);
+                    paint.setStyle(Paint.Style.FILL);
+                }
             }
         }
-        
+
         paint.clearShadowLayer();
-        drawStatsPill(canvas, startX, startX + gridW, startY + gridH + 24f * dp, data, tp, fg, dp);
+        drawStatsPill(canvas, cellsStartX, cellsStartX + cols * sq + (cols - 1) * gap, rowsStartY + rows * sq + (rows - 1) * gap + 24f * dp, data, tp, fg, dp);
+    }
+
+    // ── Frosted Liquid-Glass Widget Card ────────────────────────────────
+
+    private static void drawWidgetCard(Canvas canvas, int w, int h, WallpaperData data,
+                                       Paint paint, Paint tp,
+                                       int[] fg, int[] accent, int[][] ints, float dp) {
+        int previewWeeks = Math.min(Math.max(1, data.previewWeeks), 12);
+        int cols = 7;
+        int rows = previewWeeks;
+
+        float sq = 14f * dp * data.gridScale;
+        float gap = 3f * dp * data.gridScale;
+        float cr = 3f * dp;
+
+        float gridInnerW = cols * sq + (cols - 1) * gap;
+        float headerLabelsH = 14f * dp;
+        float gridH = headerLabelsH + rows * sq + (rows - 1) * gap;
+
+        float cardPadH = 20f * dp;
+        float cardPadV = 18f * dp;
+        float headerStatsH = 24f * dp;
+        float footerH = 22f * dp;
+        float dividerPad = 12f * dp;
+
+        float cardW = Math.max(gridInnerW + cardPadH * 2, w * 0.82f);
+        float cardH = cardPadV * 2 + headerStatsH + dividerPad + gridH + dividerPad + footerH;
+
+        float startX = (w - cardW) / 2f + (data.offsetX * dp);
+        float startY = h * data.offsetY - cardH / 2f;
+
+        // 1. Draw Frosted Card Background
+        paint.clearShadowLayer();
+        paint.setStyle(Paint.Style.FILL);
+        paint.setColor("mono".equals(data.themeKey)
+            ? Color.argb(50, 0, 0, 0)
+            : Color.argb(110, 10, 10, 15));
+        RectF cardRect = new RectF(startX, startY, startX + cardW, startY + cardH);
+        float cardRadius = 24f * dp;
+        canvas.drawRoundRect(cardRect, cardRadius, cardRadius, paint);
+
+        // 2. Draw Card Border
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(1.2f * dp);
+        paint.setColor(Color.argb(45, 255, 255, 255));
+        canvas.drawRoundRect(cardRect, cardRadius, cardRadius, paint);
+        paint.setStyle(Paint.Style.FILL);
+
+        float currentY = startY + cardPadV;
+
+        // 3. Stats Header
+        tp.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+        tp.setTextSize(13f * dp);
+        tp.setColor(fg[0]);
+        tp.setTextAlign(Paint.Align.LEFT);
+        canvas.drawText("🔥 " + data.currentStreak + "d Streak", startX + cardPadH, currentY + 14f * dp, tp);
+
+        tp.setTextAlign(Paint.Align.RIGHT);
+        tp.setColor(accent[0]);
+        tp.setTextSize(12f * dp);
+        canvas.drawText(data.completionRate + "% Done", startX + cardW - cardPadH, currentY + 14f * dp, tp);
+
+        currentY += headerStatsH;
+
+        // Divider
+        paint.setColor(Color.argb(25, 255, 255, 255));
+        paint.setStrokeWidth(1f * dp);
+        canvas.drawLine(startX + cardPadH, currentY + dividerPad / 2f, startX + cardW - cardPadH, currentY + dividerPad / 2f, paint);
+
+        currentY += dividerPad;
+
+        // 4. Day Headers: M T W T F S S
+        float gridStartX = startX + (cardW - gridInnerW) / 2f;
+        String[] dayLabels = {"M", "T", "W", "T", "F", "S", "S"};
+        tp.setTextSize(9f * dp);
+        tp.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+        tp.setColor(fg[0]);
+        tp.setAlpha(100);
+        tp.setTextAlign(Paint.Align.CENTER);
+        for (int c = 0; c < 7; c++) {
+            float cx = gridStartX + c * (sq + gap) + sq / 2f;
+            canvas.drawText(dayLabels[c], cx, currentY + 9f * dp, tp);
+        }
+        tp.setAlpha(255);
+
+        currentY += headerLabelsH;
+
+        // 5. Heatmap Grid
+        Calendar todayCal = getMidnightCalendar();
+        int todayDow = (todayCal.get(Calendar.DAY_OF_WEEK) + 5) % 7; // Mon=0 .. Sun=6
+        int heatmapLen = data.heatmap != null ? data.heatmap.length : 0;
+        int startCol = Math.max(0, heatmapLen - previewWeeks);
+        int todayColIdx = previewWeeks - 1;
+
+        for (int r = 0; r < rows; r++) {
+            int colIdx = startCol + r;
+            float rowY = currentY + r * (sq + gap);
+
+            for (int c = 0; c < 7; c++) {
+                float x = gridStartX + c * (sq + gap);
+                float y = rowY;
+
+                boolean isToday = (r == todayColIdx) && (c == todayDow);
+                boolean isFuture = (r == todayColIdx) && (c > todayDow);
+
+                int level = 0;
+                if (!isFuture && data.heatmap != null && colIdx >= 0 && colIdx < data.heatmap.length) {
+                    level = clamp(data.heatmap[colIdx][c]);
+                }
+
+                paint.setStyle(Paint.Style.FILL);
+                paint.setColor(isFuture ? Color.argb(15, 255, 255, 255) : ints[0][level]);
+                if (level >= 2 && !isFuture) {
+                    paint.setShadowLayer(5f * dp, 0, 0, ints[0][level]);
+                } else {
+                    paint.clearShadowLayer();
+                }
+
+                RectF rect = new RectF(x, y, x + sq, y + sq);
+                canvas.drawRoundRect(rect, cr, cr, paint);
+
+                if (isToday) {
+                    paint.clearShadowLayer();
+                    paint.setStyle(Paint.Style.STROKE);
+                    paint.setStrokeWidth(1.5f * dp);
+                    paint.setColor(accent[0]);
+                    float inset = 1f * dp;
+                    RectF innerRect = new RectF(x + inset, y + inset, x + sq - inset, y + sq - inset);
+                    canvas.drawRoundRect(innerRect, Math.max(0, cr - inset), Math.max(0, cr - inset), paint);
+                    paint.setStyle(Paint.Style.FILL);
+                }
+            }
+        }
+        paint.clearShadowLayer();
+
+        currentY += rows * sq + (rows - 1) * gap;
+
+        // Divider
+        paint.setColor(Color.argb(25, 255, 255, 255));
+        paint.setStrokeWidth(1f * dp);
+        canvas.drawLine(startX + cardPadH, currentY + dividerPad / 2f, startX + cardW - cardPadH, currentY + dividerPad / 2f, paint);
+
+        currentY += dividerPad;
+
+        // 6. Habit Names Footer
+        String habitStr = "FOCUS  ·  CONSISTENCY  ·  GROWTH";
+        if (data.habitText != null && data.habitText.length > 0) {
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < data.habitText.length; i++) {
+                if (i > 0) sb.append("  ·  ");
+                sb.append(data.habitText[i].toUpperCase());
+            }
+            habitStr = sb.toString();
+        }
+
+        tp.setTextSize(9.5f * dp);
+        tp.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
+        tp.setColor(fg[0]);
+        tp.setAlpha(170);
+        tp.setTextAlign(Paint.Align.CENTER);
+        canvas.drawText(habitStr, startX + cardW / 2f, currentY + 12f * dp, tp);
+        tp.setAlpha(255);
     }
 
     // ── Stacked Goals grid ──────────────────────────────────────────────

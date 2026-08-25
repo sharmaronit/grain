@@ -12,7 +12,7 @@ export interface UseWallpaperSyncProps {
   wallpaperSync: boolean;
   isGoalActive?: boolean;
   accentColor?: string;
-  gridStyle?: "weeks" | "year" | "month" | "goals";
+  gridStyle?: "weeks" | "year" | "month" | "goals" | "widget";
   customPhotoBase64?: string | null;
   photoOverlay?: number;
   statsAlignment?: "left" | "center" | "right";

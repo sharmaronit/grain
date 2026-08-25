@@ -60,7 +60,7 @@ export interface UserProfile {
   wallpaperTheme: string;
   gridColorTheme?: string;
   wallpaperHabitSet?: string;
-  wallpaperGridStyle?: "weeks" | "year" | "month" | "goals";
+  wallpaperGridStyle?: "weeks" | "year" | "month" | "goals" | "widget";
   wallpaperScale?: number;
   wallpaperPhotoOverlay?: number;
   wallpaperCustomPhoto?: string | null;

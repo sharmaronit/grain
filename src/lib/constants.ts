@@ -15,4 +15,4 @@ export const HABIT_SETS = [
   { key: "morning", label: "Morning", habits: ["Wake at 6AM", "Sunlight", "Cold Shower", "No Phone"] },
 ] as const;
 
-export const GRID_SIZES = [7, 14, 21, 28, 35, 42, 52];
+export const GRID_SIZES = [8, 12, 16, 24, 32, 52];
