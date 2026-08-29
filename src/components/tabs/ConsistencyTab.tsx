@@ -34,9 +34,12 @@ interface ConsistencyTabProps {
   rate: number;
   weeklyInsights: any;
   showToast: (msg: string) => void;
+  onOpenWeeklyReview?: () => void;
+  onOpenAiCoach?: () => void;
 }
 
 export const ConsistencyTab = memo(function ConsistencyTab({
+  heatmap,
   selectedHabit,
   setSelectedHabit,
   doneCount,

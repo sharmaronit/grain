@@ -14,7 +14,6 @@ export function SheetShell({
   subtitle?: string;
   children: React.ReactNode;
 }) {
-  const theme = useStore((s) => s.theme);
   const [dragY, setDragY] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const startY = useRef<number | null>(null);
@@ -72,7 +71,6 @@ export function SheetShell({
 
   const content = (
     <div
-      data-theme={theme}
       onClick={onClose}
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in transition-opacity"
       style={{ opacity: backdropOpacity }}

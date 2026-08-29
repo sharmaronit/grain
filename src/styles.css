@@ -31,8 +31,9 @@
   --color-accent-soft: var(--accent-soft);
 }
 
-/* Dark = default */
-:root {
+/* Dark = default (Ambient Blur) */
+:root,
+[data-theme="dark"] {
   --canvas: #09090b;
   --canvas-soft: #141416;
   --canvas-softer: #1d1d20;
@@ -46,6 +47,25 @@
   --primary: #ffffff;
   --on-primary: #000000;
   --backdrop: #09090b;
+  --accent: #ffffff;
+  --accent-soft: rgba(255, 255, 255, 0.12);
+}
+
+/* AMOLED Black (Pure #000000 Pitch Dark - 120 FPS High Performance) */
+[data-theme="amoled"] {
+  --canvas: #000000;
+  --canvas-soft: #0c0c0e;
+  --canvas-softer: #161618;
+  --surface-pressed: #222225;
+  --ink: #ffffff;
+  --on-ink: #000000;
+  --body: #a1a1aa;
+  --mute: #71717a;
+  --hairline-mid: #2f2f35;
+  --hairline: #1c1c20;
+  --primary: #ffffff;
+  --on-primary: #000000;
+  --backdrop: #000000;
   --accent: #ffffff;
   --accent-soft: rgba(255, 255, 255, 0.12);
 }

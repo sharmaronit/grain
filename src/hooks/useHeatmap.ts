@@ -64,16 +64,36 @@ export function useHeatmap(
   >({});
   const [loading, setLoading] = useState(true);
 
-  const { today, startDate, startKey, endKey } = useMemo(() => {
-    const t = new Date();
-    const sd = heatmapStartDate(t);
+  // Reactive today state that updates automatically on midnight rollover or tab visibility change
+  const [today, setToday] = useState(() => new Date());
+
+  useEffect(() => {
+    const checkDate = () => {
+      const now = new Date();
+      if (!isSameDay(now, today)) {
+        setToday(now);
+      }
+    };
+    const interval = setInterval(checkDate, 60000);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") checkDate();
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [today]);
+
+  const { startDate, startKey, endKey } = useMemo(() => {
+    const sd = heatmapStartDate(today);
     return {
-      today: t,
       startDate: sd,
       startKey: formatDateKey(sd),
-      endKey: formatDateKey(t),
+      endKey: formatDateKey(today),
     };
-  }, []);
+  }, [today]);
+
   // Subscribe to completions range
   useEffect(() => {
     if (!userId) {
@@ -127,6 +147,8 @@ export function useHeatmap(
     let scheduledDays = 0;
     let doneDays = 0;
     let perfectDays = 0;
+    let totalScheduledHabits = 0;
+    let totalDoneHabits = 0;
 
     // Streak tracking
     let currentStreak = 0;
@@ -158,10 +180,12 @@ export function useHeatmap(
       for (const habit of filteredHabits) {
         if (!isScheduledDay(habit.frequency, habit.customDays, cur)) continue;
         scheduled++;
+        totalScheduledHabits++;
 
         const entry = dayEntries2[habit.id];
         if (entry && (entry.done || entry.restDay || entry.frozenStreak)) {
           done++;
+          totalDoneHabits++;
           totalCompletions++;
         }
       }
@@ -232,7 +256,11 @@ export function useHeatmap(
     }
 
     const completionRate =
-      scheduledDays > 0 ? Math.round((doneDays / scheduledDays) * 100) : 0;
+      totalScheduledHabits > 0
+        ? Math.round((totalDoneHabits / totalScheduledHabits) * 100)
+        : scheduledDays > 0
+          ? Math.round((doneDays / scheduledDays) * 100)
+          : 0;
 
     // Today's position in the grid
     const todayDow = isoDow(today); // 0 = Mon

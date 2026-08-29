@@ -69,7 +69,12 @@ import {
   friendlyError,
 } from "../lib/auth";
 import { getFirestore, updateDoc, doc } from "firebase/firestore";
-import { scheduleDailyReminder } from "../lib/reminders";
+import {
+  scheduleHabitReminders,
+  sendTestNotification,
+  requestNotificationPermission,
+  initNotificationChannels,
+} from "../lib/reminders";
 import { useHabits } from "../hooks/useHabits";
 import { useCompletions } from "../hooks/useCompletions";
 import { useHeatmap } from "../hooks/useHeatmap";
@@ -90,6 +95,7 @@ import {
   todayKey,
   heatmapStartDate,
   isoDow,
+  isScheduledDay,
 } from "../lib/dates";
 import {
   calculateStreak,
@@ -165,9 +171,6 @@ function generateHeatmap(): number[][] {
   return cells;
 }
 
-const TODAY_COL = 51;
-const TODAY_ROW = isoDow(new Date());
-
 export function Dashboard({ user }: { user?: any }) {
   const [showStaticTargetSelector, setShowStaticTargetSelector] = useState(false);
   const sensors = useSensors(
@@ -218,7 +221,30 @@ export function Dashboard({ user }: { user?: any }) {
   const [dateDropdownOpen, setDateDropdownOpen] = useState(false);
 
   const TAB_ORDER: AppTab[] = ["today", "consistency", "myday", "goal"];
-  const [activeTab, setActiveTab] = useState<AppTab>("today");
+  const [activeTab, setActiveTab] = useState<AppTab>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("grain_active_tab");
+        if (saved && ["today", "consistency", "myday", "goal"].includes(saved)) {
+          return saved as AppTab;
+        }
+      } catch {}
+    }
+    return "today";
+  });
+  const [tabHistory, setTabHistory] = useState<AppTab[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("grain_active_tab");
+        if (saved && ["today", "consistency", "myday", "goal"].includes(saved)) {
+          return [saved as AppTab];
+        }
+      } catch {}
+    }
+    return ["today"];
+  });
+  const lastBackPressRef = useRef<number>(0);
+
   const [wallpaperEditorOpen, setWallpaperEditorOpen] = useState(false);
   const [tabDirection, setTabDirection] = useState<"left" | "right">("left");
   const [swipeMode, setSwipeMode] = useState(false);
@@ -228,7 +254,7 @@ export function Dashboard({ user }: { user?: any }) {
   const swipeContainerRef = useRef<HTMLDivElement | null>(null);
   const isNavigatingRef = useRef(false);
 
-  const switchTab = (tab: AppTab) => {
+  const switchTab = (tab: AppTab, pushHistory: boolean = true) => {
     if (activeTab === tab) return;
     const currentIdx = TAB_ORDER.indexOf(activeTab);
     const nextIdx = TAB_ORDER.indexOf(tab);
@@ -236,6 +262,16 @@ export function Dashboard({ user }: { user?: any }) {
     startTransition(() => {
       setActiveTab(tab);
     });
+
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem("grain_active_tab", tab);
+      } catch {}
+    }
+
+    if (pushHistory) {
+      setTabHistory((prev) => (prev[prev.length - 1] === tab ? prev : [...prev, tab]));
+    }
 
     if (swipeContainerRef.current) {
       const targetElement = swipeContainerRef.current.querySelector(`[data-tab-id="${tab}"]`);
@@ -256,7 +292,7 @@ export function Dashboard({ user }: { user?: any }) {
     const observer = new IntersectionObserver(
       (entries) => {
         if (isNavigatingRef.current) return;
-        
+
         entries.forEach(entry => {
           if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
             const tabId = entry.target.getAttribute("data-tab-id") as AppTab;
@@ -305,7 +341,17 @@ export function Dashboard({ user }: { user?: any }) {
   const [wallpaperState, setWallpaperState] = useState<WallpaperState>("idle");
   const [wallpaperSnapshot, setWallpaperSnapshot] = useState<number[][] | null>(null);
   const [selectedQuadrant, setSelectedQuadrant] = useState<Quadrant>("q2");
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("grain_app_theme");
+        if (saved && ["dark", "amoled", "light"].includes(saved)) {
+          return saved as Theme;
+        }
+      } catch {}
+    }
+    return "dark";
+  });
   const [toast, setToast] = useState<{ msg: string; action?: { label: string; onClick: () => void } } | null>(null);
   const toastTimerRef = useRef<number | null>(null);
 
@@ -437,6 +483,13 @@ export function Dashboard({ user }: { user?: any }) {
     previewWeeks: 26,
   });
   const [remindersOn, setRemindersOn] = useState(true);
+  const [reminderTime, setReminderTime] = useState<string>("20:00");
+  const [morningKickoff, setMorningKickoff] = useState<boolean>(false);
+
+  useEffect(() => {
+    initNotificationChannels();
+  }, []);
+
   const [detail, setDetail] = useState<{ q: Quadrant; i: number } | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
 
@@ -486,7 +539,12 @@ export function Dashboard({ user }: { user?: any }) {
 
   useEffect(() => {
     const handleBackButton = () => {
-      // 1. Check Modals in order of precedence
+      try { navigator.vibrate?.(10); } catch {}
+
+      // 1. Check Modals, Sheets & Overlays in order of precedence
+      if (applyMenuOpen) { setApplyMenuOpen(false); return; }
+      if (wallpaperEditorOpen) { setWallpaperEditorOpen(false); return; }
+      if (bulkDeleteConfirmOpen) { setBulkDeleteConfirmOpen(false); return; }
       if (signOutOpen) { setSignOutOpen(false); return; }
       if (resetConfirmOpen) { setResetConfirmOpen(false); return; }
       if (profileEditOpen) { setProfileEditOpen(false); return; }
@@ -496,29 +554,64 @@ export function Dashboard({ user }: { user?: any }) {
       if (badgesOpen) { setBadgesOpen(false); return; }
       if (shareStreakOpen) { setShareStreakOpen(false); return; }
       if (streakOpen) { setStreakOpen(false); return; }
+      if (previewModalOpen) { setPreviewModalOpen(false); return; }
       if (wallpaperPreview) { setWallpaperPreview(false); return; }
+      if (weeklyReviewOpen) { setWeeklyReviewOpen(false); return; }
+      if (dateDropdownOpen) { setDateDropdownOpen(false); return; }
       if (filterOpen) { setFilterOpen(false); return; }
+      if (drawerOpen) { setDrawerOpen(false); return; }
       if (modalOpen) { setModalOpen(false); return; } // Add Habit modal
       if (settingsOpen) { setSettingsOpen(false); return; }
+      if (isSelectionMode) {
+        setIsSelectionMode(false);
+        setSelectedHabitIds(new Set());
+        return;
+      }
+      if (swipeMode) { setSwipeMode(false); return; }
 
-      // 2. Check Tabs
-      if (activeTab !== "today") {
-        switchTab("today");
+      // 2. Check Tab History (Navigate back to previously visited tab)
+      if (tabHistory.length > 1) {
+        const nextHistory = [...tabHistory];
+        nextHistory.pop(); // remove current active tab
+        const prevTab = nextHistory[nextHistory.length - 1];
+        setTabHistory(nextHistory);
+        switchTab(prevTab, false);
         return;
       }
 
-      // 3. Exit App
-      CapacitorApp.exitApp();
+      if (activeTab !== "today") {
+        setTabHistory(["today"]);
+        switchTab("today", false);
+        return;
+      }
+
+      // 3. Double-Back to Exit with friendly toast (Standard Android UX)
+      const now = Date.now();
+      if (now - lastBackPressRef.current < 2000) {
+        CapacitorApp.exitApp();
+      } else {
+        lastBackPressRef.current = now;
+        showToast("Press back again to exit");
+      }
     };
 
     const listener = CapacitorApp.addListener('backButton', handleBackButton);
+    const appStateListener = CapacitorApp.addListener('appStateChange', (state) => {
+      if (!state.isActive && activeTab) {
+        try { localStorage.setItem("grain_active_tab", activeTab); } catch {}
+      }
+    });
+
     return () => {
       listener.then((l: any) => l.remove());
+      appStateListener.then((l: any) => l.remove());
     };
   }, [
-    signOutOpen, resetConfirmOpen, profileEditOpen, editHabitTarget, detail,
-    aiCoachOpen, badgesOpen, shareStreakOpen, streakOpen, wallpaperPreview,
-    filterOpen, modalOpen, settingsOpen, activeTab
+    applyMenuOpen, wallpaperEditorOpen, bulkDeleteConfirmOpen, signOutOpen,
+    resetConfirmOpen, profileEditOpen, editHabitTarget, detail, aiCoachOpen,
+    badgesOpen, shareStreakOpen, streakOpen, previewModalOpen, wallpaperPreview,
+    weeklyReviewOpen, dateDropdownOpen, filterOpen, drawerOpen, modalOpen,
+    settingsOpen, isSelectionMode, swipeMode, tabHistory, activeTab
   ]);
 
   const [profile, setProfile] = useState<{ name: string; email: string; tagline: string; initials: string }>(() => {
@@ -585,6 +678,8 @@ export function Dashboard({ user }: { user?: any }) {
           }
           if (typeof prefs.wallpaperSync === "boolean") setWallpaperSync(prefs.wallpaperSync);
           if (typeof prefs.remindersOn === "boolean") setRemindersOn(prefs.remindersOn);
+          if (prefs.reminderTime) setReminderTime(prefs.reminderTime);
+          if (typeof prefs.morningKickoff === "boolean") setMorningKickoff(prefs.morningKickoff);
           if (typeof prefs.previewWeeks === "number") setPreviewWeeks(prefs.previewWeeks);
           if (prefs.timeFilter) setTimeFilter(prefs.timeFilter);
           if (prefs.theme) setTheme(prefs.theme as Theme);
@@ -675,8 +770,12 @@ export function Dashboard({ user }: { user?: any }) {
 
   const flatHabits = useMemo(() => Object.values(habits).flat(), [habits]);
 
-  const doneCount = flatHabits.filter((h) => completions[h.id]?.done || completions[h.id]?.restDay).length;
-  const totalCount = flatHabits.length;
+  const scheduledHabits = useMemo(() => {
+    return flatHabits.filter((h) => isScheduledDay(h.frequency, h.customDays, selectedDate));
+  }, [flatHabits, selectedDate]);
+
+  const doneCount = scheduledHabits.filter((h) => completions[h.id]?.done || completions[h.id]?.restDay).length;
+  const totalCount = scheduledHabits.length;
   const totalStreak = heatmapStats.currentStreak;
   const rate = totalCount ? Math.round((doneCount / totalCount) * 100) : 0;
 
@@ -861,9 +960,8 @@ export function Dashboard({ user }: { user?: any }) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
 
-        // Heatmap always starts 52 weeks ago
-        const heatmapStart = new Date(today);
-        heatmapStart.setDate(heatmapStart.getDate() - (52 * 7 - 1));
+        // Heatmap start date aligned to Monday of 52 weeks ago
+        const heatmapStart = heatmapStartDate(today);
 
         const override = Array.from({ length: 52 }, () => Array(7).fill(0));
 
@@ -929,8 +1027,7 @@ export function Dashboard({ user }: { user?: any }) {
       const pct = Math.round((Math.min(elapsedDays, totalDays) / totalDays) * 100);
 
       const heatmap: number[][] = Array.from({ length: 52 }, () => Array(7).fill(0));
-      const heatmapStart = new Date(today);
-      heatmapStart.setDate(heatmapStart.getDate() - (52 * 7 - 1));
+      const heatmapStart = heatmapStartDate(today);
 
       for (let w = 0; w < 52; w++) {
         for (let d = 0; d < 7; d++) {
@@ -959,6 +1056,56 @@ export function Dashboard({ user }: { user?: any }) {
     });
   }, [wallpaperGridStyle, goals]);
 
+  const appliedStackedGoals = useMemo(() => {
+    if (appliedWallpaper.wallpaperGridStyle !== "goals") return [];
+
+    const active = goals.filter(g => {
+      if (!g.startDate || !g.targetDate) return false;
+      const target = parseDateKey(g.targetDate);
+      return target.getTime() >= new Date().setHours(0, 0, 0, 0);
+    });
+
+    return active.map(goal => {
+      const start = parseDateKey(goal.startDate!);
+      const target = parseDateKey(goal.targetDate!);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const totalDays = Math.max(1, Math.round((target.getTime() - start.getTime()) / 86400000) + 1);
+      const elapsedDays = Math.max(0, Math.round((today.getTime() - start.getTime()) / 86400000) + 1);
+      const daysLeft = Math.max(0, totalDays - Math.min(elapsedDays, totalDays));
+      const pct = Math.round((Math.min(elapsedDays, totalDays) / totalDays) * 100);
+
+      const heatmap: number[][] = Array.from({ length: 52 }, () => Array(7).fill(0));
+      const heatmapStart = heatmapStartDate(today);
+
+      for (let w = 0; w < 52; w++) {
+        for (let d = 0; d < 7; d++) {
+          const date = new Date(heatmapStart);
+          date.setDate(date.getDate() + w * 7 + d);
+          date.setHours(0, 0, 0, 0);
+
+          if (date.getTime() >= start.getTime() && date.getTime() <= target.getTime()) {
+            if (date.getTime() <= today.getTime()) {
+              heatmap[w][d] = 3; // elapsed
+            } else {
+              heatmap[w][d] = 1; // future
+            }
+          }
+        }
+      }
+
+      return {
+        id: goal.id,
+        title: goal.name,
+        heatmap,
+        boxes: heatmap.flatMap(col => col),
+        currentStreak: daysLeft,
+        completionRate: pct
+      };
+    });
+  }, [appliedWallpaper.wallpaperGridStyle, goals]);
+
   const topHabitNames = useMemo<string[]>(() => {
     if (wallpaperHabitSet !== "none") {
       const set = HABIT_SETS.find(s => s.key === wallpaperHabitSet);
@@ -969,15 +1116,19 @@ export function Dashboard({ user }: { user?: any }) {
   }, [wallpaperHabitSet, flatHabits]);
 
   const habitTextLines = useMemo(() => {
+    if (wallpaperHabitSet !== "none") {
+      return HABIT_SETS.find(s => s.key === wallpaperHabitSet)?.habits as string[] | undefined;
+    }
     if (wallpaperGridStyle === "widget") return topHabitNames;
-    if (wallpaperHabitSet === "none" || wallpaperGridStyle !== "weeks") return undefined;
-    return HABIT_SETS.find(s => s.key === wallpaperHabitSet)?.habits as string[] | undefined;
+    return undefined;
   }, [wallpaperHabitSet, wallpaperGridStyle, topHabitNames]);
 
   const appliedHabitTextLines = useMemo(() => {
+    if (appliedWallpaper.wallpaperHabitSet !== "none") {
+      return HABIT_SETS.find(s => s.key === appliedWallpaper.wallpaperHabitSet)?.habits as string[] | undefined;
+    }
     if (appliedWallpaper.wallpaperGridStyle === "widget") return topHabitNames;
-    if (appliedWallpaper.wallpaperHabitSet === "none" || appliedWallpaper.wallpaperGridStyle !== "weeks") return undefined;
-    return HABIT_SETS.find(s => s.key === appliedWallpaper.wallpaperHabitSet)?.habits as string[] | undefined;
+    return undefined;
   }, [appliedWallpaper.wallpaperHabitSet, appliedWallpaper.wallpaperGridStyle, topHabitNames]);
 
   useWallpaperSync({
@@ -987,7 +1138,7 @@ export function Dashboard({ user }: { user?: any }) {
     completionRate: displayedRate,
     wallpaperTheme: appliedWallpaper.theme,
     previewWeeks: appliedWallpaper.previewWeeks,
-    wallpaperSync,
+    wallpaperSync: wallpaperSync && !wallpaperEditorOpen,
     isGoalActive: !!(activeGoalId && goals.some(g => g.id === activeGoalId)),
     accentColor: wallpaperTokens(appliedWallpaper.theme, appliedWallpaper.gridColorTheme, theme).accent,
     gridStyle: appliedWallpaper.wallpaperGridStyle,
@@ -1001,9 +1152,34 @@ export function Dashboard({ user }: { user?: any }) {
     photoOffsetX: appliedWallpaper.wallpaperPhotoOffset.x,
     photoOffsetY: appliedWallpaper.wallpaperPhotoOffset.y,
     photoScale: appliedWallpaper.wallpaperPhotoScale,
-    stackedGoals: stackedGoals,
+    stackedGoals: appliedStackedGoals,
     habitText: appliedHabitTextLines,
   });
+
+  // Reactive habit reminders scheduler
+  useEffect(() => {
+    if (!remindersOn) {
+      scheduleHabitReminders({ enabled: false });
+      return;
+    }
+
+    const scheduledTodayHabits = flatHabits.filter(h => isScheduledDay(h.frequency, h.customDays, selectedDate));
+    const uncompleted = scheduledTodayHabits.filter(h => !h.done).length;
+    const allDone = scheduledTodayHabits.length > 0 && uncompleted === 0;
+
+    const timer = setTimeout(() => {
+      scheduleHabitReminders({
+        enabled: true,
+        reminderTime,
+        morningKickoff,
+        uncompletedCount: uncompleted,
+        streak: displayedTotalStreak,
+        allDone,
+      });
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [remindersOn, reminderTime, morningKickoff, flatHabits, displayedTotalStreak, selectedDate]);
 
   const applyWallpaper = async (forceStatic: boolean = false, screenTarget: string = "both") => {
     if (wallpaperState !== "idle") return;
@@ -1618,10 +1794,10 @@ export function Dashboard({ user }: { user?: any }) {
           })()}
         >
 
-          {/* Liquid drifting blobs — animated blur gradient ambient light for all non-consistency screens */}
+          {/* Liquid drifting blobs — animated blur gradient ambient light for all non-consistency screens (hidden in AMOLED theme for 120 FPS max performance) */}
           <div
             className={`pointer-events-none absolute inset-0 overflow-hidden z-0 transition-opacity duration-700 ease-in-out ${
-              activeTab === "consistency" ? "opacity-0" : "opacity-100"
+              activeTab === "consistency" || theme === "amoled" ? "opacity-0 pointer-events-none" : "opacity-100"
             }`}
           >
             <div
@@ -1649,9 +1825,8 @@ export function Dashboard({ user }: { user?: any }) {
 
           {/* Photographic Trekking Peak Background — Smoothly fades in ONLY for Consistency Tab */}
           <div
-            className={`absolute inset-0 pointer-events-none z-0 overflow-hidden transition-all duration-700 ease-in-out ${
-              activeTab === "consistency" ? "opacity-100 scale-100" : "opacity-0 scale-105"
-            }`}
+            className={`absolute inset-0 pointer-events-none z-0 overflow-hidden transition-all duration-700 ease-in-out ${activeTab === "consistency" ? "opacity-100 scale-100" : "opacity-0 scale-105"
+              }`}
           >
             <img
               src="/photo.jpg"
@@ -1690,9 +1865,8 @@ export function Dashboard({ user }: { user?: any }) {
                   }, 2000);
                 }
               }}
-              className={`pointer-events-auto flex items-center justify-center rounded-full border border-[color:var(--hairline-mid)] p-1 pl-1 text-xs font-semibold text-ink backdrop-blur-xl shadow-lg transition-all duration-500 ease-out active:scale-95 ${
-                showTitlePill ? "gap-2 pr-3.5 bg-canvas text-ink ring-1 ring-ink/10" : "gap-0 pr-1 bg-canvas/85"
-              } opacity-100 scale-100`}
+              className={`pointer-events-auto flex items-center justify-center rounded-full border border-[color:var(--hairline-mid)] p-1 pl-1 text-xs font-semibold text-ink backdrop-blur-xl shadow-lg transition-all duration-500 ease-out active:scale-95 ${showTitlePill ? "gap-2 pr-3.5 bg-canvas text-ink ring-1 ring-ink/10" : "gap-0 pr-1 bg-canvas/85"
+                } opacity-100 scale-100`}
               aria-label="App logo and section title"
             >
               <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full overflow-hidden relative">
@@ -2068,28 +2242,28 @@ export function Dashboard({ user }: { user?: any }) {
             >
               <div className="pt-16 pb-32">
                 <GoalTab
-                goals={goals}
-                onDelete={async (id) => {
-                  if (id === activeGoalId) {
-                    setActiveGoalId(null);
+                  goals={goals}
+                  onDelete={async (id) => {
+                    if (id === activeGoalId) {
+                      setActiveGoalId(null);
+                      if (userId) {
+                        await updateDoc(doc(getFirestore(), "users", userId), {
+                          "prefs.activeGoalId": null
+                        }).catch(console.error);
+                      }
+                    }
+                    await deleteGoal(userId!, id);
+                  }}
+                  onSetActiveGoal={async (id) => {
+                    setActiveGoalId(id);
                     if (userId) {
                       await updateDoc(doc(getFirestore(), "users", userId), {
-                        "prefs.activeGoalId": null
+                        "prefs.activeGoalId": id
                       }).catch(console.error);
                     }
-                  }
-                  await deleteGoal(userId!, id);
-                }}
-                onSetActiveGoal={async (id) => {
-                  setActiveGoalId(id);
-                  if (userId) {
-                    await updateDoc(doc(getFirestore(), "users", userId), {
-                                      "prefs.activeGoalId": id
-                    }).catch(console.error);
-                  }
-                }}
-              />
-            </div>
+                  }}
+                />
+              </div>
             </div>
           </div>
 
@@ -2141,11 +2315,10 @@ export function Dashboard({ user }: { user?: any }) {
                       try { navigator.vibrate?.(15); } catch { }
                       setBulkDeleteConfirmOpen(true);
                     }}
-                    className={`flex items-center gap-1 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all shadow-md active:scale-95 ${
-                      selectedHabitIds.size > 0
-                        ? "bg-red-500 text-white hover:bg-red-600 shadow-red-500/30"
-                        : "bg-canvas-soft text-mute opacity-50 cursor-not-allowed"
-                    }`}
+                    className={`flex items-center gap-1 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all shadow-md active:scale-95 ${selectedHabitIds.size > 0
+                      ? "bg-red-500 text-white hover:bg-red-600 shadow-red-500/30"
+                      : "bg-canvas-soft text-mute opacity-50 cursor-not-allowed"
+                      }`}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                     <span>Delete ({selectedHabitIds.size})</span>
@@ -2322,17 +2495,54 @@ export function Dashboard({ user }: { user?: any }) {
                 {/* Settings Rows */}
                 <div className="relative z-10 rounded-3xl p-[1px] bg-gradient-to-br from-[color:var(--hairline-mid)] via-transparent to-[color:var(--hairline-mid)] animate-fade-in-up shadow-sm" style={{ animationDelay: "300ms" }}>
                   <div className="rounded-3xl bg-canvas/60 backdrop-blur-2xl border border-[color:var(--hairline)] divide-y divide-[color:var(--hairline)]">
-                    <Row
-                      label="Theme"
-                      action={
-                        <button
-                          onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}
-                          className="pill bg-canvas-soft px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-ink"
-                        >
-                          {theme === "dark" ? "Dark" : "Light"}
-                        </button>
-                      }
-                    />
+                    <div className="py-3 px-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <div>
+                          <span className="font-semibold text-ink text-xs block">App Theme</span>
+                          <p className="text-[10px] text-mute font-medium">
+                            {theme === "amoled"
+                              ? "AMOLED Black · Ultra 120 FPS High Performance"
+                              : theme === "dark"
+                              ? "Ambient Glass · Blurry Atmospheric Glow"
+                              : "Minimal Light · Crisp Clean Bright Mode"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-canvas-soft border border-[color:var(--hairline)]">
+                        {[
+                          { key: "dark" as const, label: "Ambient", sub: "Atmospheric" },
+                          { key: "amoled" as const, label: "AMOLED", sub: "120 FPS" },
+                          { key: "light" as const, label: "Light", sub: "Minimal" },
+                        ].map((opt) => {
+                          const active = theme === opt.key;
+                          return (
+                            <button
+                              key={opt.key}
+                              type="button"
+                              onClick={() => {
+                                setTheme(opt.key);
+                                if (typeof window !== "undefined") {
+                                  try { localStorage.setItem("grain_app_theme", opt.key); } catch {}
+                                }
+                                if (userId) {
+                                  updateUserProfile(userId, { theme: opt.key });
+                                }
+                                try { navigator.vibrate?.(10); } catch {}
+                                showToast(`${opt.label} theme activated`);
+                              }}
+                              className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl transition-all ${
+                                active
+                                  ? "bg-ink text-on-ink shadow-md font-bold scale-[1.02]"
+                                  : "text-mute hover:text-ink font-medium"
+                              }`}
+                            >
+                              <span className="text-[11px] leading-tight">{opt.label}</span>
+                              <span className="text-[9px] opacity-75 leading-none mt-0.5">{opt.sub}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
                     <Row
                       label="Starter Packs & Walkthrough"
                       action={
@@ -2381,32 +2591,110 @@ export function Dashboard({ user }: { user?: any }) {
                         />
                       }
                     />
-                    <Row
-                      label={
-                        <span className="flex items-center gap-2">
-                          <Bell className="h-4 w-4" /> Habit reminders
-                        </span>
-                      }
-                      action={
-                        <Toggle
-                          checked={remindersOn}
-                          onChange={async () => {
-                            const next = !remindersOn;
-                            setRemindersOn(next);
-                            if (userId) {
-                              updateUserProfile(userId, { remindersOn: next });
-                            }
-                            const ok = await scheduleDailyReminder(next);
-                            if (next) {
-                              showToast(ok ? "Reminders scheduled for 8:00 PM" : "Permission needed for reminders");
-                            } else {
-                              showToast("Reminders turned off");
-                            }
-                          }}
-                          ariaLabel="Toggle reminders"
-                        />
-                      }
-                    />
+                    <div className="space-y-2">
+                      <Row
+                        label={
+                          <span className="flex items-center gap-2">
+                            <Bell className="h-4 w-4" /> Habit reminders
+                          </span>
+                        }
+                        action={
+                          <Toggle
+                            checked={remindersOn}
+                            onChange={async () => {
+                              const next = !remindersOn;
+                              setRemindersOn(next);
+                              if (userId) {
+                                updateUserProfile(userId, { remindersOn: next });
+                              }
+                              if (next) {
+                                const granted = await requestNotificationPermission();
+                                if (granted) {
+                                  showToast(`Reminders enabled for ${reminderTime}`);
+                                } else {
+                                  showToast("Notification permission required");
+                                }
+                              } else {
+                                showToast("Reminders turned off");
+                              }
+                            }}
+                            ariaLabel="Toggle reminders"
+                          />
+                        }
+                      />
+
+                      {remindersOn && (
+                        <div className="p-3 space-y-3 rounded-2xl bg-canvas-soft border border-[color:var(--hairline)] animate-fade-in text-xs">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-body font-semibold">Reminder time</span>
+                            <div className="flex items-center gap-1.5">
+                              {["18:00", "20:00", "21:30"].map((t) => (
+                                <button
+                                  key={t}
+                                  type="button"
+                                  onClick={() => {
+                                    setReminderTime(t);
+                                    if (userId) updateUserProfile(userId, { reminderTime: t });
+                                    showToast(`Reminder time set to ${t === "18:00" ? "6:00 PM" : t === "20:00" ? "8:00 PM" : "9:30 PM"}`);
+                                  }}
+                                  className={`px-2 py-1 rounded-lg text-[10px] font-bold transition ${
+                                    reminderTime === t ? "bg-ink text-on-ink shadow-sm" : "bg-canvas text-mute hover:text-ink border border-[color:var(--hairline)]"
+                                  }`}
+                                >
+                                  {t === "18:00" ? "6 PM" : t === "20:00" ? "8 PM" : "9:30 PM"}
+                                </button>
+                              ))}
+                              <input
+                                type="time"
+                                value={reminderTime}
+                                onChange={(e) => {
+                                  const t = e.target.value;
+                                  if (t) {
+                                    setReminderTime(t);
+                                    if (userId) updateUserProfile(userId, { reminderTime: t });
+                                  }
+                                }}
+                                className="bg-canvas text-ink font-bold text-[11px] px-1.5 py-1 rounded-lg border border-[color:var(--hairline)] outline-none"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-2 pt-1 border-t border-[color:var(--hairline)]">
+                            <span className="text-body font-semibold flex items-center gap-1.5">
+                              <Sunrise className="h-3.5 w-3.5 text-amber-400" /> Morning focus kickoff (8 AM)
+                            </span>
+                            <Toggle
+                              checked={morningKickoff}
+                              onChange={() => {
+                                const next = !morningKickoff;
+                                setMorningKickoff(next);
+                                if (userId) updateUserProfile(userId, { morningKickoff: next });
+                                showToast(next ? "Morning kickoff alert enabled" : "Morning kickoff disabled");
+                              }}
+                              ariaLabel="Toggle morning kickoff"
+                            />
+                          </div>
+
+                          <div className="pt-0.5">
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try { navigator.vibrate?.(15); } catch {}
+                                showToast("Sending test notification in 2 seconds...");
+                                const ok = await sendTestNotification();
+                                if (!ok) {
+                                  showToast("Please allow notification permission in system settings");
+                                }
+                              }}
+                              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-canvas hover:bg-canvas-softer text-ink font-bold text-[11px] border border-[color:var(--hairline)] active:scale-95 transition shadow-sm"
+                            >
+                              <Sparkles className="h-3.5 w-3.5 text-emerald-400" />
+                              <span>Send Test Notification</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
                     <Row
                       label="Date selector style"
                       action={
@@ -2611,11 +2899,10 @@ export function Dashboard({ user }: { user?: any }) {
                         setIsMovingPhoto(prev => !prev);
                         if (!isMovingPhoto) setIsRepositionMode(false);
                       }}
-                      className={`flex items-center gap-1.5 h-9 px-3.5 rounded-full backdrop-blur-xl border font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg ${
-                        isMovingPhoto
-                          ? "bg-white/25 border-white/50 text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)] ring-1 ring-white/30"
-                          : "bg-black/40 border-white/15 text-white/70 hover:text-white hover:bg-black/60"
-                      }`}
+                      className={`flex items-center gap-1.5 h-9 px-3.5 rounded-full backdrop-blur-xl border font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg ${isMovingPhoto
+                        ? "bg-white/25 border-white/50 text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)] ring-1 ring-white/30"
+                        : "bg-black/40 border-white/15 text-white/70 hover:text-white hover:bg-black/60"
+                        }`}
                     >
                       <Move size={13} className={isMovingPhoto ? "text-white animate-pulse" : ""} />
                       <span>{isMovingPhoto ? "Done Photo" : "Move Photo"}</span>
@@ -2629,11 +2916,10 @@ export function Dashboard({ user }: { user?: any }) {
                       setIsRepositionMode(prev => !prev);
                       if (!isRepositionMode) setIsMovingPhoto(false);
                     }}
-                    className={`flex items-center gap-1.5 h-9 px-3.5 rounded-full backdrop-blur-xl border font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg ${
-                      isRepositionMode
-                        ? "bg-white/25 border-white/50 text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)] ring-1 ring-white/30"
-                        : "bg-black/40 border-white/15 text-white/70 hover:text-white hover:bg-black/60"
-                    }`}
+                    className={`flex items-center gap-1.5 h-9 px-3.5 rounded-full backdrop-blur-xl border font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg ${isRepositionMode
+                      ? "bg-white/25 border-white/50 text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)] ring-1 ring-white/30"
+                      : "bg-black/40 border-white/15 text-white/70 hover:text-white hover:bg-black/60"
+                      }`}
                   >
                     <Move size={13} className={isRepositionMode ? "text-white animate-pulse" : ""} />
                     <span>{isRepositionMode ? "Done" : "Reposition"}</span>
@@ -2655,12 +2941,6 @@ export function Dashboard({ user }: { user?: any }) {
                     </button>
                   )}
                 </div>
-
-                <div className="pointer-events-auto">
-                  <span className="text-[10px] font-bold tracking-widest uppercase text-white/70 bg-black/40 backdrop-blur-xl px-3 py-1.5 rounded-full border border-white/15">
-                    Lock Screen Preview
-                  </span>
-                </div>
               </div>
 
               {/* Live Wallpaper Scene (Fills the entire screen) */}
@@ -2672,6 +2952,13 @@ export function Dashboard({ user }: { user?: any }) {
                   background: wallpaperThemeOf(wallpaperTheme, theme).bg,
                   ["--ink" as string]: wallpaperThemeOf(wallpaperTheme, theme).bg,
                   ["--on-ink" as string]: wallpaperThemeOf(wallpaperTheme, theme).fg,
+                  ["--wp-bg" as string]: wallpaperTokens(wallpaperTheme, gridColorTheme, theme).bg,
+                  ["--wp-fg" as string]: wallpaperTokens(wallpaperTheme, gridColorTheme, theme).fg,
+                  ["--wp-accent" as string]: wallpaperTokens(wallpaperTheme, gridColorTheme, theme).accent,
+                  ["--wp-empty" as string]: wallpaperTokens(wallpaperTheme, gridColorTheme, theme).empty,
+                  ["--wp-low" as string]: wallpaperTokens(wallpaperTheme, gridColorTheme, theme).low,
+                  ["--wp-mid" as string]: wallpaperTokens(wallpaperTheme, gridColorTheme, theme).mid,
+                  ["--wp-hi" as string]: wallpaperTokens(wallpaperTheme, gridColorTheme, theme).hi,
                   color: wallpaperThemeOf(wallpaperTheme, theme).fg,
                 }}
               >
@@ -2709,9 +2996,8 @@ export function Dashboard({ user }: { user?: any }) {
                 {/* Draggable container */}
                 <div
                   ref={wallpaperGridRef}
-                  className={`relative w-full h-full flex flex-col items-center justify-center ${
-                    isRepositionMode || isMovingPhoto ? "cursor-move pointer-events-auto" : "pointer-events-none"
-                  }`}
+                  className={`relative w-full h-full flex flex-col items-center justify-center ${isRepositionMode || isMovingPhoto ? "cursor-move pointer-events-auto" : "pointer-events-none"
+                    }`}
                   style={{
                     transform: `translate(${wallpaperOffset.x}px, ${wallpaperOffset.y}px) scale(${wallpaperScale})`,
                     touchAction: isRepositionMode || isMovingPhoto ? "none" : "auto",
@@ -2741,8 +3027,7 @@ export function Dashboard({ user }: { user?: any }) {
                       const themeColors = wallpaperTokens(wallpaperTheme, gridColorTheme, theme);
 
                       // Build a per-day completion map from heatmap
-                      const startDate = new Date(today);
-                      startDate.setDate(startDate.getDate() - (52 * 7 - 1));
+                      const startDate = heatmapStartDate(today);
                       const completionMap = new Map<string, number>();
                       displayedHeatmap.forEach((col, ci) => {
                         col.forEach((v, ri) => {
@@ -2815,8 +3100,7 @@ export function Dashboard({ user }: { user?: any }) {
                       const themeColors = wallpaperTokens(wallpaperTheme, gridColorTheme, theme);
 
                       // Build completion map
-                      const startDate = new Date(today);
-                      startDate.setDate(startDate.getDate() - (52 * 7 - 1));
+                      const startDate = heatmapStartDate(today);
                       const completionMap = new Map<string, number>();
                       displayedHeatmap.forEach((col, ci) => {
                         col.forEach((v, ri) => {
@@ -2849,78 +3133,83 @@ export function Dashboard({ user }: { user?: any }) {
                       const GAP = 2;
 
                       return (
-                        <div className="w-full flex flex-col px-6" style={{ paddingTop: "72px" }}>
-                          {/* Month name */}
-                          <div className="text-center mb-6" style={{ fontSize: 13, fontWeight: 600, letterSpacing: "0.25em", color: fg, opacity: 0.7 }}>
-                            {monthName}
-                          </div>
+                        <div className="w-full flex flex-col items-center justify-center -mt-6">
+                          <div className="flex flex-col items-center" style={{ width: "max-content" }}>
+                            {/* Month name */}
+                            <div className="text-center mb-6" style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.25em", color: fg, opacity: 0.8 }}>
+                              {monthName}
+                            </div>
 
-                          {/* Day headers */}
-                          <div style={{ display: "grid", gridTemplateColumns: `repeat(7, ${CELL_SIZE}px)`, gap: `${GAP}px`, marginBottom: 8 }}>
-                            {DAY_HEADERS.map((h) => (
-                              <div key={h} style={{ textAlign: "center", fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", color: fg, opacity: 0.4 }}>
-                                {h}
-                              </div>
-                            ))}
-                          </div>
-
-                          {/* Day grid */}
-                          <div style={{ display: "grid", gridTemplateColumns: `repeat(7, ${CELL_SIZE}px)`, gap: `${GAP}px` }}>
-                            {cells.map((cell, idx) => {
-                              if (cell.day === null) {
-                                return <div key={idx} style={{ width: CELL_SIZE, height: CELL_SIZE }} />;
-                              }
-                              const textOpacity = cell.isFuture ? 0.25 : cell.isToday ? 1 : 0.85;
-
-                              return (
-                                <div
-                                  key={idx}
-                                  style={{
-                                    width: CELL_SIZE,
-                                    height: CELL_SIZE,
-                                    display: "flex",
-                                    flexDirection: "column",
-                                    alignItems: "center",
-                                    justifyContent: "center",
-                                    position: "relative",
-                                  }}
-                                >
-                                  {/* Today circle ring */}
-                                  {cell.isToday && (
-                                    <div style={{
-                                      position: "absolute",
-                                      inset: 3,
-                                      borderRadius: "50%",
-                                      border: `1.5px solid ${themeColors.accent}`,
-                                      opacity: 0.9,
-                                    }} />
-                                  )}
-
-                                  {/* Day number */}
-                                  <span style={{
-                                    fontSize: 15,
-                                    fontWeight: cell.isToday ? 700 : 400,
-                                    color: fg,
-                                    opacity: textOpacity,
-                                    lineHeight: 1,
-                                    fontVariantNumeric: "tabular-nums",
-                                  }}>
-                                    {cell.day}
-                                  </span>
-
-                                  {/* Completion dot */}
-                                  {!cell.isFuture && (
-                                    <div style={{
-                                      width: 4,
-                                      height: 4,
-                                      borderRadius: "50%",
-                                      background: cell.isToday ? themeColors.accent : (cell.v === 0 ? themeColors.empty : cell.v === 1 ? themeColors.low : cell.v === 2 ? themeColors.mid : themeColors.hi),
-                                      marginTop: 3,
-                                    }} />
-                                  )}
+                            {/* Day headers */}
+                            <div style={{ display: "grid", gridTemplateColumns: `repeat(7, ${CELL_SIZE}px)`, gap: `${GAP}px`, marginBottom: 8 }}>
+                              {DAY_HEADERS.map((h) => (
+                                <div key={h} style={{ textAlign: "center", fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", color: fg, opacity: 0.45 }}>
+                                  {h}
                                 </div>
-                              );
-                            })}
+                              ))}
+                            </div>
+
+                            {/* Day grid */}
+                            <div style={{ display: "grid", gridTemplateColumns: `repeat(7, ${CELL_SIZE}px)`, gap: `${GAP}px` }}>
+                              {cells.map((cell, idx) => {
+                                if (cell.day === null) {
+                                  return <div key={idx} style={{ width: CELL_SIZE, height: CELL_SIZE }} />;
+                                }
+                                const textOpacity = cell.isFuture ? 0.25 : cell.isToday ? 1 : 0.85;
+
+                                return (
+                                  <div
+                                    key={idx}
+                                    style={{
+                                      width: CELL_SIZE,
+                                      height: CELL_SIZE,
+                                      display: "flex",
+                                      alignItems: "center",
+                                      justifyContent: "center",
+                                      position: "relative",
+                                    }}
+                                  >
+                                    {/* Today circle ring */}
+                                    {cell.isToday && (
+                                      <div style={{
+                                        position: "absolute",
+                                        inset: 3,
+                                        borderRadius: "50%",
+                                        border: `1.5px solid ${themeColors.accent}`,
+                                        opacity: 0.9,
+                                        pointerEvents: "none",
+                                      }} />
+                                    )}
+
+                                    {/* Day number - fixed vertical center across all days */}
+                                    <span style={{
+                                      fontSize: 15,
+                                      fontWeight: cell.isToday ? 700 : 400,
+                                      color: fg,
+                                      opacity: textOpacity,
+                                      lineHeight: 1,
+                                      fontVariantNumeric: "tabular-nums",
+                                    }}>
+                                      {cell.day}
+                                    </span>
+
+                                    {/* Completion dot - absolute bottom position to prevent baseline shifts */}
+                                    {!cell.isFuture && (
+                                      <div style={{
+                                        position: "absolute",
+                                        bottom: 5,
+                                        left: "50%",
+                                        transform: "translateX(-50%)",
+                                        width: 4,
+                                        height: 4,
+                                        borderRadius: "50%",
+                                        background: cell.isToday ? themeColors.accent : (cell.v === 0 ? themeColors.empty : cell.v === 1 ? themeColors.low : cell.v === 2 ? themeColors.mid : themeColors.hi),
+                                      }} />
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         </div>
                       );
@@ -2966,8 +3255,8 @@ export function Dashboard({ user }: { user?: any }) {
 
                               {/* 7 Day Squares in this week */}
                               {col.map((v, ri) => {
-                                const isToday = absCi === TODAY_COL && ri === TODAY_ROW;
-                                const isFuture = absCi === TODAY_COL && ri > TODAY_ROW;
+                                const isToday = absCi === todayCol && ri === todayRow;
+                                const isFuture = absCi === todayCol && ri > todayRow;
 
                                 return (
                                   <div
@@ -3045,8 +3334,8 @@ export function Dashboard({ user }: { user?: any }) {
                             return (
                               <div key={ci} className="flex items-center" style={{ gap: "3px" }}>
                                 {col.map((v, ri) => {
-                                  const isToday = absCi === TODAY_COL && ri === TODAY_ROW;
-                                  const isFuture = absCi === TODAY_COL && ri > TODAY_ROW;
+                                  const isToday = absCi === todayCol && ri === todayRow;
+                                  const isFuture = absCi === todayCol && ri > todayRow;
 
                                   return (
                                     <div
@@ -3130,8 +3419,11 @@ export function Dashboard({ user }: { user?: any }) {
                     </div>
                   )}
 
-                  {wallpaperHabitSet !== "none" && wallpaperGridStyle === "weeks" && (
-                    <div className="mt-12 flex flex-col items-center gap-2 opacity-80">
+                  {wallpaperHabitSet !== "none" && (
+                    <div className={`mt-8 flex flex-col gap-1.5 opacity-80 w-full px-12 ${wallpaperStatsAlign === 'left' ? 'items-start text-left' :
+                      wallpaperStatsAlign === 'right' ? 'items-end text-right' :
+                        'items-center text-center'
+                      }`}>
                       {(HABIT_SETS.find(s => s.key === wallpaperHabitSet)?.habits || []).map((h, i) => (
                         <span key={i} className="text-[12px] uppercase tracking-widest font-semibold">{h}</span>
                       ))}
@@ -3139,9 +3431,9 @@ export function Dashboard({ user }: { user?: any }) {
                   )}
 
                   {wallpaperGridStyle !== "widget" && (
-                    <div className={`mt-12 w-full px-12 text-[11px] font-semibold opacity-70 ${wallpaperStatsAlign === 'left' ? 'text-left' : wallpaperStatsAlign === 'right' ? 'text-right' : 'text-center'}`}>
+                    <div className={`mt-6 w-full px-12 text-[11px] font-semibold opacity-70 ${wallpaperStatsAlign === 'left' ? 'text-left' : wallpaperStatsAlign === 'right' ? 'text-right' : 'text-center'}`}>
                       {activeGoalId && goals.some(g => g.id === activeGoalId) ? (
-                        <span style={{ color: "rgba(255, 255, 255, 0.5)", fontWeight: 700, letterSpacing: "0.02em", fontSize: "11px" }}>
+                        <span className="opacity-80 font-bold tracking-wide text-[11px]">
                           {displayedTotalStreak}d left - {displayedRate}%
                         </span>
                       ) : (
@@ -3213,7 +3505,7 @@ export function Dashboard({ user }: { user?: any }) {
                   <p className="mb-2 text-[11px] font-medium text-body">Last 7 days</p>
                   <div className="flex gap-1.5">
                     {heatmap.slice(-7).map((col, i) => {
-                      const v = col[TODAY_ROW];
+                      const v = col[todayRow];
                       return (
                         <div
                           key={i}
@@ -3669,39 +3961,39 @@ export function Dashboard({ user }: { user?: any }) {
       {showStaticTargetSelector && (
         <div className="fixed inset-0 z-[9999] flex flex-col justify-end animate-fade-in pointer-events-auto p-4 pb-0">
           {/* Backdrop */}
-          <div 
-            className="absolute inset-0 backdrop-blur-sm" 
+          <div
+            className="absolute inset-0 backdrop-blur-sm"
             style={{ background: 'color-mix(in srgb, var(--ink) 30%, transparent)' }}
-            onClick={() => setShowStaticTargetSelector(false)} 
+            onClick={() => setShowStaticTargetSelector(false)}
           />
           {/* Content */}
           <div className="relative liquid-glass specular rounded-t-[32px] p-6 pb-12 shadow-2xl animate-sheet-slide-up border border-[color:var(--hairline-strong)]">
             <div className="mx-auto mt-0 mb-6 h-1.5 w-12 rounded-full bg-[color:var(--hairline-strong)]" />
-            
+
             <h2 className="text-xl font-bold text-center text-[color:var(--ink)] mb-2">Set Static Wallpaper</h2>
             <p className="text-center text-[color:var(--mute)] mb-6 text-sm">Choose where to apply the wallpaper.</p>
-            
+
             <div className="flex flex-col gap-3 max-w-sm mx-auto">
-              <button 
-                onClick={() => { setShowStaticTargetSelector(false); applyWallpaper(true, 'home'); }} 
+              <button
+                onClick={() => { setShowStaticTargetSelector(false); applyWallpaper(true, 'home'); }}
                 className="w-full bg-[color:var(--canvas-soft)] text-[color:var(--ink)] font-bold h-14 rounded-2xl flex items-center justify-center border border-[color:var(--hairline)] active:scale-[0.98] transition-all hover:bg-[color:var(--canvas-softer)]"
               >
                 Home Screen
               </button>
-              <button 
-                onClick={() => { setShowStaticTargetSelector(false); applyWallpaper(true, 'lock'); }} 
+              <button
+                onClick={() => { setShowStaticTargetSelector(false); applyWallpaper(true, 'lock'); }}
                 className="w-full bg-[color:var(--canvas-soft)] text-[color:var(--ink)] font-bold h-14 rounded-2xl flex items-center justify-center border border-[color:var(--hairline)] active:scale-[0.98] transition-all hover:bg-[color:var(--canvas-softer)]"
               >
                 Lock Screen
               </button>
-              <button 
-                onClick={() => { setShowStaticTargetSelector(false); applyWallpaper(true, 'both'); }} 
+              <button
+                onClick={() => { setShowStaticTargetSelector(false); applyWallpaper(true, 'both'); }}
                 className="w-full bg-ink text-on-ink font-bold h-14 rounded-2xl flex items-center justify-center active:scale-[0.98] transition-all hover:opacity-90 shadow-lg"
               >
                 Both Screens
               </button>
-              
-              <button 
+
+              <button
                 onClick={() => setShowStaticTargetSelector(false)}
                 className="w-full mt-2 h-12 font-semibold text-[color:var(--mute)] active:text-[color:var(--ink)] transition-colors"
               >
@@ -4221,85 +4513,274 @@ export const HabitRow = memo(function HabitRow({
   };
 
   if (isNumeric) {
-    const pct = Math.min(100, (((h.value ?? 0)) / (h.target || 1)) * 100);
+    const rawVal = h.value ?? 0;
+    const targetVal = h.target || 1;
+    const pct = Math.min(100, Math.round((rawVal / targetVal) * 100));
+    const isDone = rawVal >= targetVal || h.done;
+    const stepVal = h.step ?? (targetVal >= 500 ? 250 : targetVal >= 60 ? 30 : targetVal >= 10 ? 5 : 1);
+    const unitLabel = h.unit ? ` ${h.unit}` : "";
+
+    // Circular Ring parameters
+    const ringSize = 42;
+    const stroke = 3.5;
+    const radius = (ringSize - stroke) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const strokeDashoffset = circumference - (pct / 100) * circumference;
+
     return (
       <div
-        className="relative w-full rounded-[24px] liquid-glass overflow-hidden flex flex-col p-5 mb-2 cursor-pointer transition hover:bg-[color:var(--canvas-soft)]"
+        className={`group relative w-full rounded-2xl border p-3.5 mb-2.5 transition-all duration-300 shadow-md ${
+          isDone ? "ring-1 ring-emerald-500/30" : "hover:border-[color:var(--hairline-strong)]"
+        }`}
+        style={{
+          background: "color-mix(in srgb, var(--canvas-soft) 70%, transparent)",
+          backdropFilter: "blur(24px)",
+          borderColor: "color-mix(in srgb, var(--hairline) 70%, transparent)",
+        }}
         onClick={onOpenDetail}
       >
-        <div className="absolute inset-x-0 bottom-0 h-[60%] bg-gradient-to-t from-ink/5 to-transparent pointer-events-none" />
+        {/* Subtle radial glow when done */}
+        {isDone && (
+          <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-emerald-500/5 via-teal-500/5 to-transparent pointer-events-none" />
+        )}
 
-        <div className="relative flex items-center gap-4 z-10">
-          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-ink/5 shadow-[inset_0_0_20px_color-mix(in_srgb,var(--ink)_5%,transparent)]">
-            <Droplets className="h-6 w-6 text-ink drop-shadow-[0_0_8px_color-mix(in_srgb,var(--ink)_40%,transparent)]" />
-          </div>
+        {/* Top row: Circular ring + Habit Info + Metrics + Actions */}
+        <div className="relative flex items-center gap-3 z-10">
+          {/* Circular Progress Ring wrapping icon — 1-tap quick step forward */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              try { navigator.vibrate?.(15); } catch {}
+              if (isDone) {
+                onSetValue?.(0);
+              } else {
+                onSetValue?.(Math.min(targetVal, rawVal + stepVal));
+              }
+            }}
+            className="relative flex items-center justify-center shrink-0 transition-transform active:scale-95 group/ring"
+            style={{ width: ringSize, height: ringSize }}
+            title={isDone ? "Click to reset" : `Click to add +${stepVal}${unitLabel}`}
+          >
+            <svg width={ringSize} height={ringSize} className="-rotate-90">
+              {/* Background Track */}
+              <circle
+                cx={ringSize / 2}
+                cy={ringSize / 2}
+                r={radius}
+                fill="transparent"
+                stroke="color-mix(in srgb, var(--ink) 12%, transparent)"
+                strokeWidth={stroke}
+              />
+              {/* Animated Progress Fill */}
+              <circle
+                cx={ringSize / 2}
+                cy={ringSize / 2}
+                r={radius}
+                fill="transparent"
+                stroke={isDone ? "#10b981" : "var(--ink)"}
+                strokeWidth={stroke}
+                strokeDasharray={circumference}
+                strokeDashoffset={strokeDashoffset}
+                strokeLinecap="round"
+                className="transition-all duration-500 ease-out"
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              {isDone ? (
+                <Check className="h-4 w-4 text-emerald-400 stroke-[3] animate-scale-in" />
+              ) : (
+                <Droplets className="h-4 w-4 text-ink opacity-80 group-hover/ring:scale-110 transition-transform" />
+              )}
+            </div>
+          </button>
 
+          {/* Title & Category & Streak */}
           <div className="flex-1 min-w-0">
-            <h3 className="truncate text-sm font-bold tracking-widest text-ink uppercase">
-              {h.name}
-            </h3>
-            <p className="truncate text-[11px] font-medium text-mute mt-0.5">
-              {h.category}
-            </p>
+            <div className="flex items-center gap-1.5">
+              <h3 className={`truncate text-xs font-bold tracking-wider text-ink uppercase ${isDone ? "opacity-90" : ""}`}>
+                {h.name}
+              </h3>
+            </div>
+            <div className="mt-1 flex items-center gap-1.5">
+              <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${catClass(h.category)}`}>
+                {h.category}
+              </span>
+              {h.streak > 0 && (
+                <span className="flex items-center gap-0.5 rounded-full bg-amber-500/15 border border-amber-500/25 px-1.5 py-0.5 text-[9px] font-bold text-amber-400">
+                  <Flame className="h-2.5 w-2.5 fill-amber-400" />
+                  {h.streak}d
+                </span>
+              )}
+            </div>
             {h.note && (
-              <p className="mt-1 truncate text-[10px] italic text-mute/70">
+              <p className="mt-0.5 truncate text-[10px] italic text-mute/70">
                 "{h.note}"
               </p>
             )}
           </div>
 
-          <div className="flex shrink-0 items-center gap-1 self-start pt-1">
-            <button onClick={(e) => { e.stopPropagation(); onPin(); }} className={`grid h-7 w-7 place-items-center rounded-full transition ${h.pinned ? 'text-ink' : 'text-mute hover:bg-ink/10'}`}>
-              <Pin className="h-3.5 w-3.5" fill={h.pinned ? "currentColor" : "none"} />
-            </button>
-            <button onClick={(e) => { e.stopPropagation(); onMenuToggle(); }} className="grid h-7 w-7 place-items-center rounded-full text-mute hover:bg-ink/10">
-              <MoreVertical className="h-3.5 w-3.5" />
-            </button>
+          {/* Value Readout & Pin / Menu */}
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            <div className="flex items-center gap-1">
+              <button
+                onClick={(e) => { e.stopPropagation(); onPin(); }}
+                className={`grid h-6 w-6 place-items-center rounded-lg transition ${h.pinned ? 'text-ink' : 'text-mute hover:bg-ink/10'}`}
+                title="Pin to lock screen"
+              >
+                <Pin className="h-3 w-3" fill={h.pinned ? "currentColor" : "none"} />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); onMenuToggle(); }}
+                className="grid h-6 w-6 place-items-center rounded-lg text-mute hover:bg-ink/10"
+                title="Options"
+              >
+                <MoreVertical className="h-3 w-3" />
+              </button>
+            </div>
+            <div className="flex items-baseline gap-1">
+              <span className="font-display text-sm font-bold text-ink tabular-nums">
+                {rawVal % 1 === 0 ? rawVal : rawVal.toFixed(1)}
+              </span>
+              <span className="text-[11px] font-semibold text-mute tabular-nums">
+                /{targetVal % 1 === 0 ? targetVal : targetVal.toFixed(1)}{unitLabel}
+              </span>
+              <span className={`ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                isDone ? "bg-emerald-500/20 text-emerald-400" : "bg-ink/10 text-mute"
+              }`}>
+                {pct}%
+              </span>
+            </div>
           </div>
         </div>
 
-        <div className="relative flex flex-col items-center mt-6 z-10">
-          <div className="flex items-baseline gap-1 text-ink">
-            <input
-              type="number"
-              value={h.value === 0 ? "" : h.value}
-              placeholder="0"
-              min={0}
-              step={h.step ?? 0.25}
-              onChange={(e) => {
-                const val = Number(e.target.value);
-                if (!isNaN(val)) onSetValue?.(val);
-              }}
-              onBlur={(e) => {
-                if (e.target.value === "") onSetValue?.(0);
-              }}
-              onClick={(e) => e.stopPropagation()}
-              className="bg-transparent text-right font-bold text-xl w-16 outline-none appearance-none"
-            />
-            <span className="text-base font-semibold text-mute">/ {(h.target ?? 0).toFixed(1)} {h.unit}</span>
-          </div>
-          <span className="text-[10px] font-bold tracking-widest text-mute uppercase mt-0.5 mb-4">
-            Progress
-          </span>
-
-          <div className="w-full h-2.5 rounded-full bg-ink/10 shadow-inner relative overflow-hidden">
-            <div
-              className="absolute inset-y-0 left-0 rounded-full bg-ink shadow-[0_0_12px_color-mix(in_srgb,var(--ink)_40%,transparent)] transition-all duration-500 ease-out"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
+        {/* Progress Bar (Thin, glowing & smooth) */}
+        <div className="relative w-full h-1.5 rounded-full bg-ink/10 overflow-hidden my-2.5">
+          <div
+            className={`absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out ${
+              isDone
+                ? "bg-gradient-to-r from-emerald-500 to-teal-400 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+                : "bg-gradient-to-r from-ink/80 to-ink shadow-[0_0_6px_color-mix(in_srgb,var(--ink)_30%,transparent)]"
+            }`}
+            style={{ width: `${pct}%` }}
+          />
         </div>
 
+        {/* Bottom Bento Stepper Chips (1-tap quick logging) */}
+        <div className="flex items-center justify-between gap-1.5 pt-0.5" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center gap-1.5">
+            {/* Minus Step */}
+            <button
+              type="button"
+              disabled={rawVal <= 0}
+              onClick={() => {
+                try { navigator.vibrate?.(10); } catch {}
+                onSetValue?.(Math.max(0, rawVal - stepVal));
+              }}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold border transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none shadow-sm"
+              style={{
+                background: "color-mix(in srgb, var(--canvas) 60%, transparent)",
+                borderColor: "color-mix(in srgb, var(--hairline) 60%, transparent)",
+              }}
+              title={`Subtract ${stepVal}`}
+            >
+              <Minus className="h-3 w-3 text-mute" />
+              <span className="text-mute">{stepVal}{unitLabel}</span>
+            </button>
+
+            {/* Plus Step (Primary) */}
+            <button
+              type="button"
+              disabled={isDone}
+              onClick={() => {
+                try { navigator.vibrate?.(15); } catch {}
+                onSetValue?.(Math.min(targetVal, rawVal + stepVal));
+              }}
+              className="flex items-center gap-1 px-3 py-1 rounded-xl text-[11px] font-bold border transition-all active:scale-95 disabled:opacity-40 shadow-sm"
+              style={{
+                background: "color-mix(in srgb, var(--ink) 12%, transparent)",
+                borderColor: "color-mix(in srgb, var(--ink) 25%, transparent)",
+                color: "var(--ink)",
+              }}
+              title={`Add ${stepVal}`}
+            >
+              <Plus className="h-3 w-3" strokeWidth={2.5} />
+              <span>+{stepVal}{unitLabel}</span>
+            </button>
+
+            {/* Extra double step if target is large enough */}
+            {targetVal > stepVal * 2 && rawVal + stepVal < targetVal && (
+              <button
+                type="button"
+                onClick={() => {
+                  try { navigator.vibrate?.(15); } catch {}
+                  onSetValue?.(Math.min(targetVal, rawVal + stepVal * 2));
+                }}
+                className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold border transition-all active:scale-95 text-mute hover:text-ink shadow-sm"
+                style={{
+                  background: "color-mix(in srgb, var(--canvas) 50%, transparent)",
+                  borderColor: "color-mix(in srgb, var(--hairline) 50%, transparent)",
+                }}
+              >
+                <span>+{stepVal * 2}{unitLabel}</span>
+              </button>
+            )}
+          </div>
+
+          {/* Right Action: Complete or Reset */}
+          <button
+            type="button"
+            onClick={() => {
+              try { navigator.vibrate?.(20); } catch {}
+              if (isDone) {
+                onSetValue?.(0);
+              } else {
+                onSetValue?.(targetVal);
+              }
+            }}
+            className={`flex items-center gap-1 px-3 py-1 rounded-xl text-[11px] font-bold transition-all active:scale-95 shadow-sm ${
+              isDone
+                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                : "bg-ink/10 text-mute hover:text-ink border border-transparent"
+            }`}
+          >
+            {isDone ? (
+              <>
+                <Check className="h-3 w-3 stroke-[2.5]" />
+                <span>Done</span>
+              </>
+            ) : (
+              <span>Fill Max</span>
+            )}
+          </button>
+        </div>
+
+        {/* Dropdown Options Menu */}
         {menuOpen && (
-          <div className="absolute right-4 top-12 z-20 w-32 overflow-hidden rounded-xl border border-[color:var(--hairline)] bg-canvas shadow-xl animate-fade-in">
-            <button onClick={(e) => { e.stopPropagation(); onEdit(); onMenuClose(); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-ink hover:bg-canvas-soft">
-              <Settings className="h-3 w-3" /> Edit
+          <div
+            className="absolute right-4 top-12 z-20 w-36 overflow-hidden rounded-2xl border shadow-2xl animate-fade-in p-1 backdrop-blur-2xl"
+            style={{
+              background: "color-mix(in srgb, var(--canvas) 90%, transparent)",
+              borderColor: "color-mix(in srgb, var(--hairline-strong) 40%, transparent)",
+            }}
+          >
+            <button
+              onClick={(e) => { e.stopPropagation(); onEdit(); onMenuClose(); }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-ink hover:bg-canvas-soft rounded-xl transition-colors"
+            >
+              <Settings className="h-3.5 w-3.5" /> Edit Habit
             </button>
-            <button onClick={(e) => { e.stopPropagation(); onRest(); onMenuClose(); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-ink hover:bg-canvas-soft">
-              <Shield className="h-3 w-3" /> Rest day
+            <button
+              onClick={(e) => { e.stopPropagation(); onRest(); onMenuClose(); }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-ink hover:bg-canvas-soft rounded-xl transition-colors"
+            >
+              <Shield className="h-3.5 w-3.5" /> Rest Day
             </button>
-            <button onClick={(e) => { e.stopPropagation(); onDelete(); onMenuClose(); }} className="flex w-full items-center gap-2 px-3 py-2 text-xs text-red-500 hover:bg-red-500/10">
-              <Trash2 className="h-3 w-3" /> Delete
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete(); onMenuClose(); }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-red-400 hover:bg-red-500/10 rounded-xl transition-colors"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete
             </button>
           </div>
         )}

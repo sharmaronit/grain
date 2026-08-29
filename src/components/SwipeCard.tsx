@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
-import { Check, X as XIcon, Shield } from "lucide-react";
+import { Check, X as XIcon, Shield, Flame } from "lucide-react";
 import type { Habit } from "./types";
 
 interface SwipeCardProps {

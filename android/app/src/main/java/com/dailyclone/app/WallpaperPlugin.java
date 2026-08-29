@@ -48,15 +48,6 @@ public class WallpaperPlugin extends Plugin {
                 SharedPreferences prefs = getContext()
                     .getSharedPreferences(GrainWallpaperService.PREFS_NAME, Context.MODE_PRIVATE);
                 prefs.edit().putString(GrainWallpaperService.KEY_LIVE_DATA, jsonStr).apply();
-
-                // If the user is using the static fallback, silently refresh it
-                if (prefs.getBoolean("GRAIN_IS_STATIC_FALLBACK", false)) {
-                    if (scheduledStaticUpdate != null && !scheduledStaticUpdate.isDone())
-                        scheduledStaticUpdate.cancel(false);
-                    final String finalJson = jsonStr;
-                    scheduledStaticUpdate = debounceExecutor.schedule(() ->
-                        updateStaticWallpaperBackground(finalJson), 500, TimeUnit.MILLISECONDS);
-                }
             }
             JSObject ret = new JSObject();
             ret.put("success", true);

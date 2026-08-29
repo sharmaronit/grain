@@ -30,6 +30,8 @@ export interface UseCompletionsResult {
   setValue: (habitId: string, val: number, target: number) => Promise<void>;
   /** Mark a habit as a rest day (preserves streak). */
   setRestDay: (habitId: string) => Promise<void>;
+  /** Mark a habit as skipped for today without penalizing. */
+  markSkipped: (habitId: string) => Promise<void>;
   /** Freeze a habit's streak for the day. */
   freezeStreak: (habitId: string) => Promise<void>;
   /** Save a daily note for a habit. */

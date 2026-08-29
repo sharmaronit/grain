@@ -917,13 +917,14 @@ public class GrainWallpaperService extends WallpaperService {
         float gap       = 2f * dp * data.gridScale;
         float avail     = w - padding * 2;
         float sq        = ((avail - 6 * gap) / 7f) * data.gridScale; // Cell size
+        float gridW     = 7 * sq + 6 * gap;
         
         float monthNameH = 32f * dp;
         float headerH    = 24f * dp;
         float gridH      = numRows * sq + (numRows - 1) * gap;
         float totalH     = monthNameH + headerH + gridH;
         
-        float startX    = padding + (data.offsetX * dp);
+        float startX    = (w - gridW) / 2f + (data.offsetX * dp);
         float startY    = h * data.offsetY - totalH / 2f;
 
         // Month name
@@ -933,7 +934,7 @@ public class GrainWallpaperService extends WallpaperService {
         tp.setColor(fg[0]);
         tp.setAlpha(178); // ~0.7 opacity
         tp.setLetterSpacing(0.25f);
-        canvas.drawText(monthName, w / 2f, startY + monthNameH * 0.6f, tp);
+        canvas.drawText(monthName, startX + gridW / 2f, startY + monthNameH * 0.6f, tp);
         tp.setLetterSpacing(0f); // reset
         
         float currentY = startY + monthNameH;
@@ -983,7 +984,7 @@ public class GrainWallpaperService extends WallpaperService {
 
             RectF r = new RectF(x, y, x + sq, y + sq);
             
-            // Today ring
+            // Today ring - centered perfectly
             if (isTd) {
                 paint.setStyle(Paint.Style.STROKE);
                 paint.setStrokeWidth(1.5f * dp);
@@ -994,7 +995,7 @@ public class GrainWallpaperService extends WallpaperService {
                 paint.setStyle(Paint.Style.FILL);
             }
             
-            // Day number
+            // Day number - unified vertical center across all days
             tp.setTextSize(15f * dp);
             tp.setTypeface(Typeface.create(Typeface.DEFAULT, isTd ? Typeface.BOLD : Typeface.NORMAL));
             tp.setTextAlign(Paint.Align.CENTER);
@@ -1003,19 +1004,16 @@ public class GrainWallpaperService extends WallpaperService {
             
             Paint.FontMetrics fm = tp.getFontMetrics();
             float textY = r.centerY() - (fm.descent + fm.ascent) / 2f;
-            // Move text up slightly if we need to draw a dot under it, to make it look centered
-            if (!isFu) textY -= 2f * dp; 
             canvas.drawText(String.valueOf(dayNum), r.centerX(), textY, tp);
 
-            // Completion dot
+            // Completion dot - bottom aligned
             if (!isFu && level > 0) {
                 paint.setStyle(Paint.Style.FILL);
                 paint.setColor(ints[0][level]);
                 paint.clearShadowLayer();
-                canvas.drawCircle(r.centerX(), r.centerY() + 8f * dp, 2f * dp, paint);
+                canvas.drawCircle(r.centerX(), r.bottom - 4.5f * dp, 2f * dp, paint);
             }
         }
-        float gridW = 7 * sq + 6 * gap;
         drawStatsPill(canvas, startX, startX + gridW, currentY + gridH + 16f * dp, data, tp, fg, dp);
     }
 

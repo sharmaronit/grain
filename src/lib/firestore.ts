@@ -56,7 +56,7 @@ export interface UserProfile {
   email: string;
   tagline: string;
   initials: string;
-  theme: "dark" | "light";
+  theme: "dark" | "amoled" | "light";
   wallpaperTheme: string;
   gridColorTheme?: string;
   wallpaperHabitSet?: string;
@@ -68,6 +68,7 @@ export interface UserProfile {
   wallpaperSync: boolean;
   remindersOn: boolean;
   reminderTime?: string;
+  morningKickoff?: boolean;
   previewWeeks: number;
   activeGoalId?: string;
 }
