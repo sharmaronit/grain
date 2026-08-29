@@ -1,5 +1,8 @@
 {
-  "name": "tanstack_start_ts",
+  "name": "grain-tracker",
+  "version": "1.0.0",
+  "description": "A minimalist, high-performance habit tracker and consistency dashboard.",
+  "author": "Ronit Sharma",
   "private": true,
   "sideEffects": false,
   "type": "module",

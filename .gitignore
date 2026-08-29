@@ -31,3 +31,8 @@ google-services.json
 *.njsproj
 *.sln
 *.sw?
+
+# Environment
+.env
+.env.*
+!.env.example

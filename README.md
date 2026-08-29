@@ -1,29 +1,40 @@
-# Welcome to your Lovable project
+# Grain
 
-This project was built with [Lovable](https://lovable.dev).
+A minimalist, high-performance habit tracker and consistency dashboard. Built as a fully independent, offline-first application with Firebase syncing and native Capacitor integration.
 
-## Build with Lovable
+## 🚀 Tech Stack
+- **Frontend:** React 19, TypeScript, Vite, TailwindCSS
+- **State & Data:** Zustand, TanStack Query, Firebase Firestore (Offline-first)
+- **Native Wrapper:** Capacitor (Android/iOS)
+- **UI Architecture:** Radix UI primitives, custom animated liquid glass themes
 
-Open your project in the [Lovable editor](https://lovable.dev) and keep building.
+## 🛠️ Installation & Setup
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
-- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/[Your-Username]/Grain.git
+   cd Grain
+   ```
 
-## Development
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+3. **Configure Environment Variables:**
+   Copy the example environment file and add your Firebase credentials:
+   ```bash
+   cp .env.example .env
+   ```
 
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
-```
+4. **Start Development Server:**
+   ```bash
+   npm run dev
+   ```
 
-## Built with
-
-- TanStack Start
-- TypeScript
-- React
-- Tailwind CSS
+5. **Build for Android:**
+   ```bash
+   npm run build
+   npx cap sync android
+   cd android && ./gradlew assembleDebug
+   ```
