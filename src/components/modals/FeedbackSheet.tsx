@@ -118,7 +118,7 @@ export function FeedbackSheet({
     const body = encodeURIComponent(
       `Category: ${activeCategoryConfig.label}\nRating: ${rating}/5\nUser: ${name || "Anonymous"}\n\nMessage:\n${message}`
     );
-    window.open(`mailto:support@grainhabit.com?subject=${subject}&body=${body}`, "_blank");
+    window.open(`mailto:grainhabit.support@gmail.com?subject=${subject}&body=${body}`, "_blank");
   };
 
   return (
@@ -299,7 +299,7 @@ export function FeedbackSheet({
               className="w-full py-2.5 px-4 rounded-xl text-xs font-semibold text-body hover:text-ink flex items-center justify-center gap-1.5 transition bg-transparent hover:bg-[color:color-mix(in_srgb,var(--canvas-soft)_50%,transparent)]"
             >
               <Mail className="h-3.5 w-3.5" />
-              <span>Or email directly: support@grainhabit.com</span>
+              <span>Or email directly: grainhabit.support@gmail.com</span>
             </button>
           </div>
         </form>

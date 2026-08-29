@@ -72,7 +72,7 @@ export function SheetShell({
   const content = (
     <div
       onClick={onClose}
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in transition-opacity"
+      className="fixed inset-0 z-[60] flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in transition-opacity"
       style={{ opacity: backdropOpacity }}
     >
       <div

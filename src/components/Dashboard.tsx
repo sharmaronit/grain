@@ -4,7 +4,6 @@ import { HabitCard } from "./HabitCard";
 import { OnboardingModal } from "./OnboardingModal";
 import { WeeklyReviewModal } from "./WeeklyReviewModal";
 import { FeedbackSheet } from "./modals/FeedbackSheet";
-import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, startTransition, memo } from "react";
 import { toPng } from "html-to-image";
 import { DndContext, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors, DragOverlay, useDroppable, defaultDropAnimationSideEffects } from '@dnd-kit/core';
@@ -134,15 +133,6 @@ import {
 
 import type { AppTab, Theme, WallpaperState, Habit } from "../components/types";
 import { WheelPicker } from "./ui/WheelPicker";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerClose,
-} from "./ui/drawer";
 
 const catClass = (_c: string) => "bg-canvas-soft text-body border border-[color:var(--hairline)]";
 
@@ -1768,7 +1758,7 @@ export function Dashboard({ user }: { user?: any }) {
           {/* Liquid drifting blobs — animated blur gradient ambient light for all non-consistency screens (hidden in AMOLED theme for 120 FPS max performance) */}
           <div
             className={`pointer-events-none absolute inset-0 overflow-hidden z-0 transition-opacity duration-700 ease-in-out ${
-              activeTab === "consistency" || theme === "amoled" ? "opacity-0 pointer-events-none" : "opacity-100"
+              activeTab === "consistency" || theme === "amoled" || theme === "light" ? "opacity-0 pointer-events-none" : "opacity-100"
             }`}
           >
             <div
@@ -2384,7 +2374,7 @@ export function Dashboard({ user }: { user?: any }) {
               <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3 scrollbar-none pb-safe">
 
                 {/* Profile Card */}
-                <div className="rounded-3xl p-[1px] bg-gradient-to-br from-[color:var(--hairline-mid)] via-transparent to-[color:var(--hairline-mid)] animate-profile-card shadow-lg">
+                <div className="mx-4 mb-6">
                   <div className="card-soft relative overflow-hidden p-4 rounded-3xl bg-canvas/60 backdrop-blur-2xl border border-[color:var(--hairline)]">
                     <div className="flex items-center gap-4">
                       <div className="relative animate-profile-avatar shrink-0">
@@ -2449,8 +2439,8 @@ export function Dashboard({ user }: { user?: any }) {
                 </div>
 
                 {/* Preferences Card */}
-                <div className="relative z-10 rounded-3xl p-[1px] bg-gradient-to-br from-[color:var(--hairline-mid)] via-transparent to-[color:var(--hairline-mid)] animate-fade-in-up shadow-sm" style={{ animationDelay: "300ms" }}>
-                  <div className="rounded-3xl bg-canvas/60 backdrop-blur-2xl border border-[color:var(--hairline)] divide-y divide-[color:var(--hairline)]">
+                <div className="mx-4 mb-8 space-y-4">
+                  <div className="rounded-3xl bg-canvas/60 backdrop-blur-2xl divide-y divide-[color:var(--hairline)]">
 
                     {/* Theme */}
                     <Row
@@ -2786,8 +2776,8 @@ export function Dashboard({ user }: { user?: any }) {
                 </div>
 
                 {/* Actions Card — all grouped in one clean card */}
-                <div className="rounded-3xl p-[1px] bg-gradient-to-br from-[color:var(--hairline-mid)] via-transparent to-[color:var(--hairline-mid)] animate-fade-in-up" style={{ animationDelay: "350ms" }}>
-                  <div className="rounded-3xl bg-canvas/60 backdrop-blur-2xl border border-[color:var(--hairline)] divide-y divide-[color:var(--hairline)] overflow-hidden">
+                <div className="mx-4 mb-8 space-y-6">
+                  <div className="rounded-3xl bg-canvas/60 backdrop-blur-2xl divide-y divide-[color:var(--hairline)] overflow-hidden">
                     <button
                       data-lg-press
                       onClick={() => setFeedbackOpen(true)}
@@ -2913,12 +2903,9 @@ export function Dashboard({ user }: { user?: any }) {
             <ProfileEditSheet
               profile={profile}
               onClose={() => setProfileEditOpen(false)}
-              onSave={async (next) => {
-                try {
-                  await saveProfile(next);
-                } finally {
-                  setProfileEditOpen(false);
-                }
+              onSave={(next) => {
+                setProfileEditOpen(false);
+                saveProfile(next).catch(console.error);
               }}
             />
           )}
@@ -3635,17 +3622,18 @@ export function Dashboard({ user }: { user?: any }) {
                 habit={h}
                 quadrant={t.q}
                 onClose={() => setEditHabitTarget(null)}
-                onSave={async (patch, newQ) => {
-                  try {
-                    const updates: Partial<Omit<HabitDoc, "id" | "createdAt">> = { ...patch };
-                    if (newQ && newQ !== t.q) updates.quadrant = newQ;
-                    await updateHabitDoc(h.id, updates);
-                    showToast("Habit updated");
-                  } catch (err) {
-                    console.error("Failed to update habit:", err);
-                  } finally {
-                    setEditHabitTarget(null);
-                  }
+                onSave={(patch, newQ) => {
+                  setEditHabitTarget(null);
+                  (async () => {
+                    try {
+                      const updates: Partial<Omit<HabitDoc, "id" | "createdAt">> = { ...patch };
+                      if (newQ && newQ !== t.q) updates.quadrant = newQ;
+                      await updateHabitDoc(h.id, updates);
+                      showToast("Habit updated");
+                    } catch (err) {
+                      console.error("Failed to update habit:", err);
+                    }
+                  })();
                 }}
                 onDelete={() => {
                   deleteHabit(t.q, t.i);
@@ -4157,7 +4145,7 @@ function SheetShell({
   return (
     <div
       onClick={onClose}
-      className="absolute inset-0 z-40 flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in transition-opacity"
+      className="absolute inset-0 z-[60] flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in transition-opacity"
       style={{ opacity: backdropOpacity }}
     >
       <div
@@ -4816,14 +4804,14 @@ function ProfileEditSheet({
 
         <div className="grid grid-cols-2 gap-2 pt-1">
           <button
-            data-lg-press
+            type="button"
             onClick={onClose}
             className="pill w-full border border-[color:var(--hairline)] bg-canvas-soft py-3 text-sm font-semibold text-ink"
           >
             Cancel
           </button>
           <button
-            data-lg-press
+            type="button"
             onClick={() =>
               onSave({
                 name: name.trim() || "You",
