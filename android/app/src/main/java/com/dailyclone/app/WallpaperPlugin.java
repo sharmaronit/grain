@@ -48,12 +48,52 @@ public class WallpaperPlugin extends Plugin {
                 SharedPreferences prefs = getContext()
                     .getSharedPreferences(GrainWallpaperService.PREFS_NAME, Context.MODE_PRIVATE);
                 prefs.edit().putString(GrainWallpaperService.KEY_LIVE_DATA, jsonStr).apply();
+                
+                // If using Static Wallpaper, sync it in the background!
+                if (prefs.getBoolean("GRAIN_IS_STATIC_FALLBACK", false)) {
+                    if (scheduledStaticUpdate != null) {
+                        scheduledStaticUpdate.cancel(false);
+                    }
+                    scheduledStaticUpdate = debounceExecutor.schedule(() -> {
+                        updateStaticWallpaperSilently(prefs, jsonStr);
+                    }, 1000, TimeUnit.MILLISECONDS);
+                }
             }
             JSObject ret = new JSObject();
             ret.put("success", true);
             call.resolve(ret);
         } catch (Exception e) {
             call.reject("Failed to sync wallpaper data", e);
+        }
+    }
+
+    private void updateStaticWallpaperSilently(SharedPreferences prefs, String jsonStr) {
+        Bitmap bitmap = null;
+        try {
+            GrainWallpaperService.WallpaperData parsed =
+                GrainWallpaperService.WallpaperData.fromJson(jsonStr);
+
+            DisplayMetrics metrics = getContext().getResources().getDisplayMetrics();
+            int width  = metrics.widthPixels;
+            int height = metrics.heightPixels;
+
+            bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(bitmap);
+            GrainWallpaperService.drawHeatmapToCanvas(getContext(), canvas, width, height, parsed);
+
+            String screenTarget = prefs.getString("GRAIN_STATIC_SCREEN_TARGET", "both");
+            int flags = android.app.WallpaperManager.FLAG_SYSTEM | android.app.WallpaperManager.FLAG_LOCK;
+            if ("home".equals(screenTarget)) {
+                flags = android.app.WallpaperManager.FLAG_SYSTEM;
+            } else if ("lock".equals(screenTarget)) {
+                flags = android.app.WallpaperManager.FLAG_LOCK;
+            }
+
+            android.app.WallpaperManager.getInstance(getContext()).setBitmap(bitmap, null, true, flags);
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (bitmap != null) bitmap.recycle();
         }
     }
 

@@ -200,15 +200,20 @@ public class GrainWallpaperService extends WallpaperService {
                     }
                     currentGrid = shifted;
                     copy.completionRate = 0; // New week starts with 0% completion
+
+                    // If more than 1 week passed or past Monday of new week with no completions
+                    if (diffWeeks > 1 || (todayDow > 0 && currentGrid[cols - 1][0] == 0)) {
+                        copy.currentStreak = 0;
+                    }
                 } else if (diffWeeks == 0) {
-                    // Check if today is a new day compared to when data was synced
-                    // The last column is current week. If today's cell is unpopulated, today's rate resets.
-                    long syncedDayMs = syncedWeekMondayMs;
-                    // If current day has advanced past sync day
-                    if (nowMs > syncedDayMs) {
-                        // If today's habits haven't been completed yet, show 0% for today in stats
-                        if (currentGrid[cols - 1][todayDow] == 0) {
-                            copy.completionRate = 0;
+                    // Current week: check if today's habits haven't been completed yet
+                    if (currentGrid[cols - 1][todayDow] == 0) {
+                        copy.completionRate = 0;
+                        // If yesterday had 0 completions as well, streak is broken
+                        if (todayDow > 0 && currentGrid[cols - 1][todayDow - 1] == 0) {
+                            copy.currentStreak = 0;
+                        } else if (todayDow == 0 && cols >= 2 && currentGrid[cols - 2][6] == 0) {
+                            copy.currentStreak = 0;
                         }
                     }
                 }

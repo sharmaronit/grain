@@ -9,13 +9,12 @@ import android.util.DisplayMetrics;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
-import androidx.work.Worker;
-import androidx.work.WorkerParameters;
+import androidx.work.BackoffPolicy;
+import androidx.work.ExistingWorkPolicy;
 import androidx.work.OneTimeWorkRequest;
 import androidx.work.WorkManager;
-
-import org.json.JSONArray;
-import org.json.JSONObject;
+import androidx.work.Worker;
+import androidx.work.WorkerParameters;
 
 import java.util.Calendar;
 import java.util.concurrent.TimeUnit;
@@ -38,70 +37,91 @@ public class WallpaperWorker extends Worker {
         boolean isStatic = prefs.getBoolean("GRAIN_IS_STATIC_FALLBACK", false);
         String jsonStr = prefs.getString(GrainWallpaperService.KEY_LIVE_DATA, null);
 
-        if (isStatic && jsonStr != null) {
-            Bitmap bitmap = null;
-            try {
-                GrainWallpaperService.WallpaperData parsed = GrainWallpaperService.WallpaperData.fromJson(jsonStr);
+        boolean updateSuccess = true;
 
-                // Generate new bitmap (drawHeatmapToCanvas handles dynamic column/day shifting)
-                DisplayMetrics metrics = context.getResources().getDisplayMetrics();
-                int width  = metrics.widthPixels;
-                int height = metrics.heightPixels;
+        try {
+            if (isStatic && jsonStr != null) {
+                Bitmap bitmap = null;
+                try {
+                    GrainWallpaperService.WallpaperData parsed = GrainWallpaperService.WallpaperData.fromJson(jsonStr);
 
-                bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-                Canvas canvas = new Canvas(bitmap);
-                GrainWallpaperService.drawHeatmapToCanvas(context, canvas, width, height, parsed);
+                    // Generate new bitmap (drawHeatmapToCanvas handles dynamic column/day shifting)
+                    DisplayMetrics metrics = context.getResources().getDisplayMetrics();
+                    int width  = metrics.widthPixels;
+                    int height = metrics.heightPixels;
 
-                String screenTarget = prefs.getString("GRAIN_STATIC_SCREEN_TARGET", "both");
-                int flags = WallpaperManager.FLAG_SYSTEM | WallpaperManager.FLAG_LOCK;
-                if ("home".equals(screenTarget)) {
-                    flags = WallpaperManager.FLAG_SYSTEM;
-                } else if ("lock".equals(screenTarget)) {
-                    flags = WallpaperManager.FLAG_LOCK;
+                    bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+                    Canvas canvas = new Canvas(bitmap);
+                    GrainWallpaperService.drawHeatmapToCanvas(context, canvas, width, height, parsed);
+
+                    String screenTarget = prefs.getString("GRAIN_STATIC_SCREEN_TARGET", "both");
+                    int flags = WallpaperManager.FLAG_SYSTEM | WallpaperManager.FLAG_LOCK;
+                    if ("home".equals(screenTarget)) {
+                        flags = WallpaperManager.FLAG_SYSTEM;
+                    } else if ("lock".equals(screenTarget)) {
+                        flags = WallpaperManager.FLAG_LOCK;
+                    }
+
+                    WallpaperManager.getInstance(context).setBitmap(bitmap, null, true, flags);
+                    Log.d(TAG, "Static wallpaper updated successfully for the new day.");
+
+                } catch (Throwable e) {
+                    Log.e(TAG, "Failed to update static wallpaper", e);
+                    updateSuccess = false;
+                } finally {
+                    if (bitmap != null) bitmap.recycle();
                 }
-
-                WallpaperManager.getInstance(context).setBitmap(bitmap, null, true, flags);
-                Log.d(TAG, "Static wallpaper updated successfully for the new day.");
-
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to update static wallpaper", e);
-                return Result.failure();
-            } finally {
-                if (bitmap != null) bitmap.recycle();
             }
+        } catch (Throwable t) {
+            Log.e(TAG, "Unexpected error in WallpaperWorker", t);
+            updateSuccess = false;
+        } finally {
+            // Guarantee next midnight update is ALWAYS scheduled, preventing chain breakage
+            scheduleNextUpdate(context);
         }
 
-        // Schedule the next one for next midnight
-        scheduleNextUpdate(context);
+        if (!updateSuccess && getRunAttemptCount() < 3) {
+            Log.w(TAG, "Wallpaper update failed, retrying attempt #" + getRunAttemptCount());
+            return Result.retry();
+        }
+
         return Result.success();
     }
 
     public static void scheduleNextUpdate(Context context) {
-        Calendar currentDate = Calendar.getInstance();
-        Calendar dueDate = Calendar.getInstance();
-        
-        // Set to exactly midnight tonight
-        dueDate.set(Calendar.HOUR_OF_DAY, 0);
-        dueDate.set(Calendar.MINUTE, 0);
-        dueDate.set(Calendar.SECOND, 0);
-        dueDate.set(Calendar.MILLISECOND, 0);
-        
-        if (dueDate.before(currentDate) || dueDate.equals(currentDate)) {
-            dueDate.add(Calendar.HOUR_OF_DAY, 24);
+        try {
+            Calendar currentDate = Calendar.getInstance();
+            Calendar dueDate = Calendar.getInstance();
+            
+            // Set to exactly midnight tonight
+            dueDate.set(Calendar.HOUR_OF_DAY, 0);
+            dueDate.set(Calendar.MINUTE, 0);
+            dueDate.set(Calendar.SECOND, 0);
+            dueDate.set(Calendar.MILLISECOND, 0);
+            
+            if (dueDate.before(currentDate) || dueDate.equals(currentDate)) {
+                dueDate.add(Calendar.HOUR_OF_DAY, 24);
+            }
+            
+            long timeDiff = dueDate.getTimeInMillis() - currentDate.getTimeInMillis();
+            if (timeDiff <= 0) {
+                timeDiff = 60 * 1000L; // Fallback 1 min
+            }
+            
+            OneTimeWorkRequest workRequest = new OneTimeWorkRequest.Builder(WallpaperWorker.class)
+                    .setInitialDelay(timeDiff, TimeUnit.MILLISECONDS)
+                    .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.MINUTES)
+                    .build();
+                    
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                    "WallpaperMidnightUpdate",
+                    ExistingWorkPolicy.REPLACE,
+                    workRequest
+            );
+            Log.d(TAG, "Scheduled next wallpaper update in " + (timeDiff / 1000) + " seconds.");
+        } catch (Throwable t) {
+            Log.e(TAG, "Failed to schedule next wallpaper update", t);
         }
-        
-        long timeDiff = dueDate.getTimeInMillis() - currentDate.getTimeInMillis();
-        
-        OneTimeWorkRequest workRequest = new OneTimeWorkRequest.Builder(WallpaperWorker.class)
-                .setInitialDelay(timeDiff, TimeUnit.MILLISECONDS)
-                .build();
-                
-        WorkManager.getInstance(context).enqueueUniqueWork(
-                "WallpaperMidnightUpdate",
-                androidx.work.ExistingWorkPolicy.REPLACE,
-                workRequest
-        );
-        Log.d(TAG, "Scheduled next wallpaper update in " + (timeDiff / 1000) + " seconds.");
     }
 }
 

@@ -3,6 +3,7 @@ import { SwipeModeView } from "./SwipeModeView";
 import { HabitCard } from "./HabitCard";
 import { OnboardingModal } from "./OnboardingModal";
 import { WeeklyReviewModal } from "./WeeklyReviewModal";
+import { FeedbackSheet } from "./modals/FeedbackSheet";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, startTransition, memo } from "react";
 import { toPng } from "html-to-image";
@@ -48,6 +49,7 @@ import {
   WifiOff,
   User, GripVertical,
   MessageSquare,
+  MessageSquareHeart,
   Hexagon,
   ArrowUpRight,
   Eye,
@@ -513,6 +515,7 @@ export function Dashboard({ user }: { user?: any }) {
   const [aiCoachOpen, setAiCoachOpen] = useState(false);
   const [badgesOpen, setBadgesOpen] = useState(false);
   const [shareStreakOpen, setShareStreakOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   // Compute 28-day weekly insights
   const weeklyInsights = useMemo(
@@ -548,6 +551,7 @@ export function Dashboard({ user }: { user?: any }) {
       if (signOutOpen) { setSignOutOpen(false); return; }
       if (resetConfirmOpen) { setResetConfirmOpen(false); return; }
       if (profileEditOpen) { setProfileEditOpen(false); return; }
+      if (feedbackOpen) { setFeedbackOpen(false); return; }
       if (editHabitTarget) { setEditHabitTarget(null); return; }
       if (detail) { setDetail(null); return; }
       if (aiCoachOpen) { setAiCoachOpen(false); return; }
@@ -744,6 +748,7 @@ export function Dashboard({ user }: { user?: any }) {
   const [newIsNumeric, setNewIsNumeric] = useState(false);
   const [newTarget, setNewTarget] = useState<number>(1);
   const [newUnit, setNewUnit] = useState<string>("");
+  const [showCustomize, setShowCustomize] = useState(false);
 
   const week = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -1026,30 +1031,13 @@ export function Dashboard({ user }: { user?: any }) {
       const daysLeft = Math.max(0, totalDays - Math.min(elapsedDays, totalDays));
       const pct = Math.round((Math.min(elapsedDays, totalDays) / totalDays) * 100);
 
-      const heatmap: number[][] = Array.from({ length: 52 }, () => Array(7).fill(0));
-      const heatmapStart = heatmapStartDate(today);
-
-      for (let w = 0; w < 52; w++) {
-        for (let d = 0; d < 7; d++) {
-          const date = new Date(heatmapStart);
-          date.setDate(date.getDate() + w * 7 + d);
-          date.setHours(0, 0, 0, 0);
-
-          if (date.getTime() >= start.getTime() && date.getTime() <= target.getTime()) {
-            if (date.getTime() <= today.getTime()) {
-              heatmap[w][d] = 3; // elapsed
-            } else {
-              heatmap[w][d] = 1; // future
-            }
-          }
-        }
-      }
+      const boxes = Array.from({ length: daysLeft }, () => 1);
 
       return {
         id: goal.id,
         title: goal.name,
-        heatmap,
-        boxes: heatmap.flatMap(col => col),
+        heatmap: [],
+        boxes,
         currentStreak: daysLeft,
         completionRate: pct
       };
@@ -1076,30 +1064,13 @@ export function Dashboard({ user }: { user?: any }) {
       const daysLeft = Math.max(0, totalDays - Math.min(elapsedDays, totalDays));
       const pct = Math.round((Math.min(elapsedDays, totalDays) / totalDays) * 100);
 
-      const heatmap: number[][] = Array.from({ length: 52 }, () => Array(7).fill(0));
-      const heatmapStart = heatmapStartDate(today);
-
-      for (let w = 0; w < 52; w++) {
-        for (let d = 0; d < 7; d++) {
-          const date = new Date(heatmapStart);
-          date.setDate(date.getDate() + w * 7 + d);
-          date.setHours(0, 0, 0, 0);
-
-          if (date.getTime() >= start.getTime() && date.getTime() <= target.getTime()) {
-            if (date.getTime() <= today.getTime()) {
-              heatmap[w][d] = 3; // elapsed
-            } else {
-              heatmap[w][d] = 1; // future
-            }
-          }
-        }
-      }
+      const boxes = Array.from({ length: daysLeft }, () => 1);
 
       return {
         id: goal.id,
         title: goal.name,
-        heatmap,
-        boxes: heatmap.flatMap(col => col),
+        heatmap: [],
+        boxes,
         currentStreak: daysLeft,
         completionRate: pct
       };
@@ -1956,16 +1927,6 @@ export function Dashboard({ user }: { user?: any }) {
             >
               <div className="space-y-4 pt-16">
 
-                <div className="flex justify-start px-5">
-                  <button
-                    onClick={() => setSwipeMode(true)}
-                    className="flex items-center gap-1.5 rounded-full card-soft bg-[color:var(--canvas-soft)] px-3 py-1.5 text-xs font-bold text-ink shadow-sm transition hover:bg-ink/5"
-                  >
-                    <Layers className="h-3.5 w-3.5" />
-                    Focus Mode
-                  </button>
-                </div>
-
                 {/* Unified Hero: streak + ring + date selector */}
                 <TodayHero
                   streak={totalStreak}
@@ -2333,6 +2294,7 @@ export function Dashboard({ user }: { user?: any }) {
                 {([
                   { id: "today", label: "Today", icon: Flame },
                   { id: "consistency", label: "Consistency", icon: CalendarDays },
+                  { id: "deck", label: "Deck", icon: Layers, isAction: true },
                   { id: "myday", label: "My Day", icon: Sun },
                   { id: "goal", label: "Goals", icon: Target },
                 ] as const).map((t) => {
@@ -2342,7 +2304,11 @@ export function Dashboard({ user }: { user?: any }) {
                     <button
                       key={t.id}
                       onClick={() => {
-                        switchTab(t.id as AppTab);
+                        if ("isAction" in t && t.isAction) {
+                          setSwipeMode(true);
+                        } else {
+                          switchTab(t.id as AppTab);
+                        }
                         try { navigator.vibrate?.(10); } catch { }
                       }}
                       className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-full py-2 px-1 text-[11px] font-medium transition-all duration-200 ${active
@@ -2398,7 +2364,7 @@ export function Dashboard({ user }: { user?: any }) {
 
           {/* Settings Full Screen */}
           {settingsOpen && (
-            <div className="fixed inset-0 z-40 flex flex-col bg-canvas/80 backdrop-blur-3xl animate-fade-in-up">
+            <div className="fixed inset-0 z-50 flex flex-col bg-canvas/80 backdrop-blur-3xl animate-fade-in-up">
               {/* Header */}
               <div className="flex items-center justify-between px-6 pt-6 pb-2">
                 <div>
@@ -2415,27 +2381,33 @@ export function Dashboard({ user }: { user?: any }) {
               </div>
 
               {/* Scrollable Content */}
-              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4 scrollbar-none pb-safe">
-                {/* Profile Section */}
+              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3 scrollbar-none pb-safe">
+
+                {/* Profile Card */}
                 <div className="rounded-3xl p-[1px] bg-gradient-to-br from-[color:var(--hairline-mid)] via-transparent to-[color:var(--hairline-mid)] animate-profile-card shadow-lg">
                   <div className="card-soft relative overflow-hidden p-4 rounded-3xl bg-canvas/60 backdrop-blur-2xl border border-[color:var(--hairline)]">
-                    <div className="flex items-center gap-5">
-                      <div className="relative animate-profile-avatar">
-                        <div className="grid h-20 w-20 place-items-center rounded-full bg-ink text-on-ink font-display text-2xl font-bold shadow-lg">
+                    <div className="flex items-center gap-4">
+                      <div className="relative animate-profile-avatar shrink-0">
+                        <div className="grid h-16 w-16 place-items-center rounded-full bg-ink text-on-ink font-display text-xl font-bold shadow-lg">
                           {profile.initials}
                         </div>
-                        <span className="absolute -bottom-1 -right-1 grid h-7 w-7 place-items-center rounded-full bg-emerald-500 text-[12px] font-bold text-white ring-4 ring-[color:var(--canvas)] animate-pulse">
-                          <Flame className="h-4 w-4" />
+                        <span className="absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-emerald-500 text-[11px] font-bold text-white ring-[3px] ring-[color:var(--canvas)] animate-pulse">
+                          <Flame className="h-3.5 w-3.5" />
                         </span>
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <h2 className="font-display truncate text-xl font-bold text-ink">{profile.name}</h2>
-                          <span className="rounded-full bg-gradient-to-r from-indigo-500/20 to-purple-500/20 px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-widest text-ink border border-indigo-500/30">
-                            Pro
-                          </span>
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <h2 className="font-display truncate text-lg font-bold text-ink">{profile.name}</h2>
+                          <span className="rounded-full bg-gradient-to-r from-indigo-500/20 to-purple-500/20 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-ink border border-indigo-500/30 shrink-0">Pro</span>
                         </div>
-                        <p className="truncate text-sm text-body mt-1">{profile.tagline}</p>
+                        <p className="truncate text-xs text-body">{profile.tagline}</p>
+                        <div className="flex items-center gap-2.5 mt-2 flex-wrap">
+                          <span className="text-[11px] font-bold text-ink tabular-nums">{totalStreak}<span className="text-mute font-medium"> streak</span></span>
+                          <span className="text-mute/40 text-[11px]">·</span>
+                          <span className="text-[11px] font-bold text-ink tabular-nums">{doneCount}<span className="text-mute font-medium">/{totalCount} today</span></span>
+                          <span className="text-mute/40 text-[11px]">·</span>
+                          <span className="text-[11px] font-bold text-ink tabular-nums">{rate}<span className="text-mute font-medium">%</span></span>
+                        </div>
                       </div>
                       <button
                         onClick={() => setProfileEditOpen(true)}
@@ -2445,104 +2417,82 @@ export function Dashboard({ user }: { user?: any }) {
                         Edit
                       </button>
                     </div>
-                    <div className="mt-4 grid grid-cols-3 gap-3">
-                      <div className="rounded-2xl bg-[color:var(--canvas-softer)] p-2.5 text-center animate-profile-stat" style={{ animationDelay: "100ms" }}>
-                        <p className="font-display text-2xl font-bold leading-none text-ink tabular-nums">{totalStreak}</p>
-                        <p className="mt-2 text-[10px] font-bold uppercase tracking-widest text-body">Streak</p>
-                      </div>
-                      <div className="rounded-2xl bg-[color:var(--canvas-softer)] p-2.5 text-center animate-profile-stat" style={{ animationDelay: "160ms" }}>
-                        <p className="font-display text-2xl font-bold leading-none text-ink tabular-nums">
-                          {doneCount}<span className="text-body opacity-50 text-lg">/{totalCount}</span>
-                        </p>
-                        <p className="mt-2 text-[10px] font-bold uppercase tracking-widest text-body">Today</p>
-                      </div>
-                      <div className="rounded-2xl bg-[color:var(--canvas-softer)] p-2.5 text-center animate-profile-stat" style={{ animationDelay: "220ms" }}>
-                        <p className="font-display text-2xl font-bold leading-none text-ink tabular-nums">{rate}%</p>
-                        <p className="mt-2 text-[10px] font-bold uppercase tracking-widest text-body">Rate</p>
-                      </div>
+
+                    {/* Quick shortcuts inside profile card */}
+                    <div className="mt-3 pt-3 border-t border-[color:var(--hairline)] flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setSettingsOpen(false); setAiCoachOpen(true); }}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[color:color-mix(in_srgb,var(--canvas-soft)_60%,transparent)] text-[11px] font-bold text-ink transition active:scale-95 hover:bg-ink/10"
+                        data-lg-press
+                      >
+                        <MessageSquare className="h-4 w-4" strokeWidth={2} /> Coach
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setSettingsOpen(false); setBadgesOpen(true); }}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[color:color-mix(in_srgb,var(--canvas-soft)_60%,transparent)] text-[11px] font-bold text-ink transition active:scale-95 hover:bg-ink/10"
+                        data-lg-press
+                      >
+                        <Hexagon className="h-4 w-4" strokeWidth={2} /> Badges
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setSettingsOpen(false); setShareStreakOpen(true); }}
+                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[color:color-mix(in_srgb,var(--canvas-soft)_60%,transparent)] text-[11px] font-bold text-ink transition active:scale-95 hover:bg-ink/10"
+                        data-lg-press
+                      >
+                        <ArrowUpRight className="h-4 w-4" strokeWidth={2} /> Share
+                      </button>
                     </div>
                   </div>
                 </div>
 
-                {/* Quick Actions */}
-                <div className="grid grid-cols-3 gap-3 animate-fade-in-up" style={{ animationDelay: "250ms" }}>
-                  <button
-                    type="button"
-                    onClick={() => { setSettingsOpen(false); setAiCoachOpen(true); }}
-                    className="w-full flex flex-col items-center justify-center gap-1.5 rounded-2xl bg-canvas/60 backdrop-blur-2xl border border-[color:var(--hairline)] py-3.5 text-xs font-bold text-ink transition active:scale-95 hover:bg-ink/10 shadow-sm"
-                    data-lg-press
-                  >
-                    <MessageSquare className="h-6 w-6" strokeWidth={2} /> Coach
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setSettingsOpen(false); setBadgesOpen(true); }}
-                    className="w-full flex flex-col items-center justify-center gap-1.5 rounded-2xl bg-canvas/60 backdrop-blur-2xl border border-[color:var(--hairline)] py-3.5 text-xs font-bold text-ink transition active:scale-95 hover:bg-ink/10 shadow-sm"
-                    data-lg-press
-                  >
-                    <Hexagon className="h-6 w-6" strokeWidth={2} /> Badges
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setSettingsOpen(false); setShareStreakOpen(true); }}
-                    className="w-full flex flex-col items-center justify-center gap-1.5 rounded-2xl bg-canvas/60 backdrop-blur-2xl border border-[color:var(--hairline)] py-3.5 text-xs font-bold text-ink transition active:scale-95 hover:bg-ink/10 shadow-sm"
-                    data-lg-press
-                  >
-                    <ArrowUpRight className="h-6 w-6" strokeWidth={2} /> Share
-                  </button>
-                </div>
-
-                {/* Settings Rows */}
+                {/* Preferences Card */}
                 <div className="relative z-10 rounded-3xl p-[1px] bg-gradient-to-br from-[color:var(--hairline-mid)] via-transparent to-[color:var(--hairline-mid)] animate-fade-in-up shadow-sm" style={{ animationDelay: "300ms" }}>
                   <div className="rounded-3xl bg-canvas/60 backdrop-blur-2xl border border-[color:var(--hairline)] divide-y divide-[color:var(--hairline)]">
-                    <div className="py-3 px-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <div>
-                          <span className="font-semibold text-ink text-xs block">App Theme</span>
-                          <p className="text-[10px] text-mute font-medium">
-                            {theme === "amoled"
-                              ? "AMOLED Black · Ultra 120 FPS High Performance"
-                              : theme === "dark"
-                              ? "Ambient Glass · Blurry Atmospheric Glow"
-                              : "Minimal Light · Crisp Clean Bright Mode"}
-                          </p>
+
+                    {/* Theme */}
+                    <Row
+                      label={
+                        <div className="text-left">
+                          <span className="font-semibold text-ink block text-xs">App Theme</span>
                         </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-canvas-soft border border-[color:var(--hairline)]">
-                        {[
-                          { key: "dark" as const, label: "Ambient", sub: "Atmospheric" },
-                          { key: "amoled" as const, label: "AMOLED", sub: "120 FPS" },
-                          { key: "light" as const, label: "Light", sub: "Minimal" },
-                        ].map((opt) => {
-                          const active = theme === opt.key;
-                          return (
-                            <button
-                              key={opt.key}
-                              type="button"
-                              onClick={() => {
-                                setTheme(opt.key);
-                                if (typeof window !== "undefined") {
-                                  try { localStorage.setItem("grain_app_theme", opt.key); } catch {}
-                                }
-                                if (userId) {
-                                  updateUserProfile(userId, { theme: opt.key });
-                                }
-                                try { navigator.vibrate?.(10); } catch {}
-                                showToast(`${opt.label} theme activated`);
-                              }}
-                              className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl transition-all ${
-                                active
-                                  ? "bg-ink text-on-ink shadow-md font-bold scale-[1.02]"
-                                  : "text-mute hover:text-ink font-medium"
-                              }`}
-                            >
-                              <span className="text-[11px] leading-tight">{opt.label}</span>
-                              <span className="text-[9px] opacity-75 leading-none mt-0.5">{opt.sub}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
+                      }
+                      action={
+                        <div className="flex items-center gap-1">
+                          {[
+                            { key: "dark" as const, label: "Auto" },
+                            { key: "amoled" as const, label: "AMOLED" },
+                            { key: "light" as const, label: "Light" },
+                          ].map((opt) => {
+                            const active = theme === opt.key;
+                            return (
+                              <button
+                                key={opt.key}
+                                type="button"
+                                onClick={() => {
+                                  setTheme(opt.key);
+                                  if (typeof window !== "undefined") {
+                                    try { localStorage.setItem("grain_app_theme", opt.key); } catch {}
+                                  }
+                                  if (userId) updateUserProfile(userId, { theme: opt.key });
+                                  try { navigator.vibrate?.(10); } catch {}
+                                }}
+                                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                                  active
+                                    ? "border border-ink text-ink bg-transparent"
+                                    : "text-mute hover:text-ink opacity-60"
+                                }`}
+                              >
+                                {opt.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      }
+                    />
+
                     <Row
                       label="Starter Packs & Walkthrough"
                       action={
@@ -2572,9 +2522,7 @@ export function Dashboard({ user }: { user?: any }) {
                       action={
                         <button
                           type="button"
-                          onClick={() => {
-                            setWallpaperEditorOpen(true);
-                          }}
+                          onClick={() => { setWallpaperEditorOpen(true); }}
                           className="pill bg-ink text-on-ink px-3.5 py-1.5 text-xs font-bold shadow-sm active:scale-95 transition"
                         >
                           Customize
@@ -2625,38 +2573,144 @@ export function Dashboard({ user }: { user?: any }) {
 
                       {remindersOn && (
                         <div className="p-3 space-y-3 rounded-2xl bg-canvas-soft border border-[color:var(--hairline)] animate-fade-in text-xs">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-body font-semibold">Reminder time</span>
-                            <div className="flex items-center gap-1.5">
-                              {["18:00", "20:00", "21:30"].map((t) => (
-                                <button
-                                  key={t}
-                                  type="button"
-                                  onClick={() => {
-                                    setReminderTime(t);
-                                    if (userId) updateUserProfile(userId, { reminderTime: t });
-                                    showToast(`Reminder time set to ${t === "18:00" ? "6:00 PM" : t === "20:00" ? "8:00 PM" : "9:30 PM"}`);
-                                  }}
-                                  className={`px-2 py-1 rounded-lg text-[10px] font-bold transition ${
-                                    reminderTime === t ? "bg-ink text-on-ink shadow-sm" : "bg-canvas text-mute hover:text-ink border border-[color:var(--hairline)]"
-                                  }`}
-                                >
-                                  {t === "18:00" ? "6 PM" : t === "20:00" ? "8 PM" : "9:30 PM"}
-                                </button>
-                              ))}
-                              <input
-                                type="time"
-                                value={reminderTime}
-                                onChange={(e) => {
-                                  const t = e.target.value;
-                                  if (t) {
-                                    setReminderTime(t);
-                                    if (userId) updateUserProfile(userId, { reminderTime: t });
-                                  }
-                                }}
-                                className="bg-canvas text-ink font-bold text-[11px] px-1.5 py-1 rounded-lg border border-[color:var(--hairline)] outline-none"
-                              />
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center justify-between px-1 mb-1">
+                              <span className="text-body font-semibold">Reminder time</span>
+                              <span className="text-[10px] font-bold text-ink bg-ink/10 px-2 py-0.5 rounded-md uppercase tracking-widest">
+                                {(() => {
+                                  const [h, m] = (reminderTime || "20:00").split(":");
+                                  const h24 = parseInt(h, 10);
+                                  const ampm = h24 >= 12 ? "PM" : "AM";
+                                  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+                                  return `${h12}:${m} ${ampm}`;
+                                })()}
+                              </span>
                             </div>
+                            
+                            {(() => {
+                              const [hStr, mStr] = (reminderTime || "20:00").split(":");
+                              const h24 = parseInt(hStr, 10);
+                              const currentAmpm = h24 >= 12 ? "PM" : "AM";
+                              const currentH12 = h24 % 12 === 0 ? 12 : h24 % 12;
+                              
+                              const updateTime = (newH12: number, newMin: string, newAmpm: string) => {
+                                let newH24 = newH12;
+                                if (newAmpm === "PM" && newH12 < 12) newH24 += 12;
+                                if (newAmpm === "AM" && newH12 === 12) newH24 = 0;
+                                const timeStr = `${newH24.toString().padStart(2, '0')}:${newMin}`;
+                                if (timeStr !== (reminderTime || "20:00")) {
+                                  setReminderTime(timeStr);
+                                  if (userId) updateUserProfile(userId, { reminderTime: timeStr });
+                                }
+                              };
+
+                              const handleScroll = (
+                                e: React.UIEvent<HTMLDivElement>, 
+                                callback: (index: number) => void
+                              ) => {
+                                const target = e.currentTarget;
+                                if (target.dataset.timeout) clearTimeout(Number(target.dataset.timeout));
+                                target.dataset.timeout = setTimeout(() => {
+                                  const index = Math.round(target.scrollTop / 32);
+                                  callback(index);
+                                }, 150).toString();
+                              };
+
+                              return (
+                                <div className="relative flex justify-center h-36 mt-2 mb-1 bg-[color-mix(in_srgb,var(--canvas-soft)_60%,transparent)] backdrop-blur-xl border border-[color:var(--hairline)] rounded-2xl overflow-hidden shadow-inner">
+                                  {/* Selection Highlight */}
+                                  <div className="absolute top-1/2 left-4 right-4 h-8 -mt-4 bg-[color-mix(in_srgb,var(--ink)_8%,transparent)] rounded-xl pointer-events-none" />
+
+                                  {/* Masked Content Wrapper */}
+                                  <div className="flex justify-center gap-4 w-full h-full [mask-image:linear-gradient(to_bottom,transparent,black_20%,black_80%,transparent)]">
+                                    {/* Hours */}
+                                    <div 
+                                      className="flex flex-col overflow-y-auto scrollbar-none snap-y snap-mandatory py-[3.5rem] px-2 scroll-smooth"
+                                      ref={(el) => {
+                                        if (el && !el.dataset.initialized) {
+                                          el.scrollTop = (currentH12 - 1) * 32;
+                                          el.dataset.initialized = 'true';
+                                        }
+                                      }}
+                                      onScroll={(e) => handleScroll(e, (idx) => updateTime(Math.min(12, Math.max(1, idx + 1)), mStr, currentAmpm))}
+                                    >
+                                      {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
+                                        <button
+                                          key={`h-${h}`}
+                                          type="button"
+                                          onClick={() => updateTime(h, mStr, currentAmpm)}
+                                          className="relative shrink-0 h-8 flex items-center justify-center rounded-lg text-lg font-bold transition-all duration-300 snap-center"
+                                        >
+                                          <span className={`relative z-10 transition-all duration-300 ${
+                                            currentH12 === h ? "text-ink scale-125" : "text-mute opacity-20 hover:opacity-100"
+                                          }`}>
+                                            {h}
+                                          </span>
+                                        </button>
+                                      ))}
+                                    </div>
+
+                                    <div className="flex flex-col justify-center items-center font-bold text-ink text-lg opacity-50 pb-1">:</div>
+
+                                    {/* Minutes */}
+                                    <div 
+                                      className="flex flex-col overflow-y-auto scrollbar-none snap-y snap-mandatory py-[3.5rem] px-2 scroll-smooth"
+                                      ref={(el) => {
+                                        if (el && !el.dataset.initialized) {
+                                          el.scrollTop = parseInt(mStr, 10) * 32;
+                                          el.dataset.initialized = 'true';
+                                        }
+                                      }}
+                                      onScroll={(e) => handleScroll(e, (idx) => updateTime(currentH12, Math.min(59, Math.max(0, idx)).toString().padStart(2, '0'), currentAmpm))}
+                                    >
+                                      {Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0')).map((m) => (
+                                        <button
+                                          key={`m-${m}`}
+                                          type="button"
+                                          onClick={() => updateTime(currentH12, m, currentAmpm)}
+                                          className="relative shrink-0 h-8 flex items-center justify-center rounded-lg text-lg font-bold transition-all duration-300 snap-center"
+                                        >
+                                          <span className={`relative z-10 transition-all duration-300 ${
+                                            mStr === m ? "text-ink scale-125" : "text-mute opacity-20 hover:opacity-100"
+                                          }`}>
+                                            {m}
+                                          </span>
+                                        </button>
+                                      ))}
+                                    </div>
+
+                                    <div className="w-4" />
+
+                                    {/* AM / PM */}
+                                    <div 
+                                      className="flex flex-col overflow-y-auto scrollbar-none snap-y snap-mandatory py-[3.5rem] px-2 scroll-smooth"
+                                      ref={(el) => {
+                                        if (el && !el.dataset.initialized) {
+                                          el.scrollTop = currentAmpm === "AM" ? 0 : 32;
+                                          el.dataset.initialized = 'true';
+                                        }
+                                      }}
+                                      onScroll={(e) => handleScroll(e, (idx) => updateTime(currentH12, mStr, idx === 0 ? "AM" : "PM"))}
+                                    >
+                                      {["AM", "PM"].map((meridiem) => (
+                                        <button
+                                          key={meridiem}
+                                          type="button"
+                                          onClick={() => updateTime(currentH12, mStr, meridiem)}
+                                          className="relative shrink-0 h-8 flex items-center justify-center rounded-lg text-sm font-bold transition-all duration-300 snap-center"
+                                        >
+                                          <span className={`relative z-10 transition-all duration-300 ${
+                                            currentAmpm === meridiem ? "text-ink scale-125" : "text-mute opacity-20 hover:opacity-100"
+                                          }`}>
+                                            {meridiem}
+                                          </span>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+                              );
+                            })()}
                           </div>
 
                           <div className="flex items-center justify-between gap-2 pt-1 border-t border-[color:var(--hairline)]">
@@ -2731,45 +2785,53 @@ export function Dashboard({ user }: { user?: any }) {
                   </div>
                 </div>
 
-                {/* Danger / Data Actions */}
-                <div className="space-y-2.5 pt-2 animate-fade-in-up" style={{ animationDelay: "350ms" }}>
-                  <div className="rounded-[1.25rem] p-[1px] bg-gradient-to-br from-[color:var(--hairline-mid)] via-transparent to-[color:var(--hairline-mid)] transition-all">
+                {/* Actions Card — all grouped in one clean card */}
+                <div className="rounded-3xl p-[1px] bg-gradient-to-br from-[color:var(--hairline-mid)] via-transparent to-[color:var(--hairline-mid)] animate-fade-in-up" style={{ animationDelay: "350ms" }}>
+                  <div className="rounded-3xl bg-canvas/60 backdrop-blur-2xl border border-[color:var(--hairline)] divide-y divide-[color:var(--hairline)] overflow-hidden">
+                    <button
+                      data-lg-press
+                      onClick={() => setFeedbackOpen(true)}
+                      className="flex w-full items-center justify-between px-5 py-3.5 transition group hover:bg-ink/5 active:scale-[0.99]"
+                    >
+                      <span className="flex items-center gap-3 text-xs font-semibold text-ink">
+                        <MessageSquareHeart className="h-4 w-4 text-mute" /> Feedback & suggestions
+                      </span>
+                      <ArrowRight className="h-4 w-4 opacity-30 group-hover:opacity-70 group-hover:translate-x-0.5 transition-all" />
+                    </button>
                     <button
                       data-lg-press
                       onClick={exportBackup}
-                      className="flex w-full items-center justify-between rounded-[1.25rem] bg-canvas/60 backdrop-blur-2xl border border-[color:var(--hairline)] px-5 py-3.5 text-sm font-bold text-ink transition group hover:bg-ink/5 shadow-sm"
+                      className="flex w-full items-center justify-between px-5 py-3.5 transition group hover:bg-ink/5 active:scale-[0.99]"
                     >
-                      <span className="flex items-center gap-3">
-                        <Download className="h-5 w-5" /> Backup & export data
+                      <span className="flex items-center gap-3 text-xs font-semibold text-ink">
+                        <Download className="h-4 w-4 text-mute" /> Backup & export data
                       </span>
-                      <ArrowRight className="h-5 w-5 opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                      <ArrowRight className="h-4 w-4 opacity-30 group-hover:opacity-70 group-hover:translate-x-0.5 transition-all" />
                     </button>
-                  </div>
-                  <div className="rounded-[1.25rem] p-[1px] bg-gradient-to-br from-[color:var(--hairline-mid)] via-transparent to-[color:var(--hairline-mid)] transition-all">
                     <button
                       data-lg-press
                       onClick={() => setResetConfirmOpen(true)}
-                      className="flex w-full items-center justify-between rounded-[1.25rem] bg-canvas/60 backdrop-blur-2xl border border-[color:var(--hairline)] px-5 py-3.5 text-sm font-bold text-ink transition group hover:bg-ink/5 shadow-sm"
+                      className="flex w-full items-center justify-between px-5 py-3.5 transition group hover:bg-ink/5 active:scale-[0.99]"
                     >
-                      <span className="flex items-center gap-3">
-                        <RotateCcw className="h-5 w-5" /> Reset today's progress
+                      <span className="flex items-center gap-3 text-xs font-semibold text-ink">
+                        <RotateCcw className="h-4 w-4 text-mute" /> Reset today's progress
                       </span>
-                      <ArrowRight className="h-5 w-5 opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                      <ArrowRight className="h-4 w-4 opacity-30 group-hover:opacity-70 group-hover:translate-x-0.5 transition-all" />
                     </button>
-                  </div>
-                  <div className="rounded-[1.25rem] p-[1px] bg-gradient-to-br from-red-500/20 via-transparent to-red-500/10 transition-all">
                     <button
                       data-lg-press
                       onClick={() => setSignOutOpen(true)}
-                      className="flex w-full items-center justify-between rounded-[1.25rem] bg-red-500/10 backdrop-blur-2xl border border-red-500/20 px-5 py-3.5 text-sm font-bold text-red-500 transition group hover:bg-red-500/20 shadow-sm"
+                      className="flex w-full items-center justify-between px-5 py-3.5 transition group hover:bg-red-500/5 active:scale-[0.99]"
                     >
-                      <span className="flex items-center gap-3">
-                        <LogOut className="h-5 w-5" /> Sign out
+                      <span className="flex items-center gap-3 text-xs font-semibold text-red-500">
+                        <LogOut className="h-4 w-4" /> Sign out
                       </span>
-                      <ArrowRight className="h-5 w-5 opacity-50 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                      <ArrowRight className="h-4 w-4 text-red-500 opacity-30 group-hover:opacity-70 group-hover:translate-x-0.5 transition-all" />
                     </button>
                   </div>
                 </div>
+
+                <div className="h-4" />
               </div>
             </div>
           )}
@@ -2858,6 +2920,16 @@ export function Dashboard({ user }: { user?: any }) {
                   setProfileEditOpen(false);
                 }
               }}
+            />
+          )}
+
+          {feedbackOpen && (
+            <FeedbackSheet
+              onClose={() => setFeedbackOpen(false)}
+              userId={userId}
+              userEmail={profile.email}
+              userName={profile.name}
+              onToast={showToast}
             />
           )}
 
@@ -3388,7 +3460,7 @@ export function Dashboard({ user }: { user?: any }) {
                         stackedGoals.map((sg) => (
                           <div key={sg.id} className="flex flex-col items-center w-full">
                             <div className="flex flex-wrap gap-1 justify-center px-4 mb-4 max-w-[320px] mx-auto">
-                              {sg.heatmap && sg.heatmap.flatMap(col => col).map((v: number, i: number) => (
+                              {sg.boxes && sg.boxes.map((v: number, i: number) => (
                                 <div
                                   key={i}
                                   className="h-2 w-2 rounded-[2px] transition-colors"
@@ -3664,103 +3736,116 @@ export function Dashboard({ user }: { user?: any }) {
                   </div>
                 </Field>
 
-                <Field label="Type">
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => setNewIsNumeric(false)}
-                      className={`pill px-3 py-2.5 text-xs font-medium transition ${!newIsNumeric ? "bg-ink text-on-ink" : "liquid-input text-ink"
-                        }`}
-                    >
-                      Binary
-                    </button>
-                    <button
-                      onClick={() => setNewIsNumeric(true)}
-                      className={`pill px-3 py-2.5 text-xs font-medium transition ${newIsNumeric ? "bg-ink text-on-ink" : "liquid-input text-ink"
-                        }`}
-                    >
-                      Numeric
-                    </button>
-                  </div>
-                </Field>
+                {/* Customize Toggle */}
+                <button
+                  type="button"
+                  onClick={() => setShowCustomize(!showCustomize)}
+                  className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-[12px] font-semibold text-mute transition hover:text-ink hover:bg-[color:var(--canvas-soft)]"
+                >
+                  <span>Customize</span>
+                  <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showCustomize ? "rotate-180" : ""}`} />
+                </button>
 
-                {newIsNumeric && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <Field label="Target">
-                      <input
-                        type="number"
-                        value={newTarget}
-                        min={0}
-                        step="0.25"
-                        onChange={(e) => setNewTarget(Number(e.target.value) || 0)}
-                        className="w-full rounded-2xl liquid-input px-4 py-3 text-sm text-ink outline-none focus:bg-[color:var(--canvas-softer)]"
-                      />
-                    </Field>
-                    <Field label="Unit">
-                      <input
-                        value={newUnit}
-                        onChange={(e) => setNewUnit(e.target.value)}
-                        placeholder="pages, min…"
-                        className="w-full rounded-2xl liquid-input px-4 py-3 text-sm text-ink outline-none placeholder:text-mute focus:bg-[color:var(--canvas-softer)]"
-                      />
-                    </Field>
-                  </div>
-                )}
-
-                <Field label="Frequency">
-                  <div className="flex gap-2">
-                    {["Daily", "Weekdays", "Custom"].map((f) => {
-                      const active = newFreq === f;
-                      return (
+                <div className={`overflow-hidden transition-all duration-300 ease-out ${showCustomize ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"}`}>
+                  <div className="space-y-4 pt-1">
+                    <Field label="Type">
+                      <div className="grid grid-cols-2 gap-2">
                         <button
-                          key={f}
-                          onClick={() => setNewFreq(f)}
-                          className={`pill flex-1 px-3 py-2 text-xs font-medium transition ${active
-                            ? "bg-ink text-on-ink"
-                            : "liquid-input text-ink hover:bg-[color:var(--surface-pressed)]"
+                          onClick={() => setNewIsNumeric(false)}
+                          className={`pill px-3 py-2.5 text-xs font-medium transition ${!newIsNumeric ? "bg-ink text-on-ink" : "liquid-input text-ink"
                             }`}
                         >
-                          {f}
+                          Binary
                         </button>
-                      );
-                    })}
-                  </div>
-                </Field>
-
-
-                <div className="grid grid-cols-2 gap-3">
-                  <Field label="Shade">
-                    <div className="flex gap-1.5">
-                      {[
-                        "var(--ink)",
-                        "color-mix(in oklab, var(--ink) 70%, transparent)",
-                        "color-mix(in oklab, var(--ink) 40%, transparent)",
-                        "var(--canvas-soft)",
-                        "var(--surface-pressed)",
-                      ].map((c, i) => (
                         <button
-                          key={i}
-                          onClick={() => setNewShade(i)}
-                          style={{ background: c }}
-                          className={`h-8 w-8 rounded-full border border-[color:var(--hairline)] transition ${i === newShade ? "ring-2 ring-ink ring-offset-2 ring-offset-[color:var(--canvas)]" : ""
-                            }`}
-                        />
-                      ))}
-                    </div>
-                  </Field>
-                  <Field label="Icon">
-                    <div className="flex gap-1.5">
-                      {[Flame, Sparkles, Zap, Clock].map((I, i) => (
-                        <button
-                          key={i}
-                          onClick={() => setNewIcon(i)}
-                          className={`grid h-8 w-8 place-items-center rounded-lg transition ${i === newIcon ? "bg-ink text-on-ink" : "liquid-input text-ink"
+                          onClick={() => setNewIsNumeric(true)}
+                          className={`pill px-3 py-2.5 text-xs font-medium transition ${newIsNumeric ? "bg-ink text-on-ink" : "liquid-input text-ink"
                             }`}
                         >
-                          <I className="h-3.5 w-3.5" />
+                          Numeric
                         </button>
-                      ))}
+                      </div>
+                    </Field>
+
+                    {newIsNumeric && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <Field label="Target">
+                          <input
+                            type="number"
+                            value={newTarget}
+                            min={0}
+                            step="0.25"
+                            onChange={(e) => setNewTarget(Number(e.target.value) || 0)}
+                            className="w-full rounded-2xl liquid-input px-4 py-3 text-sm text-ink outline-none focus:bg-[color:var(--canvas-softer)]"
+                          />
+                        </Field>
+                        <Field label="Unit">
+                          <input
+                            value={newUnit}
+                            onChange={(e) => setNewUnit(e.target.value)}
+                            placeholder="pages, min…"
+                            className="w-full rounded-2xl liquid-input px-4 py-3 text-sm text-ink outline-none placeholder:text-mute focus:bg-[color:var(--canvas-softer)]"
+                          />
+                        </Field>
+                      </div>
+                    )}
+
+                    <Field label="Frequency">
+                      <div className="flex gap-2">
+                        {["Daily", "Weekdays", "Custom"].map((f) => {
+                          const active = newFreq === f;
+                          return (
+                            <button
+                              key={f}
+                              onClick={() => setNewFreq(f)}
+                              className={`pill flex-1 px-3 py-2 text-xs font-medium transition ${active
+                                ? "bg-ink text-on-ink"
+                                : "liquid-input text-ink hover:bg-[color:var(--surface-pressed)]"
+                                }`}
+                            >
+                              {f}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </Field>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Shade">
+                        <div className="flex gap-1.5">
+                          {[
+                            "var(--ink)",
+                            "color-mix(in oklab, var(--ink) 70%, transparent)",
+                            "color-mix(in oklab, var(--ink) 40%, transparent)",
+                            "var(--canvas-soft)",
+                            "var(--surface-pressed)",
+                          ].map((c, i) => (
+                            <button
+                              key={i}
+                              onClick={() => setNewShade(i)}
+                              style={{ background: c }}
+                              className={`h-8 w-8 rounded-full border border-[color:var(--hairline)] transition ${i === newShade ? "ring-2 ring-ink ring-offset-2 ring-offset-[color:var(--canvas)]" : ""
+                                }`}
+                            />
+                          ))}
+                        </div>
+                      </Field>
+                      <Field label="Icon">
+                        <div className="flex gap-1.5">
+                          {[Flame, Sparkles, Zap, Clock].map((I, i) => (
+                            <button
+                              key={i}
+                              onClick={() => setNewIcon(i)}
+                              className={`grid h-8 w-8 place-items-center rounded-lg transition ${i === newIcon ? "bg-ink text-on-ink" : "liquid-input text-ink"
+                                }`}
+                            >
+                              <I className="h-3.5 w-3.5" />
+                            </button>
+                          ))}
+                        </div>
+                      </Field>
                     </div>
-                  </Field>
+                  </div>
                 </div>
 
                 <button
@@ -4388,8 +4473,8 @@ export const HabitRow = memo(function HabitRow({
   onMove,
   onEdit,
   onAdjust,
-  onOpenDetail,
   onSetValue,
+  onOpenDetail,
 }: {
   habit: Habit;
   justDone: boolean;
@@ -4407,564 +4492,244 @@ export const HabitRow = memo(function HabitRow({
   onOpenDetail: () => void;
 }) {
   const isNumeric = h.target !== undefined;
-  const pct = isNumeric ? Math.min(100, ((h.value ?? 0) / (h.target ?? 1)) * 100) : 0;
+  
+  const rawVal = h.value ?? 0;
+  const targetVal = h.target || 1;
+  const pct = isNumeric ? Math.min(100, Math.round((rawVal / targetVal) * 100)) : (h.done ? 100 : 0);
+  const isDone = isNumeric ? rawVal >= targetVal || h.done : h.done;
+  const stepVal = h.step ?? (targetVal >= 500 ? 250 : targetVal >= 60 ? 30 : targetVal >= 10 ? 5 : 1);
+  const unitLabel = h.unit ? ` ${h.unit}` : "";
 
-  const dxRef = useRef(0);
-  const rowRef = useRef<HTMLDivElement>(null);
-  const leftBgRef = useRef<HTMLDivElement>(null);
-  const leftIconRef = useRef<SVGSVGElement>(null);
-  const leftTextRef = useRef<HTMLSpanElement>(null);
-  const rightBgRef = useRef<HTMLDivElement>(null);
-  const rightIconRef = useRef<SVGSVGElement>(null);
-  const rightTextRef = useRef<HTMLSpanElement>(null);
-  const [dragging, setDragging] = useState(false);
-  const startX = useRef<number | null>(null);
-  const startY = useRef<number | null>(null);
-  const axisLocked = useRef<"x" | "y" | null>(null);
-  const threshHit = useRef(false);
-  const COMMIT = 88;
-  const HAPTIC_AT = 60;
+  const [isExpanded, setIsExpanded] = useState(false);
 
-  const rubberband = (v: number) => {
-    const abs = Math.abs(v);
-    if (abs <= COMMIT) return v;
-    const over = abs - COMMIT;
-    const damped = COMMIT + over * (1 - over / (over + 140));
-    return v < 0 ? -damped : damped;
-  };
-
-  const onDown = (e: React.PointerEvent) => {
-    if (isNumeric) return;
-    startX.current = e.clientX;
-    startY.current = e.clientY;
-    axisLocked.current = null;
-    threshHit.current = false;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  };
-  const onMoveP = (e: React.PointerEvent) => {
-    if (isNumeric || startX.current === null || startY.current === null) return;
-    const rawX = e.clientX - startX.current;
-    const rawY = e.clientY - startY.current;
-    if (!axisLocked.current) {
-      if (Math.abs(rawX) < 6 && Math.abs(rawY) < 6) return;
-      axisLocked.current = Math.abs(rawX) > Math.abs(rawY) ? "x" : "y";
-    }
-    if (axisLocked.current !== "x") return;
-    if (!dragging) setDragging(true);
-    const val = rubberband(rawX);
-    dxRef.current = val;
-
-    requestAnimationFrame(() => {
-      if (rowRef.current) {
-        rowRef.current.style.transform = `translate3d(${val}px,0,0)`;
-        rowRef.current.style.transition = 'none';
-      }
-      const swipeProgress = Math.min(1, Math.abs(val) / COMMIT);
-      if (val > 0 && leftBgRef.current && leftIconRef.current && leftTextRef.current) {
-        leftBgRef.current.style.opacity = val > 4 ? String(0.4 + swipeProgress * 0.6) : "0";
-        leftBgRef.current.style.width = `${val + 8}px`;
-        leftIconRef.current.style.transform = `scale(${0.85 + swipeProgress * 0.4})`;
-        leftTextRef.current.textContent = swipeProgress >= 1 ? "Release" : "Done";
-      } else if (val < 0 && rightBgRef.current && rightIconRef.current && rightTextRef.current) {
-        rightBgRef.current.style.opacity = val < -4 ? String(0.4 + swipeProgress * 0.6) : "0";
-        rightBgRef.current.style.width = `${-val + 8}px`;
-        rightIconRef.current.style.transform = `scale(${0.85 + swipeProgress * 0.4})`;
-        rightTextRef.current.textContent = swipeProgress >= 1 ? "Release" : "Rest";
-      }
-    });
-
-    if (!threshHit.current && Math.abs(val) >= HAPTIC_AT) {
-      threshHit.current = true;
-      try { navigator.vibrate?.(18); } catch { }
-    }
-    if (threshHit.current && Math.abs(val) < HAPTIC_AT - 12) {
-      threshHit.current = false;
-    }
-  };
-  const onUp = (e: React.PointerEvent) => {
-    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { }
-    if (isNumeric) return;
-    const wasDrag = axisLocked.current === "x" && Math.abs(dxRef.current) > 6;
-    if (dxRef.current >= COMMIT) {
-      if (!h.done) onToggle();
-    } else if (dxRef.current <= -COMMIT) {
-      onRest();
-    }
-    dxRef.current = 0;
-
-    requestAnimationFrame(() => {
-      if (rowRef.current) {
-        rowRef.current.style.transform = 'translate3d(0,0,0)';
-        rowRef.current.style.transition = 'transform 260ms cubic-bezier(.2,.9,.3,1.2)';
-      }
-      if (leftBgRef.current) { leftBgRef.current.style.opacity = "0"; leftBgRef.current.style.width = "8px"; }
-      if (rightBgRef.current) { rightBgRef.current.style.opacity = "0"; rightBgRef.current.style.width = "8px"; }
-    });
-
-    setDragging(false);
-    startX.current = null;
-    startY.current = null;
-    axisLocked.current = null;
-    if (wasDrag) {
-      // suppress click after drag
-      e.preventDefault();
-      e.stopPropagation();
+  const handleRowClick = (e: React.MouseEvent) => {
+    // If it's boolean, tapping row checks it off. If numeric, expands it.
+    if (!isNumeric) {
+      onToggle();
+    } else {
+      setIsExpanded(!isExpanded);
     }
   };
 
-  if (isNumeric) {
-    const rawVal = h.value ?? 0;
-    const targetVal = h.target || 1;
-    const pct = Math.min(100, Math.round((rawVal / targetVal) * 100));
-    const isDone = rawVal >= targetVal || h.done;
-    const stepVal = h.step ?? (targetVal >= 500 ? 250 : targetVal >= 60 ? 30 : targetVal >= 10 ? 5 : 1);
-    const unitLabel = h.unit ? ` ${h.unit}` : "";
-
-    // Circular Ring parameters
-    const ringSize = 42;
-    const stroke = 3.5;
-    const radius = (ringSize - stroke) / 2;
-    const circumference = 2 * Math.PI * radius;
-    const strokeDashoffset = circumference - (pct / 100) * circumference;
-
-    return (
+  return (
+    <div
+      className={`group relative rounded-2xl transition-all duration-300 ${
+        isExpanded ? "bg-white/5 shadow-md border-[color:var(--hairline-strong)] pb-2" : "bg-transparent hover:bg-[color:var(--canvas-softer)]"
+      } ${isDone && !isExpanded ? "opacity-70" : ""} ${justDone ? "animate-sync-pulse" : ""}`}
+    >
+      {/* Top Row (Compact View) */}
       <div
-        className={`group relative w-full rounded-2xl border p-3.5 mb-2.5 transition-all duration-300 shadow-md ${
-          isDone ? "ring-1 ring-emerald-500/30" : "hover:border-[color:var(--hairline-strong)]"
-        }`}
-        style={{
-          background: "color-mix(in srgb, var(--canvas-soft) 70%, transparent)",
-          backdropFilter: "blur(24px)",
-          borderColor: "color-mix(in srgb, var(--hairline) 70%, transparent)",
-        }}
-        onClick={onOpenDetail}
+        onClick={handleRowClick}
+        className="relative flex cursor-pointer items-center gap-3 liquid-glass p-3 rounded-2xl"
       >
-        {/* Subtle radial glow when done */}
-        {isDone && (
-          <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-emerald-500/5 via-teal-500/5 to-transparent pointer-events-none" />
-        )}
-
-        {/* Top row: Circular ring + Habit Info + Metrics + Actions */}
-        <div className="relative flex items-center gap-3 z-10">
-          {/* Circular Progress Ring wrapping icon — 1-tap quick step forward */}
+        {isNumeric ? (
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
-              try { navigator.vibrate?.(15); } catch {}
+              // For numeric, tapping the left icon still just expands it (or maybe increments?)
+              // Let's have it expand for consistency, or increment if we want fast logging.
+              // Fast logging is better:
               if (isDone) {
                 onSetValue?.(0);
               } else {
                 onSetValue?.(Math.min(targetVal, rawVal + stepVal));
               }
             }}
-            className="relative flex items-center justify-center shrink-0 transition-transform active:scale-95 group/ring"
-            style={{ width: ringSize, height: ringSize }}
-            title={isDone ? "Click to reset" : `Click to add +${stepVal}${unitLabel}`}
-          >
-            <svg width={ringSize} height={ringSize} className="-rotate-90">
-              {/* Background Track */}
-              <circle
-                cx={ringSize / 2}
-                cy={ringSize / 2}
-                r={radius}
-                fill="transparent"
-                stroke="color-mix(in srgb, var(--ink) 12%, transparent)"
-                strokeWidth={stroke}
-              />
-              {/* Animated Progress Fill */}
-              <circle
-                cx={ringSize / 2}
-                cy={ringSize / 2}
-                r={radius}
-                fill="transparent"
-                stroke={isDone ? "#10b981" : "var(--ink)"}
-                strokeWidth={stroke}
-                strokeDasharray={circumference}
-                strokeDashoffset={strokeDashoffset}
-                strokeLinecap="round"
-                className="transition-all duration-500 ease-out"
-              />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              {isDone ? (
-                <Check className="h-4 w-4 text-emerald-400 stroke-[3] animate-scale-in" />
-              ) : (
-                <Droplets className="h-4 w-4 text-ink opacity-80 group-hover/ring:scale-110 transition-transform" />
-              )}
-            </div>
-          </button>
-
-          {/* Title & Category & Streak */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-1.5">
-              <h3 className={`truncate text-xs font-bold tracking-wider text-ink uppercase ${isDone ? "opacity-90" : ""}`}>
-                {h.name}
-              </h3>
-            </div>
-            <div className="mt-1 flex items-center gap-1.5">
-              <span className={`rounded-full px-2 py-0.5 text-[9px] font-bold ${catClass(h.category)}`}>
-                {h.category}
-              </span>
-              {h.streak > 0 && (
-                <span className="flex items-center gap-0.5 rounded-full bg-amber-500/15 border border-amber-500/25 px-1.5 py-0.5 text-[9px] font-bold text-amber-400">
-                  <Flame className="h-2.5 w-2.5 fill-amber-400" />
-                  {h.streak}d
-                </span>
-              )}
-            </div>
-            {h.note && (
-              <p className="mt-0.5 truncate text-[10px] italic text-mute/70">
-                "{h.note}"
-              </p>
-            )}
-          </div>
-
-          {/* Value Readout & Pin / Menu */}
-          <div className="flex flex-col items-end gap-1 shrink-0">
-            <div className="flex items-center gap-1">
-              <button
-                onClick={(e) => { e.stopPropagation(); onPin(); }}
-                className={`grid h-6 w-6 place-items-center rounded-lg transition ${h.pinned ? 'text-ink' : 'text-mute hover:bg-ink/10'}`}
-                title="Pin to lock screen"
-              >
-                <Pin className="h-3 w-3" fill={h.pinned ? "currentColor" : "none"} />
-              </button>
-              <button
-                onClick={(e) => { e.stopPropagation(); onMenuToggle(); }}
-                className="grid h-6 w-6 place-items-center rounded-lg text-mute hover:bg-ink/10"
-                title="Options"
-              >
-                <MoreVertical className="h-3 w-3" />
-              </button>
-            </div>
-            <div className="flex items-baseline gap-1">
-              <span className="font-display text-sm font-bold text-ink tabular-nums">
-                {rawVal % 1 === 0 ? rawVal : rawVal.toFixed(1)}
-              </span>
-              <span className="text-[11px] font-semibold text-mute tabular-nums">
-                /{targetVal % 1 === 0 ? targetVal : targetVal.toFixed(1)}{unitLabel}
-              </span>
-              <span className={`ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
-                isDone ? "bg-emerald-500/20 text-emerald-400" : "bg-ink/10 text-mute"
-              }`}>
-                {pct}%
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Progress Bar (Thin, glowing & smooth) */}
-        <div className="relative w-full h-1.5 rounded-full bg-ink/10 overflow-hidden my-2.5">
-          <div
-            className={`absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out ${
-              isDone
-                ? "bg-gradient-to-r from-emerald-500 to-teal-400 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
-                : "bg-gradient-to-r from-ink/80 to-ink shadow-[0_0_6px_color-mix(in_srgb,var(--ink)_30%,transparent)]"
-            }`}
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-
-        {/* Bottom Bento Stepper Chips (1-tap quick logging) */}
-        <div className="flex items-center justify-between gap-1.5 pt-0.5" onClick={(e) => e.stopPropagation()}>
-          <div className="flex items-center gap-1.5">
-            {/* Minus Step */}
-            <button
-              type="button"
-              disabled={rawVal <= 0}
-              onClick={() => {
-                try { navigator.vibrate?.(10); } catch {}
-                onSetValue?.(Math.max(0, rawVal - stepVal));
-              }}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold border transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none shadow-sm"
-              style={{
-                background: "color-mix(in srgb, var(--canvas) 60%, transparent)",
-                borderColor: "color-mix(in srgb, var(--hairline) 60%, transparent)",
-              }}
-              title={`Subtract ${stepVal}`}
-            >
-              <Minus className="h-3 w-3 text-mute" />
-              <span className="text-mute">{stepVal}{unitLabel}</span>
-            </button>
-
-            {/* Plus Step (Primary) */}
-            <button
-              type="button"
-              disabled={isDone}
-              onClick={() => {
-                try { navigator.vibrate?.(15); } catch {}
-                onSetValue?.(Math.min(targetVal, rawVal + stepVal));
-              }}
-              className="flex items-center gap-1 px-3 py-1 rounded-xl text-[11px] font-bold border transition-all active:scale-95 disabled:opacity-40 shadow-sm"
-              style={{
-                background: "color-mix(in srgb, var(--ink) 12%, transparent)",
-                borderColor: "color-mix(in srgb, var(--ink) 25%, transparent)",
-                color: "var(--ink)",
-              }}
-              title={`Add ${stepVal}`}
-            >
-              <Plus className="h-3 w-3" strokeWidth={2.5} />
-              <span>+{stepVal}{unitLabel}</span>
-            </button>
-
-            {/* Extra double step if target is large enough */}
-            {targetVal > stepVal * 2 && rawVal + stepVal < targetVal && (
-              <button
-                type="button"
-                onClick={() => {
-                  try { navigator.vibrate?.(15); } catch {}
-                  onSetValue?.(Math.min(targetVal, rawVal + stepVal * 2));
-                }}
-                className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold border transition-all active:scale-95 text-mute hover:text-ink shadow-sm"
-                style={{
-                  background: "color-mix(in srgb, var(--canvas) 50%, transparent)",
-                  borderColor: "color-mix(in srgb, var(--hairline) 50%, transparent)",
-                }}
-              >
-                <span>+{stepVal * 2}{unitLabel}</span>
-              </button>
-            )}
-          </div>
-
-          {/* Right Action: Complete or Reset */}
-          <button
-            type="button"
-            onClick={() => {
-              try { navigator.vibrate?.(20); } catch {}
-              if (isDone) {
-                onSetValue?.(0);
-              } else {
-                onSetValue?.(targetVal);
-              }
-            }}
-            className={`flex items-center gap-1 px-3 py-1 rounded-xl text-[11px] font-bold transition-all active:scale-95 shadow-sm ${
-              isDone
-                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                : "bg-ink/10 text-mute hover:text-ink border border-transparent"
+            className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border transition ${
+              isDone ? "border-emerald-500 bg-emerald-500/20 text-emerald-400" : "border-[color:var(--hairline-strong)] text-ink hover:border-ink hover:bg-ink/5"
             }`}
           >
-            {isDone ? (
-              <>
-                <Check className="h-3 w-3 stroke-[2.5]" />
-                <span>Done</span>
-              </>
-            ) : (
-              <span>Fill Max</span>
-            )}
+            {isDone ? <Check className="h-3.5 w-3.5 animate-scale-in" strokeWidth={3} /> : <Droplets className="h-3 w-3" />}
           </button>
-        </div>
-
-        {/* Dropdown Options Menu */}
-        {menuOpen && (
-          <div
-            className="absolute right-4 top-12 z-20 w-36 overflow-hidden rounded-2xl border shadow-2xl animate-fade-in p-1 backdrop-blur-2xl"
-            style={{
-              background: "color-mix(in srgb, var(--canvas) 90%, transparent)",
-              borderColor: "color-mix(in srgb, var(--hairline-strong) 40%, transparent)",
-            }}
-          >
-            <button
-              onClick={(e) => { e.stopPropagation(); onEdit(); onMenuClose(); }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-ink hover:bg-canvas-soft rounded-xl transition-colors"
-            >
-              <Settings className="h-3.5 w-3.5" /> Edit Habit
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); onRest(); onMenuClose(); }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-ink hover:bg-canvas-soft rounded-xl transition-colors"
-            >
-              <Shield className="h-3.5 w-3.5" /> Rest Day
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete(); onMenuClose(); }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-red-400 hover:bg-red-500/10 rounded-xl transition-colors"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> Delete
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  }
-
-  return (
-    <div
-      className={`group relative rounded-xl bg-transparent ${h.done ? "opacity-70" : ""
-        } ${justDone ? "animate-sync-pulse" : ""}`}
-    >
-      {/* Swipe reveal backgrounds */}
-      <div
-        ref={leftBgRef}
-        className="pointer-events-none absolute inset-y-0 left-0 flex items-center gap-1 rounded-l-xl pl-2 pr-2 text-[10px] font-semibold text-emerald-300 transition-opacity"
-        style={{
-          background: "color-mix(in oklab, oklch(0.72 0.15 155) 22%, transparent)",
-          opacity: 0,
-          width: 8,
-          willChange: "width, opacity"
-        }}
-      >
-        <Check
-          ref={leftIconRef}
-          className="h-3.5 w-3.5"
-          strokeWidth={3}
-          style={{ transform: "scale(0.85)" }}
-        />
-        <span ref={leftTextRef}>Done</span>
-      </div>
-      <div
-        ref={rightBgRef}
-        className="pointer-events-none absolute inset-y-0 right-0 flex items-center justify-end gap-1 rounded-r-xl pl-2 pr-2 text-[10px] font-semibold text-sky-300 transition-opacity"
-        style={{
-          background: "color-mix(in oklab, oklch(0.72 0.13 235) 22%, transparent)",
-          opacity: 0,
-          width: 8,
-          willChange: "width, opacity"
-        }}
-      >
-        <span ref={rightTextRef}>Rest</span>
-        <Shield
-          ref={rightIconRef}
-          className="h-3.5 w-3.5"
-          style={{ transform: "scale(0.85)" }}
-        />
-      </div>
-
-      {/* Static hover hints when idle */}
-      {!dragging && (
-        <>
-          <div className="pointer-events-none absolute inset-y-0 left-0 hidden items-center gap-1 rounded-l-xl bg-emerald-500/15 pl-1.5 pr-2 text-[9px] font-semibold text-emerald-300 opacity-0 transition group-hover:flex group-hover:opacity-100">
-            <Check className="h-3 w-3" strokeWidth={3} />
-            <span>Swipe →</span>
-          </div>
-          <div className="pointer-events-none absolute inset-y-0 right-0 hidden items-center gap-1 rounded-r-xl bg-sky-500/15 pl-2 pr-1.5 text-[9px] font-semibold text-sky-300 opacity-0 transition group-hover:flex group-hover:opacity-100">
-            <span>← Rest</span>
-            <Shield className="h-3 w-3" />
-          </div>
-        </>
-      )}
-
-      <div
-        ref={rowRef}
-        onPointerDown={onDown}
-        onPointerMove={onMoveP}
-        onPointerUp={onUp}
-        onPointerCancel={onUp}
-        onClick={(e) => {
-          if (Math.abs(dxRef.current) > 6) {
-            e.preventDefault();
-            e.stopPropagation();
-            return;
-          }
-          onOpenDetail();
-        }}
-        style={{
-          transform: 'translate3d(0,0,0)',
-          transition: dragging ? "none" : "transform 260ms cubic-bezier(.2,.9,.3,1.2)",
-          touchAction: "pan-y",
-          willChange: "transform"
-        }}
-        className="relative flex cursor-pointer items-center gap-2 liquid-glass p-2 transition-[background] hover:bg-[color:var(--canvas-softer)] rounded-xl"
-      >
-        {isNumeric ? (
-          <div className="grid h-5 w-5 shrink-0 place-items-center rounded-full border border-[color:var(--hairline-mid)] text-ink">
-            <Droplets className="h-3 w-3" />
-          </div>
         ) : (
           <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               onToggle();
             }}
-            className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border transition ${h.done
-              ? "border-ink bg-ink text-on-ink"
-              : "border-[color:var(--hairline-mid)] hover:border-ink"
-              }`}
+            className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border transition ${
+              h.done ? "border-ink bg-ink text-on-ink" : "border-[color:var(--hairline-strong)] hover:border-ink hover:bg-ink/5"
+            }`}
             aria-label={h.done ? `Undo ${h.name}` : `Mark ${h.name} done`}
           >
-            {h.done && <Check className="h-3 w-3 animate-scale-in" strokeWidth={3} />}
+            {h.done && <Check className="h-3.5 w-3.5 animate-scale-in" strokeWidth={3} />}
           </button>
         )}
 
         <div className="min-w-0 flex-1">
-          <p
-            className={`truncate text-[11px] font-semibold leading-tight text-ink ${h.done && !isNumeric ? "line-through" : ""
-              }`}
-          >
+          <p className={`truncate text-[13px] font-semibold leading-tight ${isDone && !isNumeric ? "line-through text-mute" : "text-ink"}`}>
             {h.name}
           </p>
-          <div className="mt-0.5 flex items-center gap-1">
-            <span className={`rounded-full px-1.5 py-px text-[8px] font-semibold ${catClass(h.category)}`}>
+          <div className="mt-1 flex items-center gap-1.5">
+            <span className={`rounded-full px-1.5 py-px text-[9px] font-bold ${catClass(h.category)}`}>
               {h.category}
             </span>
             {h.streak > 0 && (
-              <span
-                key={h.streak}
-                className="flex items-center gap-0.5 rounded-full bg-ink px-1.5 py-px text-[8px] font-semibold text-on-ink animate-pop-badge"
-              >
+              <span className="flex items-center gap-0.5 rounded-full bg-amber-500/15 border border-amber-500/25 px-1.5 py-0.5 text-[8px] font-bold text-amber-400">
+                <Flame className="h-2 w-2 fill-amber-400" />
                 {h.streak}d
               </span>
             )}
+            {isNumeric && (
+              <span className="text-[9px] font-medium text-mute tabular-nums ml-1">
+                {rawVal}/{targetVal}{unitLabel}
+              </span>
+            )}
           </div>
-          {h.note && (
-            <p className="mt-1 truncate text-[10px] italic text-mute/70">
-              "{h.note}"
-            </p>
-          )}
         </div>
-
+        
         <div className="flex shrink-0 items-center gap-0.5">
           <button
             onClick={(e) => {
               e.stopPropagation();
               onPin();
             }}
-            className={`grid h-6 w-6 place-items-center rounded-md transition ${h.pinned ? "text-ink" : "text-mute hover:text-ink"
+            className={`grid h-7 w-7 place-items-center rounded-lg transition ${h.pinned ? "text-ink bg-ink/10" : "text-mute hover:text-ink hover:bg-[color:var(--canvas-soft)]"
               }`}
             aria-label="Pin to wallpaper"
           >
-            <Pin className="h-3 w-3" fill={h.pinned ? "currentColor" : "none"} />
+            <Pin className="h-3.5 w-3.5" fill={h.pinned ? "currentColor" : "none"} />
           </button>
           <button
             onClick={(e) => {
               e.stopPropagation();
               onMenuToggle();
             }}
-            className="grid h-6 w-6 place-items-center rounded-md text-mute hover:text-ink"
+            className="grid h-7 w-7 place-items-center rounded-lg text-mute hover:text-ink hover:bg-[color:var(--canvas-soft)]"
             aria-label="More"
           >
-            <MoreVertical className="h-3 w-3" />
+            <MoreVertical className="h-4 w-4" />
           </button>
         </div>
       </div>
 
+      {/* Expanded Area (For Numeric) */}
+      {isNumeric && (
+        <div 
+          className={`overflow-hidden transition-all duration-300 ease-out px-3 ${isExpanded ? "max-h-32 opacity-100" : "max-h-0 opacity-0"}`}
+        >
+          {/* Progress Bar */}
+          <div className="relative w-full h-1.5 rounded-full bg-[color:var(--hairline-strong)] overflow-hidden my-2.5">
+            <div
+              className={`absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out ${
+                isDone
+                  ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+                  : "bg-ink shadow-[0_0_6px_color-mix(in_srgb,var(--ink)_30%,transparent)]"
+              }`}
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          
+          {/* Stepper Controls */}
+          <div className="flex items-center justify-between gap-1.5 pt-1 pb-1">
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                disabled={rawVal <= 0}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  try { navigator.vibrate?.(10); } catch {}
+                  onSetValue?.(Math.max(0, rawVal - stepVal));
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none shadow-sm bg-[color:var(--canvas-soft)] border-[color:var(--hairline)] hover:bg-[color:var(--canvas-softer)] text-mute hover:text-ink"
+              >
+                <Minus className="h-3 w-3" />
+                <span>{stepVal}</span>
+              </button>
 
+              <button
+                type="button"
+                disabled={isDone}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  try { navigator.vibrate?.(15); } catch {}
+                  onSetValue?.(Math.min(targetVal, rawVal + stepVal));
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all active:scale-95 disabled:opacity-40 shadow-sm border-transparent"
+                style={{
+                  background: "color-mix(in srgb, var(--ink) 12%, transparent)",
+                  color: "var(--ink)",
+                }}
+              >
+                <Plus className="h-3 w-3" strokeWidth={2.5} />
+                <span>{stepVal}</span>
+              </button>
+            </div>
 
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                try { navigator.vibrate?.(20); } catch {}
+                if (isDone) {
+                  onSetValue?.(0);
+                } else {
+                  onSetValue?.(targetVal);
+                  setIsExpanded(false); // auto-collapse when filled
+                }
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all active:scale-95 shadow-sm border ${
+                isDone
+                  ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                  : "bg-ink text-on-ink border-transparent"
+              }`}
+            >
+              {isDone ? (
+                <>
+                  <Check className="h-3 w-3 stroke-[2.5]" />
+                  <span>Done</span>
+                </>
+              ) : (
+                <span>Fill Max</span>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Options Menu */}
       {menuOpen && (
-        <div className="absolute right-1 top-8 z-10 w-28 overflow-hidden rounded-lg border border-[color:var(--hairline)] bg-canvas shadow-xl animate-fade-in">
+        <div className="absolute right-1 top-10 z-20 w-32 overflow-hidden rounded-xl border shadow-xl animate-fade-in p-1 backdrop-blur-2xl liquid-glass specular border-[color:var(--hairline-strong)]">
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(); onMenuClose(); }}
-            className="flex w-full items-center gap-2 px-2 py-1.5 text-[10px] text-ink hover:bg-canvas-soft"
+            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-ink hover:bg-canvas-soft rounded-lg"
           >
-            <Settings className="h-3 w-3" /> Edit
+            <Settings className="h-3.5 w-3.5" /> Edit
           </button>
+          {h.pinned ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); onPin(); onMenuClose(); }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-ink hover:bg-canvas-soft rounded-lg"
+            >
+              <Pin className="h-3.5 w-3.5" /> Unpin
+            </button>
+          ) : (
+            <button
+              onClick={(e) => { e.stopPropagation(); onPin(); onMenuClose(); }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-ink hover:bg-canvas-soft rounded-lg"
+            >
+              <Pin className="h-3.5 w-3.5" fill="currentColor" /> Pin
+            </button>
+          )}
           <button
             onClick={(e) => { e.stopPropagation(); onRest(); onMenuClose(); }}
-            className="flex w-full items-center gap-2 px-2 py-1.5 text-[10px] text-ink hover:bg-canvas-soft"
+            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-ink hover:bg-canvas-soft rounded-lg"
           >
-            <Shield className="h-3 w-3" /> Rest day
+            <Shield className="h-3.5 w-3.5" /> Rest Day
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onMove(); onMenuClose(); }}
-            className="flex w-full items-center gap-2 px-2 py-1.5 text-[10px] text-ink hover:bg-canvas-soft"
+            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-ink hover:bg-canvas-soft rounded-lg"
           >
-            <Sparkles className="h-3 w-3" /> Move
+            <Sparkles className="h-3.5 w-3.5" /> Move
           </button>
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(); onMenuClose(); }}
-            className="flex w-full items-center gap-2 px-2 py-1.5 text-[10px] text-red-500 hover:bg-canvas-soft"
+            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-red-500 hover:bg-canvas-soft rounded-lg"
           >
-            <Trash2 className="h-3 w-3" /> Delete
+            <Trash2 className="h-3.5 w-3.5" /> Delete
           </button>
         </div>
       )}
@@ -4975,7 +4740,7 @@ export const HabitRow = memo(function HabitRow({
     prev.habit === next.habit &&
     prev.justDone === next.justDone &&
     prev.menuOpen === next.menuOpen &&
-    prev.onSetValue === next.onSetValue // This might change if the parent changes it inline, but usually safe.
+    prev.onSetValue === next.onSetValue
   );
 });
 

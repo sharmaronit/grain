@@ -317,3 +317,27 @@ export async function restoreHabit(
     createdAt: createdAt,
   });
 }
+
+export interface FeedbackDoc {
+  userId?: string;
+  userEmail?: string;
+  userName?: string;
+  category: "feature" | "bug" | "praise" | "general";
+  rating: number;
+  message: string;
+  createdAt: Date;
+  deviceInfo?: string;
+}
+
+/**
+ * Submit user feedback to Firestore
+ */
+export async function submitFeedback(
+  feedback: Omit<FeedbackDoc, "createdAt">
+): Promise<string> {
+  const docRef = await addDoc(collection(db(), "feedback"), {
+    ...feedback,
+    createdAt: serverTimestamp(),
+  });
+  return docRef.id;
+}

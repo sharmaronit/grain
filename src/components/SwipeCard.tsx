@@ -160,11 +160,22 @@ export function SwipeCard({
         willChange: "transform",
         transition: dragging ? "none" : "transform 0.4s cubic-bezier(0.2, 0.9, 0.3, 1)",
         touchAction: "none", // Prevent scrolling while swiping
+        background: "color-mix(in srgb, var(--canvas-soft) 84%, transparent)",
+        backdropFilter: "blur(48px) saturate(180%)",
+        WebkitBackdropFilter: "blur(48px) saturate(180%)",
       }}
-      className={`absolute inset-0 flex flex-col justify-center rounded-[32px] liquid-glass p-8 text-center shadow-2xl overflow-hidden cursor-grab active:cursor-grabbing ${
+      className={`absolute inset-0 flex flex-col justify-center rounded-[36px] p-8 text-center border border-[color:color-mix(in_srgb,var(--ink)_18%,transparent)] shadow-[0_24px_60px_rgba(0,0,0,0.4),inset_0_1px_1px_color-mix(in_srgb,var(--ink)_25%,transparent)] overflow-hidden cursor-grab active:cursor-grabbing select-none ${
         !isTop ? "pointer-events-none" : ""
       }`}
     >
+      {/* Frosted ambient glass shine */}
+      <div 
+        className="absolute -top-24 -left-24 w-72 h-72 rounded-full pointer-events-none blur-3xl opacity-35"
+        style={{
+          background: "radial-gradient(circle, color-mix(in srgb, var(--ink) 30%, transparent) 0%, transparent 70%)"
+        }}
+      />
+
       {/* Background Overlay for swiping color */}
       <div
         ref={overlayRef}
@@ -172,24 +183,25 @@ export function SwipeCard({
         style={{ opacity: 0 }}
       />
 
-      <div className="relative z-10 flex flex-col items-center gap-6 pointer-events-none">
-        <h2 className="text-4xl font-display font-bold text-ink leading-tight balance">
+      {/* Card Content - only visible on the top card to avoid ghosting/text bleed */}
+      <div className={`relative z-10 flex flex-col items-center gap-6 pointer-events-none transition-opacity duration-300 ${!isTop ? "opacity-0" : "opacity-100"}`}>
+        <h2 className="text-4xl sm:text-5xl font-display font-black text-ink leading-tight tracking-tight balance drop-shadow-sm">
           {habit.name}
         </h2>
         
-        <div className="flex flex-wrap justify-center items-center gap-2">
-          <span className={`rounded-full px-3 py-1 text-[12px] font-bold uppercase tracking-widest ${catClass(habit.category)}`}>
+        <div className="flex flex-wrap justify-center items-center gap-2.5">
+          <span className={`rounded-full px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wider ${catClass(habit.category)}`}>
             {habit.category}
           </span>
           {habit.streak > 0 && (
-            <span className="flex items-center gap-1 rounded-full bg-ink px-3 py-1 text-[12px] font-bold text-on-ink">
-              <Flame className="w-3.5 h-3.5" /> {habit.streak} Day{habit.streak !== 1 ? 's' : ''}
+            <span className="flex items-center gap-1.5 rounded-full bg-ink px-3.5 py-1.5 text-[11px] font-bold text-on-ink shadow-sm">
+              <Flame className="w-3.5 h-3.5 fill-current" /> {habit.streak} Day{habit.streak !== 1 ? 's' : ''}
             </span>
           )}
         </div>
 
         {habit.note && (
-          <p className="text-sm italic text-mute/70 mt-2 px-4 balance">
+          <p className="text-sm font-medium text-mute mt-1 px-4 max-w-sm balance">
             "{habit.note}"
           </p>
         )}

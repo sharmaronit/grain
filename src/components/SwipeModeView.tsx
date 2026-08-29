@@ -100,7 +100,7 @@ export function SwipeModeView({
         <div className="flex items-center gap-2">
           <Layers className="h-4 w-4 text-mute" />
           <span className="font-bold tracking-widest uppercase text-[10px] text-mute">
-            Focus Mode
+            Deck
           </span>
         </div>
         <div className="w-10" /> {/* Spacer */}
@@ -155,8 +155,8 @@ export function SwipeModeView({
                 onSwipeRight={() => {}}
                 onSwipeLeft={() => {}}
                 style={{
-                  transform: "scale(0.95) translateY(16px)",
-                  opacity: 0.8,
+                  transform: "scale(0.94) translateY(16px)",
+                  opacity: 0.65,
                   zIndex: 10,
                 }}
               />

@@ -25,6 +25,7 @@ export interface WallpaperData {
     id: string;
     title: string;
     heatmap: number[][];
+    boxes?: number[];
     currentStreak: number;
     completionRate: number;
   }[];
