@@ -347,7 +347,8 @@ export function Dashboard({ user }: { user?: any }) {
     return "dark";
   });
   
-  const { toast: globalToast, error: toastError, success: toastSuccess } = useToast();
+  const { toast: globalToast, error: toastError, success: toastSuccess, toasts, removeToast } = useToast();
+  const activeToast = toasts[0];
 
 
   // Multi-select & Bulk Delete state
@@ -1819,7 +1820,10 @@ export function Dashboard({ user }: { user?: any }) {
             <button
               type="button"
               onClick={() => {
-
+                if (activeToast) {
+                  removeToast(activeToast.id);
+                  return;
+                }
                 if (showTitlePill) {
                   setStreakOpen(true);
                 } else {
@@ -1831,32 +1835,46 @@ export function Dashboard({ user }: { user?: any }) {
                   }, 2000);
                 }
               }}
-              className={`pointer-events-auto flex items-center justify-center rounded-full border border-[color:var(--hairline-mid)] p-1 pl-1 text-xs font-semibold text-ink backdrop-blur-xl shadow-lg transition-all duration-500 ease-out active:scale-95 ${showTitlePill ? "gap-2 pr-3.5 bg-canvas text-ink ring-1 ring-ink/10" : "gap-0 pr-1 bg-canvas/85"
-                } opacity-100 scale-100`}
+              className={`pointer-events-auto flex items-center justify-center rounded-full border border-[color:var(--hairline-mid)] p-1 pl-1 text-xs font-semibold backdrop-blur-xl shadow-lg transition-all duration-500 ease-out active:scale-95 ${
+                activeToast
+                  ? activeToast.type === "error"
+                    ? "gap-2 pr-3.5 bg-red-500/90 text-white border-red-500/20"
+                    : activeToast.type === "success"
+                    ? "gap-2 pr-3.5 bg-green-500/90 text-white border-green-500/20"
+                    : "gap-2 pr-3.5 bg-black/80 dark:bg-white/90 text-white dark:text-black border-white/10 dark:border-black/10"
+                  : showTitlePill
+                  ? "gap-2 pr-3.5 bg-canvas text-ink ring-1 ring-ink/10"
+                  : "gap-0 pr-1 bg-canvas/85 text-ink"
+              } opacity-100 scale-100`}
               aria-label="App logo and section title"
             >
               <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full overflow-hidden relative">
-                {showTitlePill ? (
-                  <div className="absolute inset-0 bg-ink/10 rounded-full flex items-center justify-center animate-pulse">
-                    <img src="/icon.png" alt="" className={`h-full w-full object-contain object-center filter drop-shadow-sm scale-105 ${(wallpaperThemeOf(wallpaperTheme, theme).bg === "#f5f5f5" || (wallpaperThemeOf(wallpaperTheme, theme).bg as string) === "#ffffff") ? "invert" : ""
-                      }`} />
-                  </div>
-                ) : (
-                  <img
-                    src="/icon.png"
-                    alt="Grain logo"
-                    className={`h-full w-full object-contain object-center filter drop-shadow-sm scale-105 transition-all duration-500 ${(wallpaperThemeOf(wallpaperTheme, theme).bg === "#f5f5f5" || (wallpaperThemeOf(wallpaperTheme, theme).bg as string) === "#ffffff") ? "invert" : ""
-                      }`}
-                  />
-                )}
+                {showTitlePill || activeToast ? (
+                  <div className="absolute inset-0 bg-current opacity-10 rounded-full flex items-center justify-center animate-pulse" />
+                ) : null}
+                <img
+                  src="/icon.png"
+                  alt="Grain logo"
+                  className={`h-full w-full object-contain object-center filter drop-shadow-sm scale-105 transition-all duration-500 ${
+                    activeToast
+                      ? (activeToast.type === "error" || activeToast.type === "success" || theme === "light")
+                        ? "brightness-0 invert"
+                        : "brightness-0" // for info in dark mode (white bg -> black text/icon)
+                      : (wallpaperThemeOf(wallpaperTheme, theme).bg === "#f5f5f5" || (wallpaperThemeOf(wallpaperTheme, theme).bg as string) === "#ffffff")
+                      ? "invert"
+                      : ""
+                  }`}
+                />
               </div>
               <span
-                className={`overflow-hidden transition-all duration-500 ease-out flex items-center gap-2 ${showTitlePill ? "max-w-[240px] opacity-100" : "max-w-0 opacity-0"
+                className={`overflow-hidden transition-all duration-500 ease-out flex items-center gap-2 ${showTitlePill || activeToast ? "max-w-[240px] opacity-100" : "max-w-0 opacity-0"
                   }`}
               >
-                <span className="h-3.5 w-px bg-[color:var(--hairline-mid)] shrink-0 opacity-70" />
-                <span className="text-mute font-medium text-[11px] leading-none shrink-0 whitespace-nowrap flex items-center">
-                  {activeTab === "today"
+                <span className={`h-3.5 w-px shrink-0 opacity-70 ${activeToast ? "bg-current opacity-30" : "bg-[color:var(--hairline-mid)]"}`} />
+                <span className={`font-medium text-[11px] leading-none shrink-0 whitespace-nowrap flex items-center ${activeToast ? "text-current" : "text-mute"}`}>
+                  {activeToast
+                    ? activeToast.message
+                    : activeTab === "today"
                     ? `Daily habits · ${totalStreak}d streak`
                     : activeTab === "consistency"
                       ? `Consistency · ${totalStreak}d streak`
