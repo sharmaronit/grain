@@ -2,6 +2,8 @@
 
 A minimalist, high-performance habit tracker and consistency dashboard. Built as a fully independent, offline-first application with Firebase syncing and native Capacitor integration.
 
+**Website & Landing Page:** [https://trygrain.vercel.app/](https://trygrain.vercel.app/)
+
 ## 🚀 Tech Stack
 - **Frontend:** React 19, TypeScript, Vite, TailwindCSS
 - **State & Data:** Zustand, TanStack Query, Firebase Firestore (Offline-first)
