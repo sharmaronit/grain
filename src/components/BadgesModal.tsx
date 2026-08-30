@@ -1,6 +1,7 @@
 import React from "react";
 import { SheetShell } from "./SheetShell";
 import { computeMilestones } from "../lib/badges";
+import { DynamicIcon } from "./ui/DynamicIcon";
 
 export function BadgesModal({
   onClose,
@@ -30,7 +31,7 @@ export function BadgesModal({
             }`}
           >
             <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white/5 backdrop-blur-[40px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] text-white text-2xl">
-              {m.icon}
+              <DynamicIcon name={m.icon} size={24} />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between">

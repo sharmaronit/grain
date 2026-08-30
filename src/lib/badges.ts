@@ -16,7 +16,7 @@ export function computeMilestones(currentStreak: number, bestStreak: number): Mi
       days: 7,
       title: "7-Day Ignition",
       subtitle: "First full week completed!",
-      icon: "🔥",
+      icon: "flame",
       unlocked: maxStreak >= 7,
     },
     {
@@ -24,7 +24,7 @@ export function computeMilestones(currentStreak: number, bestStreak: number): Mi
       days: 21,
       title: "21-Day Habit Lock",
       subtitle: "Neuroplasticity in action.",
-      icon: "⚡",
+      icon: "zap",
       unlocked: maxStreak >= 21,
     },
     {
@@ -32,7 +32,7 @@ export function computeMilestones(currentStreak: number, bestStreak: number): Mi
       days: 30,
       title: "30-Day Master",
       subtitle: "A full month of discipline.",
-      icon: "🛡️",
+      icon: "shield",
       unlocked: maxStreak >= 30,
     },
     {
@@ -40,7 +40,7 @@ export function computeMilestones(currentStreak: number, bestStreak: number): Mi
       days: 100,
       title: "100-Day Legend",
       subtitle: "Top 1% consistency.",
-      icon: "✨",
+      icon: "sparkles",
       unlocked: maxStreak >= 100,
     },
   ];

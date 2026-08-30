@@ -2353,474 +2353,382 @@ export function Dashboard({ user }: { user?: any }) {
 
           {/* Settings Full Screen */}
           {settingsOpen && (
-            <div className="fixed inset-0 z-50 flex flex-col bg-canvas/80 backdrop-blur-3xl animate-fade-in-up">
+            <div className="fixed inset-0 z-50 flex flex-col bg-canvas backdrop-blur-2xl animate-fade-in-up">
               {/* Header */}
-              <div className="flex items-center justify-between px-6 pt-6 pb-2">
-                <div>
-                  <h1 className="font-display text-2xl font-bold text-ink tracking-tight">Settings</h1>
-                  <p className="text-xs font-medium text-mute mt-0.5">Preferences & data</p>
-                </div>
+              <div 
+                className="flex items-center justify-between px-5 pb-3"
+                style={{ paddingTop: 'calc(max(var(--sa-top, env(safe-area-inset-top)), 24px) + 16px)' }}
+              >
+                <h1 className="font-display text-xl font-bold text-ink tracking-tight">Settings</h1>
                 <button
                   onClick={() => setSettingsOpen(false)}
-                  className="grid h-9 w-9 place-items-center rounded-full bg-canvas-soft text-ink transition hover:bg-[color:var(--surface-pressed)] active:scale-95"
+                  className="grid h-8 w-8 place-items-center rounded-md text-mute hover:text-ink hover:bg-ink/8 transition active:scale-95"
                   aria-label="Close settings"
                 >
-                  <X className="h-5 w-5" />
+                  <X className="h-4 w-4" />
                 </button>
               </div>
 
               {/* Scrollable Content */}
-              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3 scrollbar-none pb-safe">
+              <div className="flex-1 overflow-y-auto scrollbar-none pb-safe">
 
-                {/* Profile Card */}
-                <div className="mx-4 mb-6">
-                  <div className="card-soft relative overflow-hidden p-4 rounded-3xl bg-canvas/60 backdrop-blur-2xl border border-[color:var(--hairline)]">
-                    <div className="flex items-center gap-4">
-                      <div className="relative animate-profile-avatar shrink-0">
-                        <div className="grid h-16 w-16 place-items-center rounded-full bg-ink text-on-ink font-display text-xl font-bold shadow-lg">
-                          {profile.initials}
-                        </div>
-                        <span className="absolute -bottom-1 -right-1 grid h-6 w-6 place-items-center rounded-full bg-emerald-500 text-[11px] font-bold text-white ring-[3px] ring-[color:var(--canvas)] animate-pulse">
-                          <Flame className="h-3.5 w-3.5" />
-                        </span>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <h2 className="font-display truncate text-lg font-bold text-ink">{profile.name}</h2>
-                          <span className="rounded-full bg-gradient-to-r from-indigo-500/20 to-purple-500/20 px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-ink border border-indigo-500/30 shrink-0">Pro</span>
-                        </div>
-                        <p className="truncate text-xs text-body">{profile.tagline}</p>
-                        <div className="flex items-center gap-2.5 mt-2 flex-wrap">
-                          <span className="text-[11px] font-bold text-ink tabular-nums">{totalStreak}<span className="text-mute font-medium"> streak</span></span>
-                          <span className="text-mute/40 text-[11px]">·</span>
-                          <span className="text-[11px] font-bold text-ink tabular-nums">{doneCount}<span className="text-mute font-medium">/{totalCount} today</span></span>
-                          <span className="text-mute/40 text-[11px]">·</span>
-                          <span className="text-[11px] font-bold text-ink tabular-nums">{rate}<span className="text-mute font-medium">%</span></span>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => setProfileEditOpen(true)}
-                        className="chip-uber shrink-0 px-4 py-2 text-xs"
-                        aria-label="Edit profile"
-                      >
-                        Edit
-                      </button>
+                {/* Profile strip */}
+                <div className="flex items-center gap-3 px-5 py-4 border-b border-[color:var(--hairline)]">
+                  <div className="relative shrink-0">
+                    <div className="grid h-11 w-11 place-items-center rounded-full bg-ink text-on-ink font-display text-base font-bold">
+                      {profile.initials}
                     </div>
-
-                    {/* Quick shortcuts inside profile card */}
-                    <div className="mt-3 pt-3 border-t border-[color:var(--hairline)] flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => { setSettingsOpen(false); setAiCoachOpen(true); }}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[color:color-mix(in_srgb,var(--canvas-soft)_60%,transparent)] text-[11px] font-bold text-ink transition active:scale-95 hover:bg-ink/10"
-                        data-lg-press
-                      >
-                        <MessageSquare className="h-4 w-4" strokeWidth={2} /> Coach
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setSettingsOpen(false); setBadgesOpen(true); }}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[color:color-mix(in_srgb,var(--canvas-soft)_60%,transparent)] text-[11px] font-bold text-ink transition active:scale-95 hover:bg-ink/10"
-                        data-lg-press
-                      >
-                        <Hexagon className="h-4 w-4" strokeWidth={2} /> Badges
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setSettingsOpen(false); setShareStreakOpen(true); }}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-[color:color-mix(in_srgb,var(--canvas-soft)_60%,transparent)] text-[11px] font-bold text-ink transition active:scale-95 hover:bg-ink/10"
-                        data-lg-press
-                      >
-                        <ArrowUpRight className="h-4 w-4" strokeWidth={2} /> Share
-                      </button>
-                    </div>
+                    <span className="absolute -bottom-0.5 -right-0.5 grid h-4 w-4 place-items-center rounded-full bg-emerald-500 ring-2 ring-[color:var(--canvas)]">
+                      <Flame className="h-2.5 w-2.5 text-white" />
+                    </span>
                   </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-sm text-ink truncate">{profile.name}</span>
+                      <span className="rounded-full bg-gradient-to-r from-indigo-500/20 to-purple-500/20 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-widest text-ink border border-indigo-500/30 shrink-0">Pro</span>
+                    </div>
+                    <p className="text-xs text-mute truncate">{totalStreak} day streak · {rate}% today</p>
+                  </div>
+                  <button
+                    onClick={() => setProfileEditOpen(true)}
+                    className="shrink-0 px-3 py-1.5 rounded-md bg-ink/8 text-xs font-semibold text-ink hover:bg-ink/15 transition active:scale-95"
+                    aria-label="Edit profile"
+                  >
+                    Edit
+                  </button>
                 </div>
 
-                {/* Preferences Card */}
-                <div className="mx-4 mb-8 space-y-4">
-                  <div className="rounded-3xl bg-canvas/60 backdrop-blur-2xl divide-y divide-[color:var(--hairline)]">
+                {/* Quick actions row */}
+                <div className="flex items-center gap-2 px-5 py-2 border-b border-[color:var(--hairline)]">
+                  <button
+                    type="button"
+                    onClick={() => { setSettingsOpen(false); setAiCoachOpen(true); }}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 text-[11px] font-semibold text-ink transition active:scale-95 hover:bg-ink/5 rounded-lg"
+                  >
+                    <MessageSquare className="h-4 w-4 text-mute" strokeWidth={2} /> Coach
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setSettingsOpen(false); setBadgesOpen(true); }}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 text-[11px] font-semibold text-ink transition active:scale-95 hover:bg-ink/5 rounded-lg"
+                  >
+                    <Hexagon className="h-4 w-4 text-mute" strokeWidth={2} /> Badges
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setSettingsOpen(false); setShareStreakOpen(true); }}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 text-[11px] font-semibold text-ink transition active:scale-95 hover:bg-ink/5 rounded-lg"
+                  >
+                    <ArrowUpRight className="h-4 w-4 text-mute" strokeWidth={2} /> Share
+                  </button>
+                </div>
 
-                    {/* Theme */}
-                    <Row
-                      label={
-                        <div className="text-left">
-                          <span className="font-semibold text-ink block text-xs">App Theme</span>
-                        </div>
-                      }
-                      action={
-                        <div className="flex items-center gap-1">
-                          {[
-                            { key: "dark" as const, label: "Auto" },
-                            { key: "amoled" as const, label: "AMOLED" },
-                            { key: "light" as const, label: "Light" },
-                          ].map((opt) => {
-                            const active = theme === opt.key;
-                            return (
-                              <button
-                                key={opt.key}
-                                type="button"
-                                onClick={() => {
-                                  setTheme(opt.key);
-                                  if (typeof window !== "undefined") {
-                                    try { localStorage.setItem("grain_app_theme", opt.key); } catch {}
-                                  }
-                                  if (userId) updateUserProfile(userId, { theme: opt.key });
-                                  try { navigator.vibrate?.(10); } catch {}
-                                }}
-                                className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
-                                  active
-                                    ? "border border-ink text-ink bg-transparent"
-                                    : "text-mute hover:text-ink opacity-60"
-                                }`}
-                              >
-                                {opt.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      }
-                    />
-
-                    <Row
-                      label="Starter Packs & Walkthrough"
-                      action={
-                        <button
-                          onClick={() => {
-                            setSettingsOpen(false);
-                            setOnboardingOpen(true);
-                          }}
-                          className="pill bg-canvas-soft px-3 py-1.5 text-xs font-semibold text-ink hover:bg-ink/10 transition"
-                        >
-                          Explore
-                        </button>
-                      }
-                    />
-                    <Row
-                      label={
-                        <div className="flex items-center gap-2.5">
-                          <Wallpaper className="h-4 w-4 text-ink" />
-                          <div className="text-left">
-                            <span className="font-semibold text-ink block text-xs">Lock Screen Wallpaper</span>
-                            <p className="text-[10px] text-mute font-medium">
-                              {wallpaperGridStyle.toUpperCase()} · {gridColorTheme.toUpperCase()}
-                            </p>
-                          </div>
-                        </div>
-                      }
-                      action={
-                        <button
-                          type="button"
-                          onClick={() => { setWallpaperEditorOpen(true); }}
-                          className="pill bg-ink text-on-ink px-3.5 py-1.5 text-xs font-bold shadow-sm active:scale-95 transition"
-                        >
-                          Customize
-                        </button>
-                      }
-                    />
-                    <Row
-                      label="Live wallpaper sync"
-                      action={
-                        <Toggle
-                          checked={wallpaperSync}
-                          onChange={toggleWallpaperSync}
-                          ariaLabel="Toggle live wallpaper sync"
-                        />
-                      }
-                    />
-                    <div className="space-y-2">
-                      <Row
-                        label={
-                          <span className="flex items-center gap-2">
-                            <Bell className="h-4 w-4" /> Habit reminders
-                          </span>
-                        }
-                        action={
-                          <Toggle
-                            checked={remindersOn}
-                            onChange={async () => {
-                              const next = !remindersOn;
-                              setRemindersOn(next);
-                              if (userId) {
-                                updateUserProfile(userId, { remindersOn: next });
-                              }
-                              if (next) {
-                                const granted = await requestNotificationPermission();
-                                if (granted) {
-                                  showToast(`Reminders enabled for ${reminderTime}`);
-                                } else {
-                                  showToast("Notification permission required");
-                                }
-                              } else {
-                                showToast("Reminders turned off");
-                              }
-                            }}
-                            ariaLabel="Toggle reminders"
-                          />
-                        }
-                      />
-
-                      {remindersOn && (
-                        <div className="p-3 space-y-3 rounded-2xl bg-canvas-soft border border-[color:var(--hairline)] animate-fade-in text-xs">
-                          <div className="flex flex-col gap-2">
-                            <div className="flex items-center justify-between px-1 mb-1">
-                              <span className="text-body font-semibold">Reminder time</span>
-                              <span className="text-[10px] font-bold text-ink bg-ink/10 px-2 py-0.5 rounded-md uppercase tracking-widest">
-                                {(() => {
-                                  const [h, m] = (reminderTime || "20:00").split(":");
-                                  const h24 = parseInt(h, 10);
-                                  const ampm = h24 >= 12 ? "PM" : "AM";
-                                  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
-                                  return `${h12}:${m} ${ampm}`;
-                                })()}
-                              </span>
-                            </div>
-                            
-                            {(() => {
-                              const [hStr, mStr] = (reminderTime || "20:00").split(":");
-                              const h24 = parseInt(hStr, 10);
-                              const currentAmpm = h24 >= 12 ? "PM" : "AM";
-                              const currentH12 = h24 % 12 === 0 ? 12 : h24 % 12;
-                              
-                              const updateTime = (newH12: number, newMin: string, newAmpm: string) => {
-                                let newH24 = newH12;
-                                if (newAmpm === "PM" && newH12 < 12) newH24 += 12;
-                                if (newAmpm === "AM" && newH12 === 12) newH24 = 0;
-                                const timeStr = `${newH24.toString().padStart(2, '0')}:${newMin}`;
-                                if (timeStr !== (reminderTime || "20:00")) {
-                                  setReminderTime(timeStr);
-                                  if (userId) updateUserProfile(userId, { reminderTime: timeStr });
-                                }
-                              };
-
-                              const handleScroll = (
-                                e: React.UIEvent<HTMLDivElement>, 
-                                callback: (index: number) => void
-                              ) => {
-                                const target = e.currentTarget;
-                                if (target.dataset.timeout) clearTimeout(Number(target.dataset.timeout));
-                                target.dataset.timeout = setTimeout(() => {
-                                  const index = Math.round(target.scrollTop / 32);
-                                  callback(index);
-                                }, 150).toString();
-                              };
-
-                              return (
-                                <div className="relative flex justify-center h-36 mt-2 mb-1 bg-[color-mix(in_srgb,var(--canvas-soft)_60%,transparent)] backdrop-blur-xl border border-[color:var(--hairline)] rounded-2xl overflow-hidden shadow-inner">
-                                  {/* Selection Highlight */}
-                                  <div className="absolute top-1/2 left-4 right-4 h-8 -mt-4 bg-[color-mix(in_srgb,var(--ink)_8%,transparent)] rounded-xl pointer-events-none" />
-
-                                  {/* Masked Content Wrapper */}
-                                  <div className="flex justify-center gap-4 w-full h-full [mask-image:linear-gradient(to_bottom,transparent,black_20%,black_80%,transparent)]">
-                                    {/* Hours */}
-                                    <div 
-                                      className="flex flex-col overflow-y-auto scrollbar-none snap-y snap-mandatory py-[3.5rem] px-2 scroll-smooth"
-                                      ref={(el) => {
-                                        if (el && !el.dataset.initialized) {
-                                          el.scrollTop = (currentH12 - 1) * 32;
-                                          el.dataset.initialized = 'true';
-                                        }
-                                      }}
-                                      onScroll={(e) => handleScroll(e, (idx) => updateTime(Math.min(12, Math.max(1, idx + 1)), mStr, currentAmpm))}
-                                    >
-                                      {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
-                                        <button
-                                          key={`h-${h}`}
-                                          type="button"
-                                          onClick={() => updateTime(h, mStr, currentAmpm)}
-                                          className="relative shrink-0 h-8 flex items-center justify-center rounded-lg text-lg font-bold transition-all duration-300 snap-center"
-                                        >
-                                          <span className={`relative z-10 transition-all duration-300 ${
-                                            currentH12 === h ? "text-ink scale-125" : "text-mute opacity-20 hover:opacity-100"
-                                          }`}>
-                                            {h}
-                                          </span>
-                                        </button>
-                                      ))}
-                                    </div>
-
-                                    <div className="flex flex-col justify-center items-center font-bold text-ink text-lg opacity-50 pb-1">:</div>
-
-                                    {/* Minutes */}
-                                    <div 
-                                      className="flex flex-col overflow-y-auto scrollbar-none snap-y snap-mandatory py-[3.5rem] px-2 scroll-smooth"
-                                      ref={(el) => {
-                                        if (el && !el.dataset.initialized) {
-                                          el.scrollTop = parseInt(mStr, 10) * 32;
-                                          el.dataset.initialized = 'true';
-                                        }
-                                      }}
-                                      onScroll={(e) => handleScroll(e, (idx) => updateTime(currentH12, Math.min(59, Math.max(0, idx)).toString().padStart(2, '0'), currentAmpm))}
-                                    >
-                                      {Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0')).map((m) => (
-                                        <button
-                                          key={`m-${m}`}
-                                          type="button"
-                                          onClick={() => updateTime(currentH12, m, currentAmpm)}
-                                          className="relative shrink-0 h-8 flex items-center justify-center rounded-lg text-lg font-bold transition-all duration-300 snap-center"
-                                        >
-                                          <span className={`relative z-10 transition-all duration-300 ${
-                                            mStr === m ? "text-ink scale-125" : "text-mute opacity-20 hover:opacity-100"
-                                          }`}>
-                                            {m}
-                                          </span>
-                                        </button>
-                                      ))}
-                                    </div>
-
-                                    <div className="w-4" />
-
-                                    {/* AM / PM */}
-                                    <div 
-                                      className="flex flex-col overflow-y-auto scrollbar-none snap-y snap-mandatory py-[3.5rem] px-2 scroll-smooth"
-                                      ref={(el) => {
-                                        if (el && !el.dataset.initialized) {
-                                          el.scrollTop = currentAmpm === "AM" ? 0 : 32;
-                                          el.dataset.initialized = 'true';
-                                        }
-                                      }}
-                                      onScroll={(e) => handleScroll(e, (idx) => updateTime(currentH12, mStr, idx === 0 ? "AM" : "PM"))}
-                                    >
-                                      {["AM", "PM"].map((meridiem) => (
-                                        <button
-                                          key={meridiem}
-                                          type="button"
-                                          onClick={() => updateTime(currentH12, mStr, meridiem)}
-                                          className="relative shrink-0 h-8 flex items-center justify-center rounded-lg text-sm font-bold transition-all duration-300 snap-center"
-                                        >
-                                          <span className={`relative z-10 transition-all duration-300 ${
-                                            currentAmpm === meridiem ? "text-ink scale-125" : "text-mute opacity-20 hover:opacity-100"
-                                          }`}>
-                                            {meridiem}
-                                          </span>
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })()}
-                          </div>
-
-                          <div className="flex items-center justify-between gap-2 pt-1 border-t border-[color:var(--hairline)]">
-                            <span className="text-body font-semibold flex items-center gap-1.5">
-                              <Sunrise className="h-3.5 w-3.5 text-amber-400" /> Morning focus kickoff (8 AM)
-                            </span>
-                            <Toggle
-                              checked={morningKickoff}
-                              onChange={() => {
-                                const next = !morningKickoff;
-                                setMorningKickoff(next);
-                                if (userId) updateUserProfile(userId, { morningKickoff: next });
-                                showToast(next ? "Morning kickoff alert enabled" : "Morning kickoff disabled");
-                              }}
-                              ariaLabel="Toggle morning kickoff"
-                            />
-                          </div>
-
-                          <div className="pt-0.5">
+                {/* Section: Appearance */}
+                <div className="pt-5 pb-1 px-5">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-mute">Appearance</p>
+                </div>
+                <div className="divide-y divide-[color:var(--hairline)] border-t border-b border-[color:var(--hairline)]">
+                  <Row
+                    label={<span className="text-sm font-medium text-ink">App Theme</span>}
+                    action={
+                      <div className="flex items-center gap-0.5">
+                        {[
+                          { key: "dark" as const, label: "Auto" },
+                          { key: "amoled" as const, label: "AMOLED" },
+                          { key: "light" as const, label: "Light" },
+                        ].map((opt) => {
+                          const active = theme === opt.key;
+                          return (
                             <button
+                              key={opt.key}
                               type="button"
-                              onClick={async () => {
-                                try { navigator.vibrate?.(15); } catch {}
-                                showToast("Sending test notification in 2 seconds...");
-                                const ok = await sendTestNotification();
-                                if (!ok) {
-                                  showToast("Please allow notification permission in system settings");
+                              onClick={() => {
+                                setTheme(opt.key);
+                                if (typeof window !== "undefined") {
+                                  try { localStorage.setItem("grain_app_theme", opt.key); } catch {}
                                 }
+                                if (userId) updateUserProfile(userId, { theme: opt.key });
+                                try { navigator.vibrate?.(10); } catch {}
                               }}
-                              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-xl bg-canvas hover:bg-canvas-softer text-ink font-bold text-[11px] border border-[color:var(--hairline)] active:scale-95 transition shadow-sm"
+                              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                                active
+                                  ? "bg-ink text-on-ink shadow-sm"
+                                  : "text-mute hover:text-ink"
+                              }`}
                             >
-                              <Sparkles className="h-3.5 w-3.5 text-emerald-400" />
-                              <span>Send Test Notification</span>
+                              {opt.label}
                             </button>
-                          </div>
+                          );
+                        })}
+                      </div>
+                    }
+                  />
+                  <Row
+                    label={
+                      <div className="flex items-center gap-2">
+                        <Wallpaper className="h-4 w-4 text-mute" />
+                        <div>
+                          <span className="text-sm font-medium text-ink block">Lock Screen</span>
+                          <p className="text-[10px] text-mute">{wallpaperGridStyle} · {gridColorTheme}</p>
                         </div>
-                      )}
-                    </div>
-                    <Row
-                      label="Date selector style"
-                      action={
-                        <div className="relative">
-                          <button
-                            onClick={() => setDateDropdownOpen(!dateDropdownOpen)}
-                            className="pill bg-canvas-soft px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-ink flex items-center gap-1.5"
-                          >
-                            {dateStyle}
-                            <svg className="w-3 h-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M8 9l4-4 4 4m0 6l-4 4-4-4" /></svg>
-                          </button>
-                          {dateDropdownOpen && (
-                            <>
-                              <div className="fixed inset-0 z-40" onClick={() => setDateDropdownOpen(false)} />
-                              <div className="absolute right-0 top-full mt-2 w-32 rounded-xl bg-canvas shadow-xl border border-[color:var(--hairline-strong)] z-50 overflow-hidden flex flex-col py-1 animate-in fade-in zoom-in-95 duration-150">
-                                {["underline", "block", "mono"].map((styleOpt) => (
-                                  <button
-                                    key={styleOpt}
-                                    onClick={() => {
-                                      setDateStyle(styleOpt as any);
-                                      setDateDropdownOpen(false);
-                                    }}
-                                    className={`px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider transition-colors hover:bg-ink/5 ${dateStyle === styleOpt ? "text-[color:var(--accent)] bg-ink/5" : "text-ink"}`}
-                                  >
-                                    {styleOpt}
+                      </div>
+                    }
+                    action={
+                      <button
+                        type="button"
+                        onClick={() => { setWallpaperEditorOpen(true); }}
+                        className="px-3 py-1.5 rounded-md bg-ink text-on-ink text-xs font-semibold active:scale-95 transition shadow-sm"
+                      >
+                        Customize
+                      </button>
+                    }
+                  />
+                  <Row
+                    label={<span className="text-sm font-medium text-ink">Live wallpaper sync</span>}
+                    action={
+                      <Toggle
+                        checked={wallpaperSync}
+                        onChange={toggleWallpaperSync}
+                        ariaLabel="Toggle live wallpaper sync"
+                      />
+                    }
+                  />
+                  <Row
+                    label={<span className="text-sm font-medium text-ink">Date selector style</span>}
+                    action={
+                      <div className="relative">
+                        <button
+                          onClick={() => setDateDropdownOpen(!dateDropdownOpen)}
+                          className="flex items-center gap-1 text-xs font-semibold text-mute hover:text-ink transition"
+                        >
+                          <span className="capitalize">{dateStyle}</span>
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                        </button>
+                        {dateDropdownOpen && (
+                          <>
+                            <div className="fixed inset-0 z-40" onClick={() => setDateDropdownOpen(false)} />
+                            <div className="absolute right-0 top-full mt-2 w-32 rounded-xl bg-canvas shadow-xl border border-[color:var(--hairline-strong)] z-50 overflow-hidden flex flex-col py-1 animate-in fade-in zoom-in-95 duration-150">
+                              {["underline", "block", "mono"].map((styleOpt) => (
+                                <button
+                                  key={styleOpt}
+                                  onClick={() => {
+                                    setDateStyle(styleOpt as any);
+                                    setDateDropdownOpen(false);
+                                  }}
+                                  className={`px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider transition-colors hover:bg-ink/5 ${dateStyle === styleOpt ? "text-[color:var(--accent)] bg-ink/5" : "text-ink"}`}
+                                >
+                                  {styleOpt}
+                                </button>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    }
+                  />
+                </div>
+
+                {/* Section: Reminders */}
+                <div className="pt-5 pb-1 px-5">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-mute">Reminders</p>
+                </div>
+                <div className="divide-y divide-[color:var(--hairline)] border-t border-b border-[color:var(--hairline)]">
+                  <Row
+                    label={
+                      <span className="flex items-center gap-2 text-sm font-medium text-ink">
+                        <Bell className="h-4 w-4 text-mute" /> Habit reminders
+                      </span>
+                    }
+                    action={
+                      <Toggle
+                        checked={remindersOn}
+                        onChange={async () => {
+                          const next = !remindersOn;
+                          setRemindersOn(next);
+                          if (userId) updateUserProfile(userId, { remindersOn: next });
+                          if (next) {
+                            const granted = await requestNotificationPermission();
+                            if (granted) {
+                              showToast(`Reminders enabled for ${reminderTime}`);
+                            } else {
+                              showToast("Notification permission required");
+                            }
+                          } else {
+                            showToast("Reminders turned off");
+                          }
+                        }}
+                        ariaLabel="Toggle reminders"
+                      />
+                    }
+                  />
+
+                  {remindersOn && (
+                    <div className="px-5 py-4 space-y-3 animate-fade-in">
+                      {/* Time picker */}
+                      {(() => {
+                        const [hStr, mStr] = (reminderTime || "20:00").split(":");
+                        const h24 = parseInt(hStr, 10);
+                        const currentAmpm = h24 >= 12 ? "PM" : "AM";
+                        const currentH12 = h24 % 12 === 0 ? 12 : h24 % 12;
+
+                        const updateTime = (newH12: number, newMin: string, newAmpm: string) => {
+                          let newH24 = newH12;
+                          if (newAmpm === "PM" && newH12 < 12) newH24 += 12;
+                          if (newAmpm === "AM" && newH12 === 12) newH24 = 0;
+                          const timeStr = `${newH24.toString().padStart(2, '0')}:${newMin}`;
+                          if (timeStr !== (reminderTime || "20:00")) {
+                            setReminderTime(timeStr);
+                            if (userId) updateUserProfile(userId, { reminderTime: timeStr });
+                          }
+                        };
+
+                        const handleScroll = (
+                          e: React.UIEvent<HTMLDivElement>,
+                          callback: (index: number) => void
+                        ) => {
+                          const target = e.currentTarget;
+                          if (target.dataset.timeout) clearTimeout(Number(target.dataset.timeout));
+                          target.dataset.timeout = setTimeout(() => {
+                            const index = Math.round(target.scrollTop / 32);
+                            callback(index);
+                          }, 150).toString();
+                        };
+
+                        return (
+                          <div className="relative flex justify-center h-32 border-y border-[color:var(--hairline)] overflow-hidden bg-canvas/30 mx-[-20px]">
+                            <div className="absolute top-1/2 left-4 right-4 h-8 -mt-4 bg-transparent rounded-lg pointer-events-none" />
+                            <div className="flex justify-center gap-4 w-full h-full [mask-image:linear-gradient(to_bottom,transparent,black_20%,black_80%,transparent)]">
+                              <div
+                                className="flex flex-col overflow-y-auto scrollbar-none snap-y snap-mandatory py-[3rem] px-2 scroll-smooth"
+                                ref={(el) => { if (el && !el.dataset.initialized) { el.scrollTop = (currentH12 - 1) * 32; el.dataset.initialized = 'true'; } }}
+                                onScroll={(e) => handleScroll(e, (idx) => updateTime(Math.min(12, Math.max(1, idx + 1)), mStr, currentAmpm))}
+                              >
+                                {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
+                                  <button key={`h-${h}`} type="button" onClick={() => updateTime(h, mStr, currentAmpm)} className="shrink-0 h-8 flex items-center justify-center text-lg font-bold snap-center">
+                                    <span className={`transition-all duration-200 ${currentH12 === h ? "text-ink scale-110" : "text-mute opacity-20"}`}>{h}</span>
                                   </button>
                                 ))}
                               </div>
-                            </>
-                          )}
-                        </div>
-                      }
-                    />
-                  </div>
+                              <div className="flex flex-col justify-center items-center font-bold text-ink text-lg opacity-40">:</div>
+                              <div
+                                className="flex flex-col overflow-y-auto scrollbar-none snap-y snap-mandatory py-[3rem] px-2 scroll-smooth"
+                                ref={(el) => { if (el && !el.dataset.initialized) { el.scrollTop = parseInt(mStr, 10) * 32; el.dataset.initialized = 'true'; } }}
+                                onScroll={(e) => handleScroll(e, (idx) => updateTime(currentH12, Math.min(59, Math.max(0, idx)).toString().padStart(2, '0'), currentAmpm))}
+                              >
+                                {Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0')).map((m) => (
+                                  <button key={`m-${m}`} type="button" onClick={() => updateTime(currentH12, m, currentAmpm)} className="shrink-0 h-8 flex items-center justify-center text-lg font-bold snap-center">
+                                    <span className={`transition-all duration-200 ${mStr === m ? "text-ink scale-110" : "text-mute opacity-20"}`}>{m}</span>
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="w-3" />
+                              <div
+                                className="flex flex-col overflow-y-auto scrollbar-none snap-y snap-mandatory py-[3rem] px-2 scroll-smooth"
+                                ref={(el) => { if (el && !el.dataset.initialized) { el.scrollTop = currentAmpm === "AM" ? 0 : 32; el.dataset.initialized = 'true'; } }}
+                                onScroll={(e) => handleScroll(e, (idx) => updateTime(currentH12, mStr, idx === 0 ? "AM" : "PM"))}
+                              >
+                                {["AM", "PM"].map((meridiem) => (
+                                  <button key={meridiem} type="button" onClick={() => updateTime(currentH12, mStr, meridiem)} className="shrink-0 h-8 flex items-center justify-center text-sm font-bold snap-center">
+                                    <span className={`transition-all duration-200 ${currentAmpm === meridiem ? "text-ink scale-110" : "text-mute opacity-20"}`}>{meridiem}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      <div className="flex items-center justify-between">
+                        <span className="flex items-center gap-1.5 text-xs text-body">
+                          <Sunrise className="h-3.5 w-3.5 text-amber-400" /> Morning kickoff (8 AM)
+                        </span>
+                        <Toggle
+                          checked={morningKickoff}
+                          onChange={() => {
+                            const next = !morningKickoff;
+                            setMorningKickoff(next);
+                            if (userId) updateUserProfile(userId, { morningKickoff: next });
+                            showToast(next ? "Morning kickoff enabled" : "Morning kickoff disabled");
+                          }}
+                          ariaLabel="Toggle morning kickoff"
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try { navigator.vibrate?.(15); } catch {}
+                          showToast("Sending test notification in 2 seconds...");
+                          const ok = await sendTestNotification();
+                          if (!ok) showToast("Please allow notification permission in system settings");
+                        }}
+                        className="w-full flex items-center justify-between py-3 group hover:bg-ink/4 transition"
+                      >
+                        <span className="flex items-center gap-2 text-sm font-medium text-ink">
+                          <Sparkles className="h-4 w-4 text-emerald-400" /> Send Test Notification
+                        </span>
+                        <ArrowRight className="h-4 w-4 text-mute group-hover:translate-x-0.5 transition-transform" />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
-                {/* Actions Card — all grouped in one clean card */}
-                <div className="mx-4 mb-8 space-y-6">
-                  <div className="rounded-3xl bg-canvas/60 backdrop-blur-2xl divide-y divide-[color:var(--hairline)] overflow-hidden">
-                    <button
-                      data-lg-press
-                      onClick={() => setFeedbackOpen(true)}
-                      className="flex w-full items-center justify-between px-5 py-3.5 transition group hover:bg-ink/5 active:scale-[0.99]"
-                    >
-                      <span className="flex items-center gap-3 text-xs font-semibold text-ink">
-                        <MessageSquareHeart className="h-4 w-4 text-mute" /> Feedback & suggestions
-                      </span>
-                      <ArrowRight className="h-4 w-4 opacity-30 group-hover:opacity-70 group-hover:translate-x-0.5 transition-all" />
-                    </button>
-                    <button
-                      data-lg-press
-                      onClick={exportBackup}
-                      className="flex w-full items-center justify-between px-5 py-3.5 transition group hover:bg-ink/5 active:scale-[0.99]"
-                    >
-                      <span className="flex items-center gap-3 text-xs font-semibold text-ink">
-                        <Download className="h-4 w-4 text-mute" /> Backup & export data
-                      </span>
-                      <ArrowRight className="h-4 w-4 opacity-30 group-hover:opacity-70 group-hover:translate-x-0.5 transition-all" />
-                    </button>
-                    <button
-                      data-lg-press
-                      onClick={() => setResetConfirmOpen(true)}
-                      className="flex w-full items-center justify-between px-5 py-3.5 transition group hover:bg-ink/5 active:scale-[0.99]"
-                    >
-                      <span className="flex items-center gap-3 text-xs font-semibold text-ink">
-                        <RotateCcw className="h-4 w-4 text-mute" /> Reset today's progress
-                      </span>
-                      <ArrowRight className="h-4 w-4 opacity-30 group-hover:opacity-70 group-hover:translate-x-0.5 transition-all" />
-                    </button>
-                    <button
-                      data-lg-press
-                      onClick={() => setSignOutOpen(true)}
-                      className="flex w-full items-center justify-between px-5 py-3.5 transition group hover:bg-red-500/5 active:scale-[0.99]"
-                    >
-                      <span className="flex items-center gap-3 text-xs font-semibold text-red-500">
-                        <LogOut className="h-4 w-4" /> Sign out
-                      </span>
-                      <ArrowRight className="h-4 w-4 text-red-500 opacity-30 group-hover:opacity-70 group-hover:translate-x-0.5 transition-all" />
-                    </button>
-                  </div>
+                {/* Section: More */}
+                <div className="pt-5 pb-1 px-5">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-mute">More</p>
+                </div>
+                <div className="divide-y divide-[color:var(--hairline)] border-t border-b border-[color:var(--hairline)]">
+                  <button
+                    data-lg-press
+                    onClick={() => { setSettingsOpen(false); setOnboardingOpen(true); }}
+                    className="flex w-full items-center justify-between px-5 py-3.5 group hover:bg-ink/4 active:scale-[0.99] transition"
+                  >
+                    <span className="text-sm font-medium text-ink">Starter Packs & Walkthrough</span>
+                    <ArrowRight className="h-4 w-4 text-mute group-hover:translate-x-0.5 transition-transform" />
+                  </button>
+                  <button
+                    data-lg-press
+                    onClick={() => setFeedbackOpen(true)}
+                    className="flex w-full items-center justify-between px-5 py-3.5 group hover:bg-ink/4 active:scale-[0.99] transition"
+                  >
+                    <span className="flex items-center gap-2.5 text-sm font-medium text-ink">
+                      <MessageSquareHeart className="h-4 w-4 text-mute" /> Feedback
+                    </span>
+                    <ArrowRight className="h-4 w-4 text-mute group-hover:translate-x-0.5 transition-transform" />
+                  </button>
+                  <button
+                    data-lg-press
+                    onClick={exportBackup}
+                    className="flex w-full items-center justify-between px-5 py-3.5 group hover:bg-ink/4 active:scale-[0.99] transition"
+                  >
+                    <span className="flex items-center gap-2.5 text-sm font-medium text-ink">
+                      <Download className="h-4 w-4 text-mute" /> Export data
+                    </span>
+                    <ArrowRight className="h-4 w-4 text-mute group-hover:translate-x-0.5 transition-transform" />
+                  </button>
+                  <button
+                    data-lg-press
+                    onClick={() => setResetConfirmOpen(true)}
+                    className="flex w-full items-center justify-between px-5 py-3.5 group hover:bg-ink/4 active:scale-[0.99] transition"
+                  >
+                    <span className="flex items-center gap-2.5 text-sm font-medium text-ink">
+                      <RotateCcw className="h-4 w-4 text-mute" /> Reset today
+                    </span>
+                    <ArrowRight className="h-4 w-4 text-mute group-hover:translate-x-0.5 transition-transform" />
+                  </button>
                 </div>
 
-                <div className="h-4" />
+                <div className="px-5 py-4">
+                  <button
+                    data-lg-press
+                    onClick={() => setSignOutOpen(true)}
+                    className="w-full flex items-center justify-center gap-2 py-3 rounded-lg text-red-500 text-sm font-semibold hover:bg-red-500/8 active:scale-[0.98] transition"
+                  >
+                    <LogOut className="h-4 w-4" /> Sign out
+                  </button>
+                </div>
+
+                <div className="pb-8" />
               </div>
             </div>
           )}
@@ -4195,8 +4103,8 @@ function SheetShell({
 
 function Row({ label, action }: { label: React.ReactNode; action: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between rounded-2xl bg-canvas-soft px-4 py-3">
-      <span className="text-sm font-medium text-ink">{label}</span>
+    <div className="flex items-center justify-between px-5 py-3.5 group transition">
+      <div className="text-sm font-medium text-ink">{label}</div>
       {action}
     </div>
   );

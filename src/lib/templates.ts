@@ -23,7 +23,7 @@ export const HABIT_PACKS: HabitPack[] = [
   {
     id: "mindfulness",
     name: "Mindful Morning",
-    icon: "🧘",
+    icon: "user",
     description: "Start every day grounded, focused, and calm.",
     habits: [
       {
@@ -57,7 +57,7 @@ export const HABIT_PACKS: HabitPack[] = [
   {
     id: "deep_work",
     name: "High Performance & Focus",
-    icon: "⚡",
+    icon: "zap",
     description: "Structure your day around high-impact priorities.",
     habits: [
       {
@@ -93,7 +93,7 @@ export const HABIT_PACKS: HabitPack[] = [
   {
     id: "fitness",
     name: "Daily Physical Vitality",
-    icon: "🔥",
+    icon: "flame",
     description: "Build consistent physical stamina and rest discipline.",
     habits: [
       {

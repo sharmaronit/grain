@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { X, Check, ArrowLeft, Layers } from "lucide-react";
+import { X, Check, ArrowLeft, Layers, PartyPopper } from "lucide-react";
 import type { Habit, Quadrant } from "./types";
 import { SwipeCard } from "./SwipeCard";
 import { Confetti } from "./Confetti";
@@ -70,7 +70,9 @@ export function SwipeModeView({
     return (
       <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-canvas p-6 animate-fade-in text-center">
         <Confetti count={80} />
-        <div className="text-6xl mb-6 animate-bounce">🎉</div>
+        <div className="flex justify-center mb-6 animate-bounce">
+          <PartyPopper size={64} className="text-amber-500" />
+        </div>
         <h1 className="text-3xl font-display font-bold text-ink mb-2">
           All caught up!
         </h1>

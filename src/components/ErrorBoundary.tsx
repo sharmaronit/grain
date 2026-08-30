@@ -1,4 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from "react";
+import { Sprout } from "lucide-react";
 
 interface Props {
   children: ReactNode;
@@ -36,7 +37,7 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black text-white p-6 text-center select-none">
           <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center mb-6 shadow-xl border border-white/15">
-            <span className="text-2xl">🌱</span>
+            <Sprout size={28} className="text-white" />
           </div>
           <h2 className="text-xl font-bold tracking-tight mb-2">Something unexpected happened</h2>
           <p className="text-sm text-neutral-400 max-w-sm mb-8">

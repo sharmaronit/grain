@@ -4,6 +4,7 @@ import type { GoalDoc } from "../../lib/firestore";
 import { AddGoalSheet } from "../modals/AddGoalSheet";
 import { useStore } from "../../store/useStore";
 import { parseDateKey, todayKey } from "../../lib/dates";
+import { DynamicIcon } from "../ui/DynamicIcon";
 
 interface GoalTabProps {
   goals: GoalDoc[];
@@ -61,7 +62,7 @@ export const GoalTab = memo(function GoalTab({ goals, onDelete, onSetActiveGoal 
           <div className="absolute top-0 left-0 w-full h-1" style={{ backgroundColor: activeGoal.color }} />
           
           <div className="flex items-center justify-between mb-8">
-            <span className="text-4xl grayscale">{activeGoal.emoji}</span>
+            <DynamicIcon name={activeGoal.emoji} size={40} className="text-on-ink" />
             <div className="flex flex-col items-end">
               <span className="text-[10px] font-black uppercase tracking-widest text-mute">Active Goal</span>
               <span className="font-display text-xl font-bold text-ink truncate max-w-[200px]">{activeGoal.name}</span>
@@ -118,10 +119,10 @@ export const GoalTab = memo(function GoalTab({ goals, onDelete, onSetActiveGoal 
             >
               <div className="flex items-center gap-4">
                 <div 
-                  className="w-12 h-12 rounded-full flex items-center justify-center text-2xl shadow-inner grayscale"
+                  className="w-12 h-12 rounded-full flex items-center justify-center shadow-inner text-ink"
                   style={{ backgroundColor: `${g.color}20` }} // 20 hex opacity
                 >
-                  {g.emoji}
+                  <DynamicIcon name={g.emoji} size={20} className="opacity-90" />
                 </div>
                 <div className="flex flex-col">
                   <span className="font-display text-lg font-bold text-ink">{g.name}</span>

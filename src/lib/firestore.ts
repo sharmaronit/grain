@@ -199,7 +199,7 @@ export function goalFromDoc(d: DocumentData, id: string): GoalDoc {
   return {
     id,
     name: d.name ?? "",
-    emoji: d.emoji ?? "🎯",
+    emoji: d.emoji ?? "target",
     startDate: d.startDate ?? "",
     targetDate: d.targetDate ?? "",
     color: d.color ?? "#22c55e",

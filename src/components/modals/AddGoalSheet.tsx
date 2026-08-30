@@ -7,8 +7,7 @@ import { doc, updateDoc } from "firebase/firestore";
 import { addGoal } from "../../lib/firestore";
 import { todayKey } from "../../lib/dates";
 import { CustomDatePicker } from "../CustomDatePicker";
-
-const EMOJIS = ["🎯", "🚀", "💪", "📚", "✈️", "💰", "🏃", "🏆", "🧘", "🎨"];
+import { DynamicIcon, ICONS } from "../ui/DynamicIcon";
 const COLORS = [
   "#22c55e", // emerald
   "#dc2626", // crimson
@@ -19,7 +18,7 @@ const COLORS = [
 
 export function AddGoalSheet({ onClose }: { onClose: () => void }) {
   const [name, setName] = useState("");
-  const [emoji, setEmoji] = useState(EMOJIS[0]);
+  const [emoji, setEmoji] = useState(ICONS[0]);
   const [color, setColor] = useState(COLORS[0]);
   
   const [startDate, setStartDate] = useState(todayKey());
@@ -108,17 +107,19 @@ export function AddGoalSheet({ onClose }: { onClose: () => void }) {
         {/* Emoji Selection */}
         <div>
           <label className="text-[10px] font-bold uppercase tracking-widest text-mute mb-2 block">Icon</label>
-          <div className="grid grid-cols-5 gap-2">
-            {EMOJIS.map(e => (
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-none snap-x snap-mandatory px-1">
+            {ICONS.map((e) => (
               <button
-                type="button"
                 key={e}
+                type="button"
                 onClick={() => setEmoji(e)}
-                className={`flex h-10 items-center justify-center rounded-xl text-xl transition grayscale ${
-                  emoji === e ? "bg-ink ring-1 ring-ink" : "liquid-input opacity-60 hover:opacity-100 hover:bg-[color:var(--surface-pressed)]"
+                className={`grid h-12 w-12 shrink-0 snap-center place-items-center rounded-2xl transition-all ${
+                  emoji === e
+                    ? "bg-ink text-on-ink shadow-md scale-105"
+                    : "bg-[color:var(--surface-sunken)] text-ink hover:bg-[color:var(--surface-pressed)]"
                 }`}
               >
-                {e}
+                <DynamicIcon name={e} size={20} className={emoji === e ? "text-on-ink" : "text-ink opacity-70"} />
               </button>
             ))}
           </div>

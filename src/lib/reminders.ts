@@ -74,7 +74,7 @@ export async function sendTestNotification(): Promise<boolean> {
         notifications: [
           {
             id: 9999,
-            title: "⚡ Grain · Streak Protector Active",
+            title: "Grain · Streak Protector Active",
             body: "Notifications are working! We'll remind you to check off your habits and protect your streak.",
             channelId: NOTIFICATION_CHANNEL_ID,
             schedule: {
@@ -93,7 +93,7 @@ export async function sendTestNotification(): Promise<boolean> {
 
   if ("Notification" in window && Notification.permission === "granted") {
     setTimeout(() => {
-      new Notification("⚡ Grain · Streak Protector Active", {
+      new Notification("Grain · Streak Protector Active", {
         body: "Notifications are working! We'll remind you to check off your habits and protect your streak.",
         icon: "/icon.png",
       });
@@ -209,7 +209,7 @@ export async function scheduleHabitReminders(opts: HabitReminderOptions): Promis
           if (!skipMorningToday) {
             notificationsToSchedule.push({
               id: 2000 + i,
-              title: "☀️ Grain · Morning Focus",
+              title: "Grain · Morning Focus",
               body: "Start your day with one grain of effort. Check off your morning habits!",
               channelId: NOTIFICATION_CHANNEL_ID,
               schedule: {
