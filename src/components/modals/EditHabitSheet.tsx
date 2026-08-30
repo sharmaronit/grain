@@ -39,6 +39,7 @@ export function EditHabitSheet({
   const [isNumeric, setIsNumeric] = useState(habit.target !== undefined && habit.target !== null);
   const [target, setTarget] = useState<number>(habit.target ?? 1);
   const [unit, setUnit] = useState<string>(habit.unit ?? "");
+  const [reminderTime, setReminderTime] = useState<string>(habit.reminderTime ?? "");
 
   const CATS = ["Mind", "Health", "Growth", "Focus", "Fitness", "Admin"];
   const TIMES: Array<{ key: NonNullable<Habit["time"]> | "any"; label: string }> = [
@@ -156,6 +157,25 @@ export function EditHabitSheet({
           </div>
         )}
 
+        <Field label="Custom Push Reminder (Optional)">
+          <div className="flex items-center gap-2">
+            <input
+              type="time"
+              value={reminderTime}
+              onChange={(e) => setReminderTime(e.target.value)}
+              className="w-full rounded-2xl bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] px-4 py-3 text-sm text-ink outline-none focus:bg-[color:var(--canvas-softer)]"
+            />
+            {reminderTime && (
+              <button 
+                onClick={() => setReminderTime("")}
+                className="pill px-4 py-3 text-sm font-medium border border-white/10 bg-white/5 text-ink"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </Field>
+
         <div className="grid grid-cols-2 gap-2 pt-1">
           <button
             data-lg-press
@@ -166,7 +186,7 @@ export function EditHabitSheet({
           </button>
           <button
             data-lg-press
-            onClick={() => onSave({ name, category, time: time ?? null, target: isNumeric ? target : null, unit: isNumeric ? unit : null }, q)}
+            onClick={() => onSave({ name, category, time: time ?? null, target: isNumeric ? target : null, unit: isNumeric ? unit : null, reminderTime: reminderTime || undefined }, q)}
             className="btn-primary-uber w-full py-3 text-sm"
           >
             Save

@@ -38,6 +38,12 @@ public class WallpaperPlugin extends Plugin {
     // so the large base64 never ends up in GRAIN_LIVE_DATA.
 
     @PluginMethod
+    public void updateWidget(PluginCall call) {
+        GrainWidget.forceUpdate(getContext());
+        call.resolve();
+    }
+
+    @PluginMethod
     public void syncWallpaperData(PluginCall call) {
         try {
             JSObject data = call.getData();

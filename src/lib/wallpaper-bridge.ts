@@ -37,6 +37,7 @@ export interface WallpaperPluginDef {
   setWallpaper(opts: WallpaperData): Promise<{ success: boolean }>;
   setStaticWallpaper(opts: WallpaperData): Promise<{ success: boolean }>;
   isLiveWallpaperSupported(): Promise<{ supported: boolean }>;
+  updateWidget(): Promise<{ success: boolean }>;
 }
 
 // Bug 12 fix: Lazy-initialize the plugin to avoid crashing during SSR or
@@ -46,6 +47,7 @@ const webStub: WallpaperPluginDef = {
   setWallpaper: async () => ({ success: false }),
   setStaticWallpaper: async () => ({ success: false }),
   isLiveWallpaperSupported: async () => ({ supported: false }),
+  updateWidget: async () => ({ success: false }),
 };
 
 let _instance: WallpaperPluginDef | null = null;

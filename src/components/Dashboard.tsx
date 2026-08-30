@@ -114,6 +114,7 @@ import { InsightsCoachModal } from "../components/InsightsCoachModal";
 import { ShareStreakModal } from "../components/ShareStreakModal";
 import { TodayHero } from "../components/TodayHero";
 import { WallpaperNative } from "../lib/wallpaper-bridge";
+import { WidgetBridge } from "../lib/widget-bridge";
 import { useWallpaperSync } from "../hooks/useWallpaperSync";
 import { GoalTab } from "../components/tabs/GoalTab";
 import { useGoals } from "../hooks/useGoals";
@@ -132,6 +133,7 @@ import {
 } from "../lib/theme";
 
 import type { AppTab, Theme, WallpaperState, Habit } from "../components/types";
+import { useToast } from "./ui/Toast";
 import { WheelPicker } from "./ui/WheelPicker";
 
 const catClass = (_c: string) => "bg-canvas-soft text-body border border-[color:var(--hairline)]";
@@ -344,8 +346,9 @@ export function Dashboard({ user }: { user?: any }) {
     }
     return "dark";
   });
-  const [toast, setToast] = useState<{ msg: string; action?: { label: string; onClick: () => void } } | null>(null);
-  const toastTimerRef = useRef<number | null>(null);
+  
+  const { toast: globalToast, error: toastError, success: toastSuccess } = useToast();
+
 
   // Multi-select & Bulk Delete state
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -804,12 +807,7 @@ export function Dashboard({ user }: { user?: any }) {
   }, []);
 
   const showToast = (msg: string, action?: { label: string; onClick: () => void }, duration = 1600) => {
-    if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
-    setToast({ msg, action });
-    toastTimerRef.current = window.setTimeout(() => {
-      setToast((t) => (t?.msg === msg ? null : t));
-      toastTimerRef.current = null;
-    }, duration);
+    globalToast(msg, "info");
   };
 
   const toggleDone = async (q: Quadrant, i: number) => {
@@ -841,7 +839,7 @@ export function Dashboard({ user }: { user?: any }) {
     try {
       const targetHabit = habits[q][i];
       if (!targetHabit) return;
-      freezeHabitStreak(targetHabit.id).catch(err => console.error("Freeze error:", err));
+      freezeHabitStreak(targetHabit.id).catch(err => toastError("Freeze error"));
       showToast(`Streak frozen for "${targetHabit.name}"`);
     } finally {
       setDetail(null);
@@ -926,7 +924,7 @@ export function Dashboard({ user }: { user?: any }) {
 
     addHabit(habitData as any).then(() => {
       showToast(`Added "${name}"`);
-    }).catch(console.error);
+    }).catch(err => toastError("An error occurred"));
   };
 
 
@@ -1136,6 +1134,18 @@ export function Dashboard({ user }: { user?: any }) {
         uncompletedCount: uncompleted,
         streak: displayedTotalStreak,
         allDone,
+        habits: flatHabits.map(h => ({
+          id: h.id,
+          name: h.name,
+          reminderTime: h.reminderTime || "",
+          done: h.done || false
+        })),
+      });
+
+      WidgetBridge.sync({
+        completed: scheduledTodayHabits.length - uncompleted,
+        total: scheduledTodayHabits.length,
+        streak: displayedTotalStreak
       });
     }, 400);
 
@@ -1183,7 +1193,7 @@ export function Dashboard({ user }: { user?: any }) {
             wallpaperPhotoScale,
             wallpaperCustomPhoto,
           }
-        } as any).catch(err => console.error("Failed to save wallpaper prefs", err));
+        } as any).catch(err => toastError("Failed to save wallpaper prefs"));
       }
 
       if (typeof window !== "undefined" && (window as any).Capacitor?.isNativePlatform()) {
@@ -1253,7 +1263,7 @@ export function Dashboard({ user }: { user?: any }) {
       setWallpaperState("applied");
       setWallpaperSnapshot(heatmap.map((c) => c.slice()));
     } catch (e: any) {
-      console.error(e);
+      toastError(e.message || "An error occurred");
       if (e?.message?.includes("static")) {
         showToast("Static wallpaper failed. Try Live Wallpaper instead.");
       } else {
@@ -1338,7 +1348,7 @@ export function Dashboard({ user }: { user?: any }) {
           prefs: { wallpaperTheme, gridColorTheme, wallpaperHabitSet, wallpaperGridStyle, wallpaperScale, wallpaperPhotoOverlay, wallpaperStatsAlign, wallpaperSync, remindersOn, timeFilter, theme, previewWeeks, activeGoalId, wallpaperOffset, wallpaperPhotoOffset, wallpaperPhotoScale },
         });
       } catch (err) {
-        console.error("Failed to save wallpaper prefs", err);
+        toastError("Failed to save wallpaper prefs");
       }
       showToast("Saved to downloads");
       if (navigator.vibrate) navigator.vibrate(18);
@@ -1809,12 +1819,7 @@ export function Dashboard({ user }: { user?: any }) {
             <button
               type="button"
               onClick={() => {
-                if (toast?.action) {
-                  toast.action.onClick();
-                  if (toastTimerRef.current) window.clearTimeout(toastTimerRef.current);
-                  setToast(null);
-                  return;
-                }
+
                 if (showTitlePill) {
                   setStreakOpen(true);
                 } else {
@@ -1864,30 +1869,6 @@ export function Dashboard({ user }: { user?: any }) {
               </span>
             </button>
 
-            {/* Context Pill (Dynamic Island) */}
-            <div className={`absolute left-1/2 -translate-x-1/2 top-[env(safe-area-inset-top,24px)] transition-all duration-500 ${toast ? 'scale-100 opacity-100 translate-y-0' : 'scale-90 opacity-0 -translate-y-8 pointer-events-none'}`} style={{ transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)' }}>
-              <button
-                onClick={() => {
-                  if (toast?.action?.onClick) toast.action.onClick();
-                }}
-                className="pointer-events-auto flex h-10 items-center justify-center rounded-full bg-black border border-white/10 shadow-[0_16px_32px_rgba(0,0,0,0.4)] px-5 transition-all active:scale-95"
-              >
-                <div className="flex items-center gap-2.5 overflow-hidden">
-                  {toast && (
-                    <>
-                      <span className="font-bold text-[13px] leading-none shrink-0 whitespace-nowrap text-white">
-                        {toast.msg}
-                      </span>
-                      {toast.action && (
-                        <span className="rounded-full bg-white/15 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-white">
-                          {toast.action.label}
-                        </span>
-                      )}
-                    </>
-                  )}
-                </div>
-              </button>
-            </div>
 
             {/* Profile Button (Top Right) */}
             <button
@@ -2200,7 +2181,7 @@ export function Dashboard({ user }: { user?: any }) {
                       if (userId) {
                         await updateDoc(doc(getFirestore(), "users", userId), {
                           "prefs.activeGoalId": null
-                        }).catch(console.error);
+                        }).catch(err => toastError("An error occurred"));
                       }
                     }
                     await deleteGoal(userId!, id);
@@ -2210,7 +2191,7 @@ export function Dashboard({ user }: { user?: any }) {
                     if (userId) {
                       await updateDoc(doc(getFirestore(), "users", userId), {
                         "prefs.activeGoalId": id
-                      }).catch(console.error);
+                      }).catch(err => toastError("An error occurred"));
                     }
                   }}
                 />
@@ -2858,7 +2839,7 @@ export function Dashboard({ user }: { user?: any }) {
                     6000
                   );
                 } catch (err) {
-                  console.error("Bulk delete failed:", err);
+                  toastError("Bulk delete failed");
                   showToast("Failed to delete habits. Please try again.");
                 }
               }}
@@ -2905,7 +2886,7 @@ export function Dashboard({ user }: { user?: any }) {
               onClose={() => setProfileEditOpen(false)}
               onSave={(next) => {
                 setProfileEditOpen(false);
-                saveProfile(next).catch(console.error);
+                saveProfile(next).catch(err => toastError("An error occurred"));
               }}
             />
           )}
@@ -3631,7 +3612,7 @@ export function Dashboard({ user }: { user?: any }) {
                       await updateHabitDoc(h.id, updates);
                       showToast("Habit updated");
                     } catch (err) {
-                      console.error("Failed to update habit:", err);
+                      toastError("Failed to update habit");
                     }
                   })();
                 }}
@@ -3946,10 +3927,10 @@ export function Dashboard({ user }: { user?: any }) {
                         try {
                           // Persist note to Firestore first (fire and forget)
                           if (noteDraft.trim()) {
-                            saveHabitNote(h.id, noteDraft.trim()).catch(err => console.error(err));
+                            saveHabitNote(h.id, noteDraft.trim()).catch(err => toastError(err.message || "An error occurred"));
                           }
                           if (!h.done) {
-                            toggleHabitDone(h.id).catch(err => console.error(err));
+                            toggleHabitDone(h.id).catch(err => toastError(err.message || "An error occurred"));
                           }
                           showToast(noteDraft.trim() ? "Note saved & marked done" : "Marked done");
                         } finally {

@@ -22,6 +22,7 @@ const queryClient = new QueryClient({
 });
 
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { ToastProvider } from "./components/ui/Toast";
 
 const rootEl = document.getElementById("root");
 if (rootEl) {
@@ -29,9 +30,11 @@ if (rootEl) {
     <React.StrictMode>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
-          <AuthGate>
-            {(user) => <Dashboard key={user.uid} user={user} />}
-          </AuthGate>
+          <ToastProvider>
+            <AuthGate>
+              {(user) => <Dashboard key={user.uid} user={user} />}
+            </AuthGate>
+          </ToastProvider>
         </QueryClientProvider>
       </ErrorBoundary>
     </React.StrictMode>

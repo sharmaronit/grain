@@ -52,6 +52,17 @@
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
+
+        <receiver
+            android:name=".GrainWidget"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/grain_widget_info" />
+        </receiver>
     </application>
 
     <!-- Allow the app to see and launch the system Live Wallpaper Picker on Android 11+ -->

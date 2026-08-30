@@ -112,6 +112,7 @@ export interface HabitReminderOptions {
   uncompletedCount?: number;
   streak?: number;
   allDone?: boolean;
+  habits?: { id: string; name: string; reminderTime: string; done: boolean }[];
 }
 
 /**
@@ -126,6 +127,7 @@ export async function scheduleHabitReminders(opts: HabitReminderOptions): Promis
     uncompletedCount = 0,
     streak = 0,
     allDone = false,
+    habits = [],
   } = opts;
 
   if (!enabled) {
@@ -217,6 +219,33 @@ export async function scheduleHabitReminders(opts: HabitReminderOptions): Promis
             });
           }
         }
+
+        // ── Per-Habit Reminders ──
+        habits.forEach((habit, hIdx) => {
+          if (!habit.reminderTime) return;
+          const [hHourStr, hMinStr] = habit.reminderTime.split(":");
+          const hHour = parseInt(hHourStr || "12", 10);
+          const hMin = parseInt(hMinStr || "0", 10);
+
+          const habitDate = new Date(now);
+          habitDate.setDate(habitDate.getDate() + i);
+          habitDate.setHours(hHour, hMin, 0, 0);
+
+          const skipHabitToday = i === 0 && (habit.done || habitDate.getTime() <= now.getTime());
+
+          if (!skipHabitToday) {
+            notificationsToSchedule.push({
+              id: 3000 + i * 100 + hIdx,
+              title: `Grain · ${habit.name}`,
+              body: `Time for "${habit.name}". Just 1% better every day.`,
+              channelId: NOTIFICATION_CHANNEL_ID,
+              schedule: {
+                at: habitDate,
+                allowWhileIdle: true,
+              },
+            });
+          }
+        });
       }
 
       if (notificationsToSchedule.length > 0) {

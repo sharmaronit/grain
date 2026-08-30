@@ -48,6 +48,7 @@ export interface HabitDoc {
   shade: number;
   bestStreak: number;
   order: number;
+  reminderTime?: string;
   createdAt: Date;
 }
 
