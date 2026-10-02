@@ -3598,6 +3598,10 @@ export function Dashboard({ user }: { user?: any }) {
                   </button>
                 </div>
 
+                <p className="pb-2 text-center text-[10px] leading-relaxed text-mute">
+                  Grain · © 2026 Ronit Sharma · All rights reserved
+                </p>
+
                 <div className="pb-8" />
               </div>
             </div>

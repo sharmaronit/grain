@@ -1,8 +1,16 @@
 # Grain
 
+> Copyright © 2026 Ronit Sharma. All rights reserved. This is a proprietary project; see [LICENSE](LICENSE) before viewing, using, or distributing the code.
+
 A minimalist, high-performance habit tracker and consistency dashboard. Built as a fully independent, offline-first application with Firebase syncing and native Capacitor integration.
 
 **Website & Landing Page:** [https://trygrain.vercel.app/](https://trygrain.vercel.app/)
+
+## Ownership and usage
+
+Grain, its source code, UI designs, assets, logo, and compiled applications are owned by Ronit Sharma. The repository is published for controlled review and development access only. Copying, redistribution, commercial use, or creating derivative products requires written permission.
+
+Do not commit credentials, signing keys, release tokens, or private user data. Keep the GitHub repository private if the source should not be visible, and enable branch protection and required pull requests for `main` in GitHub repository settings.
 
 ## 🚀 Tech Stack
 - **Frontend:** React 19, TypeScript, Vite, TailwindCSS
