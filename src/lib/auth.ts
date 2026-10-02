@@ -8,9 +8,20 @@ import {
   signOut as firebaseSignOut,
   updateProfile,
   onAuthStateChanged,
+  browserLocalPersistence,
+  browserSessionPersistence,
+  setPersistence,
   type User,
 } from "firebase/auth";
-import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  setDoc,
+  serverTimestamp,
+  writeBatch,
+} from "firebase/firestore";
 import { useEffect, useState } from "react";
 import { auth, db } from "./firebase";
 
@@ -55,13 +66,73 @@ function friendlyError(err: unknown): string {
   return errorMessages[code] ?? (msg || "Something went wrong. Please try again.");
 }
 
+/**
+ * Copy data created by older builds from users/{email} to users/{uid}.
+ * The legacy documents are deliberately retained as a recoverable backup.
+ */
+async function migrateLegacyUserData(user: User): Promise<void> {
+  const legacyId = user.email;
+  if (!legacyId || legacyId === user.uid) return;
+
+  const targetRef = doc(db(), "users", user.uid);
+  const targetSnap = await getDoc(targetRef);
+  if (targetSnap.exists()) return;
+
+  const legacyRef = doc(db(), "users", legacyId);
+  const legacySnap = await getDoc(legacyRef);
+  if (!legacySnap.exists()) return;
+
+  await setDoc(targetRef, {
+    ...legacySnap.data(),
+    email: user.email,
+    migratedFrom: legacyId,
+    updatedAt: serverTimestamp(),
+  });
+
+  const subcollections = ["habits", "goals", "completions"] as const;
+  const snapshots = await Promise.all(
+    subcollections.map((name) => getDocs(collection(db(), "users", legacyId, name))),
+  );
+
+  const pending: Array<{ path: string; id: string; data: Record<string, unknown> }> = [];
+  snapshots.forEach((snapshot, index) => {
+    const name = subcollections[index];
+    snapshot.docs.forEach((item) => pending.push({ path: name, id: item.id, data: item.data() }));
+  });
+
+  // Firestore batches support at most 500 operations; leave headroom.
+  for (let offset = 0; offset < pending.length; offset += 450) {
+    const batch = writeBatch(db());
+    pending.slice(offset, offset + 450).forEach((item) => {
+      batch.set(doc(db(), "users", user.uid, item.path, item.id), item.data);
+    });
+    await batch.commit();
+  }
+}
+
+// Migration is maintenance work, not part of session restoration. Keep one
+// background task per user so React StrictMode cannot start duplicate copies.
+const legacyMigrationTasks = new Map<string, Promise<void>>();
+
+function migrateLegacyUserDataInBackground(user: User): void {
+  if (legacyMigrationTasks.has(user.uid)) return;
+
+  const task = migrateLegacyUserData(user).catch((error) => {
+    // UID-based data can still load and the legacy document remains intact.
+    console.error("[auth] Legacy data migration failed:", error);
+  });
+  legacyMigrationTasks.set(user.uid, task);
+}
+
 // ── Auth operations ──────────────────────────────────────
 
 /** Sign in with email and password. */
 export async function signInEmail(
   email: string,
   password: string,
+  remember = true,
 ): Promise<User> {
+  await setPersistence(auth(), remember ? browserLocalPersistence : browserSessionPersistence);
   const cred = await signInWithEmailAndPassword(auth(), email, password);
   return cred.user;
 }
@@ -71,7 +142,9 @@ export async function signUpEmail(
   email: string,
   password: string,
   name: string,
+  remember = true,
 ): Promise<User> {
+  await setPersistence(auth(), remember ? browserLocalPersistence : browserSessionPersistence);
   const cred = await createUserWithEmailAndPassword(auth(), email, password);
   const user = cred.user;
 
@@ -87,7 +160,7 @@ export async function signUpEmail(
     .join("")
     .toUpperCase();
 
-  await setDoc(doc(db(), "users", user.email || user.uid), {
+  await setDoc(doc(db(), "users", user.uid), {
     name,
     email: user.email,
     tagline: "Building the 1% better version daily.",
@@ -140,7 +213,7 @@ export async function signInGoogle(): Promise<User> {
 
   if (user) {
     // Create user doc if this is their first sign-in
-    const userRef = doc(db(), "users", user.email || user.uid);
+    const userRef = doc(db(), "users", user.uid);
     const snap = await getDoc(userRef);
     if (!snap.exists()) {
       const name = user.displayName ?? user.email?.split("@")[0] ?? "You";
@@ -205,7 +278,9 @@ export function useAuth(): AuthState {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth(), (user) => {
+      // Release the app immediately after Firebase restores the local session.
       setState({ user, loading: false });
+      if (user) migrateLegacyUserDataInBackground(user);
     });
     return unsubscribe;
   }, []);

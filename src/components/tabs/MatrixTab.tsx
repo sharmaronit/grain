@@ -2,6 +2,7 @@ import { useState, useRef, memo } from "react";
 import { Sparkles, Plus, Check, Shield, Droplets, Pin, MoreVertical, Minus, Settings, Trash2 } from "lucide-react";
 import { useStore } from "../../store/useStore";
 import type { Habit, Quadrant } from "../types";
+import { DropdownMotion } from "../ui/DropdownMotion";
 
 const QUADRANTS: Record<Quadrant, { title: string }> = {
   q1: { title: "Do first" },
@@ -11,7 +12,7 @@ const QUADRANTS: Record<Quadrant, { title: string }> = {
 };
 const QUADRANT_ORDER: Quadrant[] = ["q1", "q2", "q3", "q4"];
 
-const catClass = (_c: string) => "bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] text-white";
+const catClass = (_c: string) => "liquid-control text-ink";
 
 interface MatrixTabProps {
   totalCount: number;
@@ -40,12 +41,9 @@ export const MatrixTab = memo(function MatrixTab({
 
   return (
     <div className="animate-tab-fade pt-16">
-      <section className="px-5">
+      <section className="px-4">
         {totalCount === 0 ? (
           <div className="liquid-glass specular flex flex-col items-center justify-center gap-3 px-5 py-10 text-center rounded-3xl">
-            <div className="grid h-12 w-12 place-items-center rounded-full bg-[color:color-mix(in_srgb,var(--canvas)_40%,transparent)] border border-[color:color-mix(in_srgb,var(--accent)_15%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_20%,transparent)]">
-              <Sparkles className="h-5 w-5 text-ink" />
-            </div>
             <div>
               <p className="font-display text-base font-bold text-ink">No habits yet</p>
               <p className="mt-1 max-w-[240px] text-[12px] text-body">
@@ -125,7 +123,7 @@ function QuadrantCard({
   const doneCount = habits.filter((h) => h.done).length;
 
   return (
-    <div className="liquid-glass specular relative flex w-full flex-col overflow-hidden rounded-[24px] border border-[color:color-mix(in_srgb,var(--accent)_12%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_20%,transparent),0_8px_32px_rgba(0,0,0,0.3)] transition-all">
+    <div className="liquid-glass specular relative flex w-full flex-col overflow-hidden rounded-[24px] transition-all">
       {/* Simple header — no collapse, no subtitle */}
       <div className="flex items-center justify-between px-4 py-3">
         <h3 className="font-display text-sm font-bold text-ink">{meta.title}</h3>
@@ -178,7 +176,7 @@ function HabitRow({
   onAdjust,
   onOpenDetail,
 }: any) {
-  const isNumeric = h.target !== undefined;
+  const isNumeric = h.type === "numeric";
   const pct = isNumeric ? Math.min(100, ((h.value ?? 0) / (h.target ?? 1)) * 100) : 0;
   // Numeric +/- controls hidden by default — show on tap
   const [numericOpen, setNumericOpen] = useState(false);
@@ -253,7 +251,7 @@ function HabitRow({
 
   return (
     <div
-      className={`group relative overflow-hidden rounded-xl bg-white/5 backdrop-blur-[40px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] text-white ${
+      className={`group relative overflow-hidden rounded-xl liquid-control text-ink ${
         h.done ? "opacity-70" : ""
       } ${justDone ? "animate-sync-pulse" : ""}`}
     >
@@ -322,7 +320,7 @@ function HabitRow({
           transition: dragging ? "none" : "transform 260ms cubic-bezier(.2,.9,.3,1.2)",
           touchAction: "pan-y",
         }}
-        className="relative flex cursor-pointer items-center gap-2 bg-white/5 backdrop-blur-[40px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] text-white p-2 transition-[background] hover:bg-[color:var(--canvas-softer)]"
+        className="relative flex cursor-pointer items-center gap-2 bg-transparent text-ink p-2 transition-[background] hover:bg-[color:color-mix(in_srgb,var(--ink)_8%,transparent)]"
       >
         {isNumeric ? (
           <div className="grid h-5 w-5 shrink-0 place-items-center rounded-full border border-[color:var(--hairline-mid)] text-ink">
@@ -401,7 +399,7 @@ function HabitRow({
 
       {isNumeric && numericOpen && (
         <div
-          className="bg-white/5 backdrop-blur-[40px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] text-white px-2 pb-2 animate-fade-in-up"
+          className="bg-transparent text-ink px-2 pb-2 animate-fade-in-up"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="mb-1 flex items-center justify-between text-[9px] font-medium text-body">
@@ -413,14 +411,14 @@ function HabitRow({
             <div className="flex items-center gap-1">
               <button
                 onClick={() => onAdjust(-1)}
-                className="grid h-5 w-5 place-items-center rounded-full bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] text-ink hover:bg-[color:var(--surface-pressed)]"
+                className="liquid-control grid h-5 w-5 place-items-center rounded-full text-ink hover:bg-[color:var(--surface-pressed)]"
                 aria-label="Decrease"
               >
                 <Minus className="h-2.5 w-2.5" strokeWidth={3} />
               </button>
               <button
                 onClick={() => onAdjust(1)}
-                className="grid h-5 w-5 place-items-center rounded-full bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.25)] text-white hover:opacity-90"
+                className="liquid-control grid h-5 w-5 place-items-center rounded-full text-ink hover:opacity-90"
                 aria-label="Increase"
               >
                 <Plus className="h-2.5 w-2.5" strokeWidth={3} />
@@ -436,8 +434,7 @@ function HabitRow({
         </div>
       )}
 
-      {menuOpen && (
-        <div className="absolute right-1 top-full mt-1 z-30 w-28 overflow-hidden rounded-lg border border-white/10 bg-[#1A1A1A]/50 backdrop-blur-[40px] shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] text-white animate-fade-in">
+      <DropdownMotion open={menuOpen} className="absolute right-1 top-full z-30 mt-1 w-28 overflow-hidden rounded-lg border border-white/10 bg-[#1A1A1A]/50 text-white backdrop-blur-[40px] shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)]">
           <button
             onClick={(e) => { e.stopPropagation(); onEdit(); onMenuClose(); }}
             className="flex w-full items-center gap-2 px-2 py-1.5 text-[10px] text-white/80 hover:text-white hover:bg-white/10 transition"
@@ -462,8 +459,7 @@ function HabitRow({
           >
             <Trash2 className="h-3 w-3" /> Delete
           </button>
-        </div>
-      )}
+      </DropdownMotion>
     </div>
   );
 }

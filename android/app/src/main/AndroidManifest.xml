@@ -54,6 +54,11 @@
         </receiver>
 
         <receiver
+            android:name=".WallpaperUpdateReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
+        <receiver
             android:name=".GrainWidget"
             android:exported="true">
             <intent-filter>

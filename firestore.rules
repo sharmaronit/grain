@@ -2,14 +2,29 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    function isUserOwner(userId) {
+      return request.auth != null && (
+        request.auth.uid == userId ||
+        (request.auth.token.email != null && request.auth.token.email == userId)
+      );
+    }
+
     // Only allow users to read and write their own documents
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Email matching is retained temporarily so signed-in users can migrate
+      // legacy email-keyed data into their UID-keyed document.
+      allow read, write: if isUserOwner(userId);
       
       // Allow access to subcollections under the user's document
       match /{document=**} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
+        allow read, write: if isUserOwner(userId);
       }
+    }
+
+    match /feedback/{feedbackId} {
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+      allow read, update, delete: if false;
     }
   }
 }

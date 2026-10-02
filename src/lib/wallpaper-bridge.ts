@@ -37,6 +37,8 @@ export interface WallpaperPluginDef {
   setWallpaper(opts: WallpaperData): Promise<{ success: boolean }>;
   setStaticWallpaper(opts: WallpaperData): Promise<{ success: boolean }>;
   isLiveWallpaperSupported(): Promise<{ supported: boolean }>;
+  isExactAlarmAllowed(): Promise<{ supported: boolean; allowed: boolean }>;
+  requestExactAlarmPermission(): Promise<{ opened: boolean }>;
   updateWidget(): Promise<{ success: boolean }>;
 }
 
@@ -47,6 +49,8 @@ const webStub: WallpaperPluginDef = {
   setWallpaper: async () => ({ success: false }),
   setStaticWallpaper: async () => ({ success: false }),
   isLiveWallpaperSupported: async () => ({ supported: false }),
+  isExactAlarmAllowed: async () => ({ supported: false, allowed: false }),
+  requestExactAlarmPermission: async () => ({ opened: false }),
   updateWidget: async () => ({ success: false }),
 };
 

@@ -5,16 +5,9 @@
  * plus CRUD operations that write directly to Firestore.
  */
 
-import { useEffect, useMemo, useState } from "react";
-import {
-  collection,
-  onSnapshot,
-  orderBy,
-  query,
-  type DocumentData,
-  type QueryDocumentSnapshot,
-} from "firebase/firestore";
-import { db } from "../lib/firebase";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { usePageVisible } from "./usePageVisible";
+import { readLocalData, subscribeLocalData } from "../lib/local-data";
 import {
   addHabit as fbAddHabit,
   updateHabitDoc,
@@ -25,29 +18,6 @@ import {
   type Quadrant,
 } from "../lib/firestore";
 
-function habitFromSnap(snap: QueryDocumentSnapshot<DocumentData>): HabitDoc {
-  const d = snap.data();
-  return {
-    id: snap.id,
-    name: d.name ?? "",
-    category: d.category ?? "Mind",
-    quadrant: (d.quadrant as Quadrant) ?? "q2",
-    time: d.time ?? null,
-    type: d.type ?? "binary",
-    target: d.target ?? null,
-    unit: d.unit ?? null,
-    step: d.step ?? null,
-    pinned: d.pinned ?? false,
-    frequency: d.frequency ?? "daily",
-    customDays: d.customDays ?? [],
-    icon: d.icon ?? 0,
-    shade: d.shade ?? 0,
-    bestStreak: d.bestStreak ?? 0,
-    order: d.order ?? 0,
-    createdAt: d.createdAt?.toDate?.() ?? new Date(),
-  };
-}
-
 export interface UseHabitsResult {
   /** All habits, flat list ordered by `order`. */
   habits: HabitDoc[];
@@ -55,6 +25,8 @@ export interface UseHabitsResult {
   byQuadrant: Record<Quadrant, HabitDoc[]>;
   /** Whether the initial fetch is still loading. */
   loading: boolean;
+  error: Error | null;
+  retry: () => void;
   /** Add a new habit. Returns the Firestore document ID. */
   add: (habit: Omit<HabitDoc, "id" | "createdAt">) => Promise<string>;
   /** Update fields on an existing habit. */
@@ -71,36 +43,37 @@ export interface UseHabitsResult {
 }
 
 export function useHabits(userId: string | null): UseHabitsResult {
+  const pageVisible = usePageVisible();
   const [habits, setHabits] = useState<HabitDoc[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
     if (!userId) {
       setHabits([]);
       setLoading(false);
+      setError(null);
+      hasLoadedRef.current = false;
       return;
     }
+    if (!pageVisible) return;
 
-    const q = query(
-      collection(db(), "users", userId, "habits"),
-      orderBy("order", "asc"),
-    );
+    // Visibility changes reattach the listener. Keep the last snapshot on
+    // screen instead of replacing a populated list with a loading spinner.
+    if (!hasLoadedRef.current) setLoading(true);
+    setError(null);
 
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const list = snap.docs.map(habitFromSnap);
-        setHabits(list);
-        setLoading(false);
-      },
-      (err) => {
-        console.error("[useHabits] snapshot error:", err);
-        setLoading(false);
-      },
-    );
-
-    return unsub;
-  }, [userId]);
+    const refresh = () => {
+      const list = readLocalData(userId).habits.slice().sort((a, b) => a.order - b.order);
+      setHabits(list);
+      hasLoadedRef.current = true;
+      setLoading(false);
+    };
+    refresh();
+    return subscribeLocalData(userId, refresh);
+  }, [userId, pageVisible, retryNonce]);
 
   const byQuadrant = useMemo(() => {
     const out: Record<Quadrant, HabitDoc[]> = {
@@ -127,7 +100,12 @@ export function useHabits(userId: string | null): UseHabitsResult {
     habit: Omit<HabitDoc, "id" | "createdAt">,
   ): Promise<string> => {
     if (!userId) throw new Error("Not authenticated");
-    return fbAddHabit(userId, habit);
+    try {
+      return await fbAddHabit(userId, habit);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error("Habit could not be saved"));
+      throw err;
+    }
   };
 
   const update = async (
@@ -135,7 +113,12 @@ export function useHabits(userId: string | null): UseHabitsResult {
     patch: Partial<Omit<HabitDoc, "id" | "createdAt">>,
   ): Promise<void> => {
     if (!userId) return;
-    await updateHabitDoc(userId, habitId, patch);
+    try {
+      await updateHabitDoc(userId, habitId, patch);
+    } catch (err) {
+      setError(err instanceof Error ? err : new Error("Habit could not be updated"));
+      throw err;
+    }
   };
 
   const remove = async (habitId: string): Promise<HabitDoc | undefined> => {
@@ -147,6 +130,7 @@ export function useHabits(userId: string | null): UseHabitsResult {
       await deleteHabitDoc(userId, habitId);
     } catch (err) {
       console.error("[useHabits] Failed to delete habit from Firestore:", err);
+      setError(err instanceof Error ? err : new Error("Habit could not be deleted"));
       // Revert if delete failed
       if (removed) {
         setHabits((prev) => [...prev, removed]);
@@ -165,6 +149,7 @@ export function useHabits(userId: string | null): UseHabitsResult {
       await deleteHabitDocs(userId, habitIds);
     } catch (err) {
       console.error("[useHabits] Failed to bulk delete habits from Firestore:", err);
+      setError(err instanceof Error ? err : new Error("Habits could not be deleted"));
       // Revert if batch delete failed
       setHabits((prev) => [...prev, ...removedList]);
       throw err;
@@ -180,10 +165,11 @@ export function useHabits(userId: string | null): UseHabitsResult {
       await restoreHabit(userId, habit);
     } catch (err) {
       console.error("[useHabits] Failed to restore habit:", err);
+      setError(err instanceof Error ? err : new Error("Habit could not be restored"));
       setHabits((prev) => prev.filter((h) => h.id !== habit.id));
       throw err;
     }
   };
 
-  return { habits, byQuadrant, loading, add, update, remove, removeMany, restore };
+  return { habits, byQuadrant, loading, error, retry: () => setRetryNonce((value) => value + 1), add, update, remove, removeMany, restore };
 }

@@ -11,14 +11,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  collection,
-  onSnapshot,
-  orderBy,
-  query,
-  where,
-} from "firebase/firestore";
-import { db } from "../lib/firebase";
-import {
   formatDateKey,
   heatmapStartDate,
   isoDow,
@@ -27,6 +19,8 @@ import {
 } from "../lib/dates";
 import { calculateStreak, calculateBestStreak, type CompletionEntry } from "../lib/streaks";
 import type { HabitDoc } from "../lib/firestore";
+import { usePageVisible } from "./usePageVisible";
+import { readLocalData, subscribeLocalData } from "../lib/local-data";
 
 export interface HeatmapStats {
   currentStreak: number; // consecutive days with >= 1 habit done
@@ -52,6 +46,8 @@ export interface UseHeatmapResult {
   completionsMap: Record<string, Record<string, CompletionEntry>>;
   /** Loading flag for initial data fetch. */
   loading: boolean;
+  error: Error | null;
+  retry: () => void;
 }
 
 export function useHeatmap(
@@ -59,15 +55,19 @@ export function useHeatmap(
   habits: HabitDoc[],
   categoryFilter?: string,
 ): UseHeatmapResult {
+  const pageVisible = usePageVisible();
   const [completionsMap, setCompletionsMap] = useState<
     Record<string, Record<string, CompletionEntry>>
   >({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   // Reactive today state that updates automatically on midnight rollover or tab visibility change
   const [today, setToday] = useState(() => new Date());
 
   useEffect(() => {
+    if (!pageVisible) return;
     const checkDate = () => {
       const now = new Date();
       if (!isSameDay(now, today)) {
@@ -83,7 +83,7 @@ export function useHeatmap(
       clearInterval(interval);
       document.removeEventListener("visibilitychange", onVisibilityChange);
     };
-  }, [today]);
+  }, [today, pageVisible]);
 
   const { startDate, startKey, endKey } = useMemo(() => {
     const sd = heatmapStartDate(today);
@@ -99,35 +99,23 @@ export function useHeatmap(
     if (!userId) {
       setCompletionsMap({});
       setLoading(false);
+      setError(null);
       return;
     }
+    if (!pageVisible) return;
 
-    const q = query(
-      collection(db(), "users", userId, "completions"),
-      where("date", ">=", startKey),
-      where("date", "<=", endKey),
-      orderBy("date", "asc"),
-    );
+    setLoading(true);
+    setError(null);
 
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const map: Record<string, Record<string, CompletionEntry>> = {};
-        for (const d of snap.docs) {
-          const data = d.data();
-          map[d.id] = (data.entries as Record<string, CompletionEntry>) ?? {};
-        }
-        setCompletionsMap(map);
-        setLoading(false);
-      },
-      (err) => {
-        console.error("[useHeatmap] snapshot error:", err);
-        setLoading(false);
-      },
-    );
-
-    return unsub;
-  }, [userId, startKey, endKey]);
+    const refresh = () => {
+      const all = readLocalData(userId).completions;
+      const map = Object.fromEntries(Object.entries(all).filter(([key]) => key >= startKey && key <= endKey));
+      setCompletionsMap(map);
+      setLoading(false);
+    };
+    refresh();
+    return subscribeLocalData(userId, refresh);
+  }, [userId, startKey, endKey, pageVisible, retryNonce]);
 
   // Filter habits by category if specified
   const filteredHabits = useMemo(() => {
@@ -282,6 +270,8 @@ export function useHeatmap(
       habitStreaks,
       completionsMap,
       loading,
+      error,
+      retry: () => setRetryNonce((value) => value + 1),
     };
-  }, [completionsMap, filteredHabits, habits, loading, startDate, today]);
+  }, [completionsMap, error, filteredHabits, habits, loading, startDate, today]);
 }

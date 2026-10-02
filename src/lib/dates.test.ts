@@ -9,6 +9,7 @@ import {
   daysBetween,
   isSameDay,
   heatmapStartDate,
+  heatmapWeekLabelDate,
 } from "./dates";
 
 describe("dates utility functions", () => {
@@ -98,5 +99,12 @@ describe("dates utility functions", () => {
     const monday = new Date(2026, 7, 24);
     const startMon = heatmapStartDate(monday);
     expect(isoDow(startMon)).toBe(0); // Must be Monday
+  });
+
+  it("labels a cross-month week by its majority month", () => {
+    // Sep 28–Oct 4, 2026 contains four October days.
+    const labelDate = heatmapWeekLabelDate(new Date(2026, 8, 28));
+    expect(labelDate.getMonth()).toBe(9); // October
+    expect(labelDate.getDate()).toBe(1);
   });
 });

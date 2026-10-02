@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import { WallpaperNative } from "../lib/wallpaper-bridge";
 import { Capacitor } from "@capacitor/core";
 import equal from "fast-deep-equal";
 
@@ -111,7 +110,8 @@ export function useWallpaperSync({
     }
 
     // Debounce to avoid flooding the bridge when multiple state updates happen
-    syncTimeout.current = window.setTimeout(() => {
+    syncTimeout.current = window.setTimeout(async () => {
+      const { WallpaperNative } = await import("../lib/wallpaper-bridge");
       WallpaperNative.syncWallpaperData(payload).catch((e) => console.warn("Live wallpaper sync error:", e));
     }, 500);
 
@@ -145,4 +145,3 @@ export function useWallpaperSync({
     habitText,
   ]);
 }
-

@@ -34,7 +34,7 @@ export function WeeklyReviewModal({
   let thisWeekCompletions = 0;
   for (const h of habits) {
     for (const dk of thisWeekKeys) {
-      if (completionsMap[h.id]?.[dk]?.done) {
+      if (completionsMap[dk]?.[h.id]?.done) {
         thisWeekCompletions++;
       }
     }

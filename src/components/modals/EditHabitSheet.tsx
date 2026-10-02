@@ -36,7 +36,7 @@ export function EditHabitSheet({
   const [category, setCategory] = useState(habit.category);
   const [q, setQ] = useState<Quadrant>(quadrant);
   const [time, setTime] = useState<Habit["time"] | undefined>(habit.time);
-  const [isNumeric, setIsNumeric] = useState(habit.target !== undefined && habit.target !== null);
+  const [isNumeric, setIsNumeric] = useState(habit.type === "numeric");
   const [target, setTarget] = useState<number>(habit.target ?? 1);
   const [unit, setUnit] = useState<string>(habit.unit ?? "");
   const [reminderTime, setReminderTime] = useState<string>(habit.reminderTime ?? "");

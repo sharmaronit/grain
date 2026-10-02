@@ -1,16 +1,18 @@
-import { ConsistencyTab } from "../components/tabs/ConsistencyTab";
-import { SwipeModeView } from "./SwipeModeView";
 import { HabitCard } from "./HabitCard";
-import { OnboardingModal } from "./OnboardingModal";
-import { WeeklyReviewModal } from "./WeeklyReviewModal";
-import { FeedbackSheet } from "./modals/FeedbackSheet";
-import { useEffect, useMemo, useRef, useState, startTransition, memo } from "react";
-import { toPng } from "html-to-image";
-import { DndContext, closestCorners, KeyboardSensor, PointerSensor, useSensor, useSensors, DragOverlay, useDroppable, defaultDropAnimationSideEffects } from '@dnd-kit/core';
-import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
+import { BottomNavigation } from "./BottomNavigation";
+import { DropdownMotion } from "./ui/DropdownMotion";
 import {
-  Layers,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  startTransition,
+  memo,
+  lazy,
+  Suspense,
+} from "react";
+import {
   Flame,
   Settings,
   Plus,
@@ -23,7 +25,6 @@ import {
   Zap,
   Clock,
   Trash2,
-  Wallpaper,
   X,
   Sun,
   Moon,
@@ -46,7 +47,8 @@ import {
   LogOut,
   AlertCircle,
   WifiOff,
-  User, GripVertical,
+  User,
+  GripVertical,
   MessageSquare,
   MessageSquareHeart,
   Hexagon,
@@ -54,9 +56,11 @@ import {
   Eye,
   ImagePlus,
   Move,
-  Infinity
+  Infinity,
+  Wheat,
 } from "lucide-react";
 import { App as CapacitorApp } from "@capacitor/app";
+import { Capacitor } from "@capacitor/core";
 import { StatusBar, Style } from "@capacitor/status-bar";
 
 // ── Firebase auth & data hooks ───────────────────────────
@@ -69,7 +73,6 @@ import {
   resetPassword,
   friendlyError,
 } from "../lib/auth";
-import { getFirestore, updateDoc, doc } from "firebase/firestore";
 import {
   scheduleHabitReminders,
   sendTestNotification,
@@ -80,6 +83,7 @@ import { useHabits } from "../hooks/useHabits";
 import { useCompletions } from "../hooks/useCompletions";
 import { useHeatmap } from "../hooks/useHeatmap";
 import { useOnlineStatus } from "../hooks/useOnlineStatus";
+import { usePageVisible } from "../hooks/usePageVisible";
 import {
   updateUserProfile,
   getUserProfile,
@@ -95,28 +99,20 @@ import {
   shortDay,
   todayKey,
   heatmapStartDate,
+  heatmapWeekLabelDate,
   isoDow,
   isScheduledDay,
 } from "../lib/dates";
-import {
-  calculateStreak,
-  calculateBestStreak,
-  type CompletionsMap,
-} from "../lib/streaks";
+import { calculateStreak, calculateBestStreak, type CompletionsMap } from "../lib/streaks";
 
 // ── Podium Features Modules ─────────────────────────────
 import { HABIT_PACKS, type HabitPack } from "../lib/templates";
 import { computeWeeklyInsights } from "../lib/insights";
 import { computeMilestones } from "../lib/badges";
 import { InsightsCard } from "../components/InsightsCard";
-import { BadgesModal } from "../components/BadgesModal";
-import { InsightsCoachModal } from "../components/InsightsCoachModal";
-import { ShareStreakModal } from "../components/ShareStreakModal";
 import { TodayHero } from "../components/TodayHero";
-import { WallpaperNative } from "../lib/wallpaper-bridge";
 import { WidgetBridge } from "../lib/widget-bridge";
 import { useWallpaperSync } from "../hooks/useWallpaperSync";
-import { GoalTab } from "../components/tabs/GoalTab";
 import { useGoals } from "../hooks/useGoals";
 import { deleteGoal } from "../lib/firestore";
 import { Target } from "lucide-react";
@@ -129,12 +125,49 @@ import {
   wallpaperThemeOf,
   gridColorOf,
   wallpaperTokens,
-  type WpTokens
+  type WpTokens,
 } from "../lib/theme";
 
 import type { AppTab, Theme, WallpaperState, Habit } from "../components/types";
 import { useToast } from "./ui/Toast";
 import { WheelPicker } from "./ui/WheelPicker";
+import { DataStatusBanner } from "./ui/DataStatusBanner";
+import { WallpaperEditorControls } from "./wallpaper/WallpaperEditorControls";
+import {
+  clearLocalCompletionDate,
+  exportLocalBackup,
+  importLocalBackup,
+  migrateCloudDataToLocalOnce,
+  updateLocalPrefs,
+} from "../lib/local-data";
+
+const ConsistencyTab = lazy(() =>
+  import("../components/tabs/ConsistencyTab").then((m) => ({ default: m.ConsistencyTab })),
+);
+const GoalTab = lazy(() =>
+  import("../components/tabs/GoalTab").then((m) => ({ default: m.GoalTab })),
+);
+const loadSwipeModeView = () =>
+  import("./SwipeModeView").then((m) => ({ default: m.SwipeModeView }));
+const SwipeModeView = lazy(loadSwipeModeView);
+const OnboardingModal = lazy(() =>
+  import("./OnboardingModal").then((m) => ({ default: m.OnboardingModal })),
+);
+const WeeklyReviewModal = lazy(() =>
+  import("./WeeklyReviewModal").then((m) => ({ default: m.WeeklyReviewModal })),
+);
+const FeedbackSheet = lazy(() =>
+  import("./modals/FeedbackSheet").then((m) => ({ default: m.FeedbackSheet })),
+);
+const BadgesModal = lazy(() =>
+  import("../components/BadgesModal").then((m) => ({ default: m.BadgesModal })),
+);
+const InsightsCoachModal = lazy(() =>
+  import("../components/InsightsCoachModal").then((m) => ({ default: m.InsightsCoachModal })),
+);
+const ShareStreakModal = lazy(() =>
+  import("../components/ShareStreakModal").then((m) => ({ default: m.ShareStreakModal })),
+);
 
 const catClass = (_c: string) => "bg-canvas-soft text-body border border-[color:var(--hairline)]";
 
@@ -147,6 +180,13 @@ const QUADRANTS: Record<Quadrant, { title: string; sub: string }> = {
 
 const QUADRANT_ORDER: Quadrant[] = ["q1", "q2", "q3", "q4"];
 const TIME_ORDER = ["morning", "afternoon", "evening", "any"] as const;
+const TAB_ORDER: AppTab[] = ["today", "consistency", "myday", "goal"];
+
+const DeferredTabFallback = () => (
+  <div className="flex h-full items-center justify-center gap-2 text-sm text-mute">
+    <Loader2 className="h-4 w-4 animate-spin" /> Loading…
+  </div>
+);
 
 const INITIAL_HABITS: Record<Quadrant, Habit[]> = {
   q1: [],
@@ -166,55 +206,42 @@ function generateHeatmap(): number[][] {
 }
 
 export function Dashboard({ user }: { user?: any }) {
+  const pageVisible = usePageVisible();
   const [showStaticTargetSelector, setShowStaticTargetSelector] = useState(false);
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
-  );
 
-  const [activeDragHabit, setActiveDragHabit] = useState<any>(null);
-
-  const handleDragStart = (event: any) => {
-    const { active } = event;
-    const habit = flatHabits.find((h: any) => h.id === active.id);
-    if (habit) setActiveDragHabit(habit);
-  };
-
-  const handleDragEnd = async (event: any) => {
-    setActiveDragHabit(null);
-    const { active, over } = event;
-    if (!over) return;
-
-    const activeHabit = flatHabits.find((h: any) => h.id === active.id);
-    if (!activeHabit) return;
-
-    let targetQuadrant = activeHabit.quadrant;
-    let targetOrder = activeHabit.order;
-
-    if (["q1", "q2", "q3", "q4"].includes(over.id)) {
-      targetQuadrant = over.id;
-      const quadrantHabits = habits[targetQuadrant as keyof typeof habits] || [];
-      targetOrder = quadrantHabits.length > 0 ? (quadrantHabits[quadrantHabits.length - 1] as any).order + 1 : 0;
-    } else {
-      const overHabit = flatHabits.find((h: any) => h.id === over.id);
-      if (overHabit) {
-        targetQuadrant = overHabit.quadrant;
-        targetOrder = overHabit.order;
-      }
-    }
-
-    if (activeHabit.quadrant !== targetQuadrant || activeHabit.order !== targetOrder) {
-      await updateHabitDoc(active.id, { quadrant: targetQuadrant, order: targetOrder + 0.1 } as any);
-    }
-  };
-
-  const userId = user?.email ?? user?.uid ?? null;
+  const userId = user?.uid ?? null;
+  const onboardingStorageKey = userId ? `grain_onboarded_${userId}` : "";
   const online = useOnlineStatus();
 
-  const [dateStyle, setDateStyle] = useState<"underline" | "block" | "mono">("underline");
+  useEffect(() => {
+    if (!userId || !online) return;
+    void migrateCloudDataToLocalOnce(userId).then((migrated) => {
+      if (migrated) showToast("Existing data moved to this device");
+    });
+  }, [online, userId]);
+
+  // The Deck is a primary navigation destination. Fetch its split chunk while
+  // the startup splash is still visible so opening it never waits on a download.
+  useEffect(() => {
+    void loadSwipeModeView();
+  }, []);
+
+  const [dateStyle, setDateStyle] = useState<"underline" | "block" | "mono">(() => {
+    try {
+      const saved = localStorage.getItem("grain_date_selector_style");
+      if (saved === "underline" || saved === "block" || saved === "mono") return saved;
+    } catch {}
+    return "underline";
+  });
   const [dateDropdownOpen, setDateDropdownOpen] = useState(false);
 
-  const TAB_ORDER: AppTab[] = ["today", "consistency", "myday", "goal"];
+  // This is a visual preference, so retain it between Dashboard remounts and app launches.
+  useEffect(() => {
+    try {
+      localStorage.setItem("grain_date_selector_style", dateStyle);
+    } catch {}
+  }, [dateStyle]);
+
   const [activeTab, setActiveTab] = useState<AppTab>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -244,94 +271,70 @@ export function Dashboard({ user }: { user?: any }) {
   const [swipeMode, setSwipeMode] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const tabTouchStartRef = useRef<{ x: number; y: number } | null>(null);
 
-  const swipeContainerRef = useRef<HTMLDivElement | null>(null);
-  const isNavigatingRef = useRef(false);
+  const switchTab = useCallback(
+    (tab: AppTab, pushHistory: boolean = true) => {
+      if (activeTab === tab) return;
+      const currentIdx = TAB_ORDER.indexOf(activeTab);
+      const nextIdx = TAB_ORDER.indexOf(tab);
+      setTabDirection(nextIdx >= currentIdx ? "left" : "right");
+      startTransition(() => {
+        setActiveTab(tab);
+      });
 
-  const switchTab = (tab: AppTab, pushHistory: boolean = true) => {
-    if (activeTab === tab) return;
-    const currentIdx = TAB_ORDER.indexOf(activeTab);
-    const nextIdx = TAB_ORDER.indexOf(tab);
-    setTabDirection(nextIdx >= currentIdx ? "left" : "right");
-    startTransition(() => {
-      setActiveTab(tab);
-    });
-
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem("grain_active_tab", tab);
-      } catch {}
-    }
-
-    if (pushHistory) {
-      setTabHistory((prev) => (prev[prev.length - 1] === tab ? prev : [...prev, tab]));
-    }
-
-    if (swipeContainerRef.current) {
-      const targetElement = swipeContainerRef.current.querySelector(`[data-tab-id="${tab}"]`);
-      if (targetElement) {
-        isNavigatingRef.current = true;
-        targetElement.scrollIntoView({ behavior: "smooth", inline: "start", block: "nearest" });
-        setTimeout(() => {
-          isNavigatingRef.current = false;
-        }, 600);
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem("grain_active_tab", tab);
+        } catch {}
       }
-    }
-  };
 
-  useEffect(() => {
-    const container = swipeContainerRef.current;
-    if (!container) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (isNavigatingRef.current) return;
-
-        entries.forEach(entry => {
-          if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
-            const tabId = entry.target.getAttribute("data-tab-id") as AppTab;
-            if (tabId && tabId !== activeTab) {
-              startTransition(() => setActiveTab(tabId));
-            }
-          }
-        });
-      },
-      {
-        root: container,
-        threshold: 0.5,
+      if (pushHistory) {
+        setTabHistory((prev) => (prev[prev.length - 1] === tab ? prev : [...prev, tab]));
       }
-    );
+    },
+    [activeTab],
+  );
+  const openDeck = useCallback(() => setSwipeMode(true), []);
 
-    const tabs = container.querySelectorAll("[data-tab-id]");
-    tabs.forEach(tab => observer.observe(tab));
-
-    return () => observer.disconnect();
-  }, [activeTab]);
-
-  const { goals } = useGoals(userId);
+  const { goals, error: goalsError, retry: retryGoals } = useGoals(userId);
   const activeGoalId = useStore((s) => s.activeGoalId);
   const setActiveGoalId = useStore((s) => s.setActiveGoalId);
 
   const [selectedHabit, setSelectedHabit] = useState("All habits");
+  const [myDayOverrideId, setMyDayOverrideId] = useState<string | null>(null);
+  const [myDayCompletedOpen, setMyDayCompletedOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [isCreatingHabit, setIsCreatingHabit] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(() => {
-    return typeof window !== "undefined" && !localStorage.getItem("grain_onboarded");
+    return (
+      typeof window !== "undefined" &&
+      !!onboardingStorageKey &&
+      !localStorage.getItem(onboardingStorageKey)
+    );
   });
 
   useEffect(() => {
-    if (typeof window !== "undefined" && !localStorage.getItem("grain_onboarded")) {
+    if (
+      typeof window !== "undefined" &&
+      onboardingStorageKey &&
+      !localStorage.getItem(onboardingStorageKey)
+    ) {
       setOnboardingOpen(true);
     }
-  }, [userId]);
+  }, [onboardingStorageKey]);
   const [weeklyReviewOpen, setWeeklyReviewOpen] = useState(false);
-  const [activeSettingTab, setActiveSettingTab] = useState<"theme" | "style" | "color" | "habits" | "stats" | "size">("theme");
+  const [activeSettingTab, setActiveSettingTab] = useState<
+    "theme" | "style" | "color" | "habits" | "stats" | "size"
+  >("theme");
   const [applyMenuOpen, setApplyMenuOpen] = useState(false);
   const toolbarDragStartY = useRef<number | null>(null);
   const [wallpaperSync, setWallpaperSync] = useState(true);
+  const [exactAlarmAllowed, setExactAlarmAllowed] = useState<boolean | null>(null);
   const [wallpaperState, setWallpaperState] = useState<WallpaperState>("idle");
   const [wallpaperSnapshot, setWallpaperSnapshot] = useState<number[][] | null>(null);
   const [selectedQuadrant, setSelectedQuadrant] = useState<Quadrant>("q2");
@@ -346,10 +349,16 @@ export function Dashboard({ user }: { user?: any }) {
     }
     return "dark";
   });
-  
-  const { toast: globalToast, error: toastError, success: toastSuccess, toasts, removeToast } = useToast();
-  const activeToast = toasts[0];
 
+  const {
+    toast: globalToast,
+    error: toastError,
+    success: toastSuccess,
+    toasts,
+    removeToast,
+  } = useToast();
+  const activeToast = toasts[0];
+  const pillNotice = activeToast;
 
   // Multi-select & Bulk Delete state
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -385,6 +394,8 @@ export function Dashboard({ user }: { user?: any }) {
     habits: rawHabits,
     byQuadrant: habitsByQ,
     loading: habitsLoading,
+    error: habitsError,
+    retry: retryHabits,
     add: addHabit,
     update: updateHabitDoc,
     remove: removeHabitDoc,
@@ -394,6 +405,9 @@ export function Dashboard({ user }: { user?: any }) {
 
   const {
     entries: completions,
+    loading: completionsLoading,
+    error: completionsError,
+    retry: retryCompletions,
     toggleDone: toggleHabitDone,
     setValue: setHabitValue,
     adjustValue: adjustHabitValue,
@@ -410,7 +424,18 @@ export function Dashboard({ user }: { user?: any }) {
     stats: heatmapStats,
     habitStreaks,
     completionsMap,
+    loading: heatmapLoading,
+    error: heatmapError,
+    retry: retryHeatmap,
   } = useHeatmap(userId, rawHabits, selectedHabit);
+
+  const dataError = habitsError || completionsError || heatmapError || goalsError;
+  const retryData = useCallback(() => {
+    retryHabits();
+    retryCompletions();
+    retryHeatmap();
+    retryGoals();
+  }, [retryCompletions, retryGoals, retryHabits, retryHeatmap]);
 
   // Derived heatmap state for UI compatibility
   const heatmap = heatmapGrid;
@@ -425,7 +450,7 @@ export function Dashboard({ user }: { user?: any }) {
     const applyStatusBarStyle = async () => {
       try {
         const wt = wallpaperThemeOf(wallpaperTheme, theme);
-        // If the theme background is bright, we want dark icons (Style.Light). 
+        // If the theme background is bright, we want dark icons (Style.Light).
         // If it's dark, we want light icons (Style.Dark).
         const isBright = wt.bg === "#f5f5f5" || (wt.bg as string) === "#ffffff";
         await StatusBar.setStyle({ style: isBright ? Style.Light : Style.Dark });
@@ -437,11 +462,16 @@ export function Dashboard({ user }: { user?: any }) {
   }, [wallpaperTheme]);
   const [gridColorTheme, setGridColorTheme] = useState<string>("emerald");
   const [wallpaperHabitSet, setWallpaperHabitSet] = useState<string>("none");
-  const [wallpaperGridStyle, setWallpaperGridStyle] = useState<"weeks" | "year" | "month" | "goals" | "widget">("weeks");
+  const [wallpaperGridStyle, setWallpaperGridStyle] = useState<
+    "weeks" | "year" | "month" | "goals" | "widget"
+  >("weeks");
   const [wallpaperCustomPhoto, setWallpaperCustomPhoto] = useState<string | null>(null);
   const [wallpaperPhotoOverlay, setWallpaperPhotoOverlay] = useState<number>(0.4);
-  const [wallpaperStatsAlign, setWallpaperStatsAlign] = useState<"left" | "center" | "right">("center");
+  const [wallpaperStatsAlign, setWallpaperStatsAlign] = useState<"left" | "center" | "right">(
+    "center",
+  );
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const backupInputRef = useRef<HTMLInputElement>(null);
   const wallpaperGridRef = useRef<HTMLDivElement>(null);
   const wallpaperPhotoRef = useRef<HTMLImageElement>(null);
   const [wallpaperOffset, setWallpaperOffset] = useState({ x: 0, y: 0 });
@@ -449,6 +479,15 @@ export function Dashboard({ user }: { user?: any }) {
   const [wallpaperPhotoScale, setWallpaperPhotoScale] = useState(1);
   const [isMovingPhoto, setIsMovingPhoto] = useState(false);
   const [isRepositionMode, setIsRepositionMode] = useState(false);
+  const [wallpaperActionMenuOpen, setWallpaperActionMenuOpen] = useState(false);
+  const [wallpaperMenuExpanded, setWallpaperMenuExpanded] = useState(false);
+  const [showGridGestureHint, setShowGridGestureHint] = useState(() => {
+    try {
+      return localStorage.getItem("grain_grid_gesture_learned") !== "true";
+    } catch {
+      return true;
+    }
+  });
   const [isDraggingWallpaper, setIsDraggingWallpaper] = useState(false);
   const [wallpaperScale, setWallpaperScale] = useState(1);
   const [appliedWallpaper, setAppliedWallpaper] = useState<{
@@ -478,7 +517,7 @@ export function Dashboard({ user }: { user?: any }) {
     wallpaperScale: 1,
     previewWeeks: 26,
   });
-  const [remindersOn, setRemindersOn] = useState(true);
+  const [remindersOn, setRemindersOn] = useState(() => Capacitor.isNativePlatform());
   const [reminderTime, setReminderTime] = useState<string>("20:00");
   const [morningKickoff, setMorningKickoff] = useState<boolean>(false);
 
@@ -514,7 +553,7 @@ export function Dashboard({ user }: { user?: any }) {
   // Compute 28-day weekly insights
   const weeklyInsights = useMemo(
     () => computeWeeklyInsights(rawHabits, completionsMap, habitStreaks),
-    [rawHabits, completionsMap, habitStreaks]
+    [rawHabits, completionsMap, habitStreaks],
   );
 
   // Floating page title pill state & 2-second auto-fade timer
@@ -536,36 +575,104 @@ export function Dashboard({ user }: { user?: any }) {
 
   useEffect(() => {
     const handleBackButton = () => {
-      try { navigator.vibrate?.(10); } catch {}
+      try {
+        navigator.vibrate?.(10);
+      } catch {}
 
       // 1. Check Modals, Sheets & Overlays in order of precedence
-      if (applyMenuOpen) { setApplyMenuOpen(false); return; }
-      if (wallpaperEditorOpen) { setWallpaperEditorOpen(false); return; }
-      if (bulkDeleteConfirmOpen) { setBulkDeleteConfirmOpen(false); return; }
-      if (signOutOpen) { setSignOutOpen(false); return; }
-      if (resetConfirmOpen) { setResetConfirmOpen(false); return; }
-      if (profileEditOpen) { setProfileEditOpen(false); return; }
-      if (feedbackOpen) { setFeedbackOpen(false); return; }
-      if (editHabitTarget) { setEditHabitTarget(null); return; }
-      if (detail) { setDetail(null); return; }
-      if (aiCoachOpen) { setAiCoachOpen(false); return; }
-      if (badgesOpen) { setBadgesOpen(false); return; }
-      if (shareStreakOpen) { setShareStreakOpen(false); return; }
-      if (streakOpen) { setStreakOpen(false); return; }
-      if (previewModalOpen) { setPreviewModalOpen(false); return; }
-      if (wallpaperPreview) { setWallpaperPreview(false); return; }
-      if (weeklyReviewOpen) { setWeeklyReviewOpen(false); return; }
-      if (dateDropdownOpen) { setDateDropdownOpen(false); return; }
-      if (filterOpen) { setFilterOpen(false); return; }
-      if (drawerOpen) { setDrawerOpen(false); return; }
-      if (modalOpen) { setModalOpen(false); return; } // Add Habit modal
-      if (settingsOpen) { setSettingsOpen(false); return; }
+      if (applyMenuOpen) {
+        setApplyMenuOpen(false);
+        return;
+      }
+      if (wallpaperEditorOpen) {
+        setWallpaperEditorOpen(false);
+        return;
+      }
+      if (bulkDeleteConfirmOpen) {
+        setBulkDeleteConfirmOpen(false);
+        return;
+      }
+      if (signOutOpen) {
+        setSignOutOpen(false);
+        return;
+      }
+      if (resetConfirmOpen) {
+        setResetConfirmOpen(false);
+        return;
+      }
+      if (profileEditOpen) {
+        setProfileEditOpen(false);
+        return;
+      }
+      if (feedbackOpen) {
+        setFeedbackOpen(false);
+        return;
+      }
+      if (editHabitTarget) {
+        setEditHabitTarget(null);
+        return;
+      }
+      if (detail) {
+        setDetail(null);
+        return;
+      }
+      if (aiCoachOpen) {
+        setAiCoachOpen(false);
+        return;
+      }
+      if (badgesOpen) {
+        setBadgesOpen(false);
+        return;
+      }
+      if (shareStreakOpen) {
+        setShareStreakOpen(false);
+        return;
+      }
+      if (streakOpen) {
+        setStreakOpen(false);
+        return;
+      }
+      if (previewModalOpen) {
+        setPreviewModalOpen(false);
+        return;
+      }
+      if (wallpaperPreview) {
+        setWallpaperPreview(false);
+        return;
+      }
+      if (weeklyReviewOpen) {
+        setWeeklyReviewOpen(false);
+        return;
+      }
+      if (dateDropdownOpen) {
+        setDateDropdownOpen(false);
+        return;
+      }
+      if (filterOpen) {
+        setFilterOpen(false);
+        return;
+      }
+      if (drawerOpen) {
+        setDrawerOpen(false);
+        return;
+      }
+      if (modalOpen) {
+        setModalOpen(false);
+        return;
+      } // Add Habit modal
+      if (settingsOpen) {
+        setSettingsOpen(false);
+        return;
+      }
       if (isSelectionMode) {
         setIsSelectionMode(false);
         setSelectedHabitIds(new Set());
         return;
       }
-      if (swipeMode) { setSwipeMode(false); return; }
+      if (swipeMode) {
+        setSwipeMode(false);
+        return;
+      }
 
       // 2. Check Tab History (Navigate back to previously visited tab)
       if (tabHistory.length > 1) {
@@ -593,10 +700,12 @@ export function Dashboard({ user }: { user?: any }) {
       }
     };
 
-    const listener = CapacitorApp.addListener('backButton', handleBackButton);
-    const appStateListener = CapacitorApp.addListener('appStateChange', (state) => {
+    const listener = CapacitorApp.addListener("backButton", handleBackButton);
+    const appStateListener = CapacitorApp.addListener("appStateChange", (state) => {
       if (!state.isActive && activeTab) {
-        try { localStorage.setItem("grain_active_tab", activeTab); } catch {}
+        try {
+          localStorage.setItem("grain_active_tab", activeTab);
+        } catch {}
       }
     });
 
@@ -605,17 +714,53 @@ export function Dashboard({ user }: { user?: any }) {
       appStateListener.then((l: any) => l.remove());
     };
   }, [
-    applyMenuOpen, wallpaperEditorOpen, bulkDeleteConfirmOpen, signOutOpen,
-    resetConfirmOpen, profileEditOpen, editHabitTarget, detail, aiCoachOpen,
-    badgesOpen, shareStreakOpen, streakOpen, previewModalOpen, wallpaperPreview,
-    weeklyReviewOpen, dateDropdownOpen, filterOpen, drawerOpen, modalOpen,
-    settingsOpen, isSelectionMode, swipeMode, tabHistory, activeTab
+    applyMenuOpen,
+    wallpaperEditorOpen,
+    bulkDeleteConfirmOpen,
+    signOutOpen,
+    resetConfirmOpen,
+    profileEditOpen,
+    editHabitTarget,
+    detail,
+    aiCoachOpen,
+    badgesOpen,
+    shareStreakOpen,
+    streakOpen,
+    previewModalOpen,
+    wallpaperPreview,
+    weeklyReviewOpen,
+    dateDropdownOpen,
+    filterOpen,
+    drawerOpen,
+    modalOpen,
+    settingsOpen,
+    isSelectionMode,
+    swipeMode,
+    tabHistory,
+    activeTab,
   ]);
 
-  const [profile, setProfile] = useState<{ name: string; email: string; tagline: string; initials: string }>(() => {
+  const [profile, setProfile] = useState<{
+    name: string;
+    email: string;
+    tagline: string;
+    initials: string;
+  }>(() => {
     const name = user?.displayName || user?.email?.split("@")[0] || "You";
-    const initials = name.split(/\s+/).map((w: string) => w[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "U";
-    return { name, email: user?.email || "", tagline: "Building the 1% better version daily.", initials };
+    const initials =
+      name
+        .split(/\s+/)
+        .map((w: string) => w[0])
+        .filter(Boolean)
+        .slice(0, 2)
+        .join("")
+        .toUpperCase() || "U";
+    return {
+      name,
+      email: user?.email || "",
+      tagline: "Building the 1% better version daily.",
+      initials,
+    };
   });
 
   // Load user profile doc from Firestore on mount
@@ -638,11 +783,13 @@ export function Dashboard({ user }: { user?: any }) {
             wallpaperHabitSet: prefs.wallpaperHabitSet ?? "none",
             wallpaperGridStyle: (prefs.wallpaperGridStyle as any) ?? "weeks",
             wallpaperCustomPhoto: prefs.wallpaperCustomPhoto ?? null,
-            wallpaperPhotoOverlay: typeof prefs.wallpaperPhotoOverlay === "number" ? prefs.wallpaperPhotoOverlay : 0.4,
+            wallpaperPhotoOverlay:
+              typeof prefs.wallpaperPhotoOverlay === "number" ? prefs.wallpaperPhotoOverlay : 0.4,
             wallpaperStatsAlign: prefs.wallpaperStatsAlign ?? "center",
             wallpaperOffset: prefs.wallpaperOffset ?? { x: 0, y: 0 },
             wallpaperPhotoOffset: prefs.wallpaperPhotoOffset ?? { x: 0, y: 0 },
-            wallpaperPhotoScale: typeof prefs.wallpaperPhotoScale === "number" ? prefs.wallpaperPhotoScale : 1,
+            wallpaperPhotoScale:
+              typeof prefs.wallpaperPhotoScale === "number" ? prefs.wallpaperPhotoScale : 1,
             wallpaperScale: typeof prefs.wallpaperScale === "number" ? prefs.wallpaperScale : 1,
             previewWeeks: typeof prefs.previewWeeks === "number" ? prefs.previewWeeks : 26,
           };
@@ -675,7 +822,8 @@ export function Dashboard({ user }: { user?: any }) {
             setWallpaperStatsAlign(prefs.wallpaperStatsAlign);
           }
           if (typeof prefs.wallpaperSync === "boolean") setWallpaperSync(prefs.wallpaperSync);
-          if (typeof prefs.remindersOn === "boolean") setRemindersOn(prefs.remindersOn);
+          if (typeof prefs.remindersOn === "boolean")
+            setRemindersOn(Capacitor.isNativePlatform() && prefs.remindersOn);
           if (prefs.reminderTime) setReminderTime(prefs.reminderTime);
           if (typeof prefs.morningKickoff === "boolean") setMorningKickoff(prefs.morningKickoff);
           if (typeof prefs.previewWeeks === "number") setPreviewWeeks(prefs.previewWeeks);
@@ -735,6 +883,7 @@ export function Dashboard({ user }: { user?: any }) {
   // Form state for habit creation
   const [newName, setNewName] = useState("");
   const [newFreq, setNewFreq] = useState("Daily");
+  const [newCustomDays, setNewCustomDays] = useState<number[]>([0, 1, 2, 3, 4]);
   const [newShade, setNewShade] = useState(0);
   const [newIcon, setNewIcon] = useState(0);
   const [newCategory, setNewCategory] = useState<string>("Mind");
@@ -773,7 +922,24 @@ export function Dashboard({ user }: { user?: any }) {
     return flatHabits.filter((h) => isScheduledDay(h.frequency, h.customDays, selectedDate));
   }, [flatHabits, selectedDate]);
 
-  const doneCount = scheduledHabits.filter((h) => completions[h.id]?.done || completions[h.id]?.restDay).length;
+  const scheduledHabitsByQuadrant = useMemo(() => {
+    const result: Record<Quadrant, Array<{ habit: Habit; index: number }>> = {
+      q1: [],
+      q2: [],
+      q3: [],
+      q4: [],
+    };
+    for (const q of QUADRANT_ORDER) {
+      result[q] = habits[q]
+        .map((habit, index) => ({ habit, index }))
+        .filter(({ habit }) => isScheduledDay(habit.frequency, habit.customDays, selectedDate));
+    }
+    return result;
+  }, [habits, selectedDate]);
+
+  const doneCount = scheduledHabits.filter(
+    (h) => completions[h.id]?.done || completions[h.id]?.restDay,
+  ).length;
   const totalCount = scheduledHabits.length;
   const totalStreak = heatmapStats.currentStreak;
   const rate = totalCount ? Math.round((doneCount / totalCount) * 100) : 0;
@@ -783,11 +949,13 @@ export function Dashboard({ user }: { user?: any }) {
     const root = scrollRef.current?.parentElement ?? document.body;
     const onDown = (e: PointerEvent) => {
       const target = (e.target as HTMLElement | null)?.closest<HTMLElement>(
-        '[class*="btn-"], [class*="chip-"], [data-lg-press]'
+        '[class*="btn-"], [class*="chip-"], [data-lg-press]',
       );
       if (!target) return;
       if (target.hasAttribute("disabled")) return;
-      try { navigator.vibrate?.(18); } catch { }
+      try {
+        navigator.vibrate?.(18);
+      } catch {}
 
       const cs = getComputedStyle(target);
       if (cs.position === "static") target.style.position = "relative";
@@ -807,8 +975,12 @@ export function Dashboard({ user }: { user?: any }) {
     return () => root.removeEventListener("pointerdown", onDown);
   }, []);
 
-  const showToast = (msg: string, action?: { label: string; onClick: () => void }, duration = 1600) => {
-    globalToast(msg, "info");
+  const showToast = (
+    msg: string,
+    action?: { label: string; onClick: () => void },
+    duration = 1600,
+  ) => {
+    globalToast(msg, "info", action, duration);
   };
 
   const toggleDone = async (q: Quadrant, i: number) => {
@@ -816,7 +988,9 @@ export function Dashboard({ user }: { user?: any }) {
     if (!targetHabit) return;
     const wasDone = targetHabit.done;
     if (!wasDone) {
-      try { navigator.vibrate?.([14, 40, 22]); } catch { }
+      try {
+        navigator.vibrate?.([14, 40, 22]);
+      } catch {}
     }
     await toggleHabitDone(targetHabit.id);
   };
@@ -824,7 +998,9 @@ export function Dashboard({ user }: { user?: any }) {
   const restHabit = async (q: Quadrant, i: number) => {
     const target = habits[q][i];
     if (!target || target.done) return;
-    try { navigator.vibrate?.(10); } catch { }
+    try {
+      navigator.vibrate?.(10);
+    } catch {}
     await setHabitRestDay(target.id);
     showToast(`Rest day · "${target.name}" streak preserved`);
   };
@@ -840,7 +1016,7 @@ export function Dashboard({ user }: { user?: any }) {
     try {
       const targetHabit = habits[q][i];
       if (!targetHabit) return;
-      freezeHabitStreak(targetHabit.id).catch(err => toastError("Freeze error"));
+      freezeHabitStreak(targetHabit.id).catch((err) => toastError("Freeze error"));
       showToast(`Streak frozen for "${targetHabit.name}"`);
     } finally {
       setDetail(null);
@@ -851,13 +1027,17 @@ export function Dashboard({ user }: { user?: any }) {
     const targetHabit = habits[q][i];
     if (!targetHabit) return;
     await updateHabitDoc(targetHabit.id, { pinned: !targetHabit.pinned });
-    showToast(!targetHabit.pinned ? `Pinned "${targetHabit.name}"` : `Unpinned "${targetHabit.name}"`);
+    showToast(
+      !targetHabit.pinned ? `Pinned "${targetHabit.name}"` : `Unpinned "${targetHabit.name}"`,
+    );
   };
 
   const deleteHabit = async (q: Quadrant, i: number) => {
     const targetHabit = habits[q][i];
     if (!targetHabit) return;
-    try { navigator.vibrate?.([28, 60, 40]); } catch { }
+    try {
+      navigator.vibrate?.([28, 60, 40]);
+    } catch {}
     const removed = await removeHabitDoc(targetHabit.id);
     if (!removed) return;
     showToast(
@@ -865,7 +1045,9 @@ export function Dashboard({ user }: { user?: any }) {
       {
         label: "Undo",
         onClick: () => {
-          try { navigator.vibrate?.(10); } catch { }
+          try {
+            navigator.vibrate?.(10);
+          } catch {}
           restoreHabitDoc(removed);
           showToast(`Restored "${removed.name}"`);
         },
@@ -883,16 +1065,13 @@ export function Dashboard({ user }: { user?: any }) {
     showToast(`Moved to "${QUADRANTS[targetQ].title}"`);
   };
 
-  const createHabit = () => {
+  const createHabit = async () => {
     const name = newName.trim();
-    if (!name) {
+    if (!name || isCreatingHabit) {
       showToast("Please enter a name for your habit");
       return;
     }
     const freq = newFreq === "Weekdays" ? "weekdays" : newFreq === "Custom" ? "custom" : "daily";
-
-    // Close modal immediately
-    setModalOpen(false);
 
     const habitData = {
       name,
@@ -900,34 +1079,39 @@ export function Dashboard({ user }: { user?: any }) {
       quadrant: selectedQuadrant,
       time: newTime ?? null,
       type: newIsNumeric ? "numeric" : "binary",
-      target: newIsNumeric ? (newTarget || 1) : null,
-      unit: newIsNumeric ? (newUnit || null) : null,
+      target: newIsNumeric ? newTarget || 1 : null,
+      unit: newIsNumeric ? newUnit || null : null,
       step: newIsNumeric ? 0.25 : null,
       pinned: false,
       frequency: freq,
-      customDays: [0, 1, 2, 3, 4],
+      customDays: freq === "custom" ? newCustomDays : [],
       icon: newIcon,
       shade: newShade,
       bestStreak: 0,
-      order: flatHabits.length > 0 ? Math.min(...flatHabits.map(h => h.order)) - 1 : 0,
+      order: flatHabits.length > 0 ? Math.min(...flatHabits.map((h) => h.order)) - 1 : 0,
     };
 
-    // Reset ALL form fields so next open is a clean slate
-    setNewName("");
-    setNewCategory("Mind");
-    setNewFreq("Daily");
-    setNewShade(0);
-    setNewIcon(0);
-    setNewTime(undefined);
-    setNewIsNumeric(false);
-    setNewTarget(1);
-    setNewUnit("");
-
-    addHabit(habitData as any).then(() => {
-      showToast(`Added "${name}"`);
-    }).catch(err => toastError("An error occurred"));
+    setIsCreatingHabit(true);
+    try {
+      await addHabit(habitData as any);
+      setModalOpen(false);
+      setNewName("");
+      setNewCategory("Mind");
+      setNewFreq("Daily");
+      setNewCustomDays([0, 1, 2, 3, 4]);
+      setNewShade(0);
+      setNewIcon(0);
+      setNewTime(undefined);
+      setNewIsNumeric(false);
+      setNewTarget(1);
+      setNewUnit("");
+      showToast(`Saved "${name}" on this device`);
+    } catch {
+      toastError("Habit was not saved. Check your connection and try again.");
+    } finally {
+      setIsCreatingHabit(false);
+    }
   };
-
 
   const toggleWallpaperSync = () => {
     setWallpaperSync((v) => {
@@ -944,10 +1128,40 @@ export function Dashboard({ user }: { user?: any }) {
     });
   };
 
+  useEffect(() => {
+    if (!settingsOpen || !Capacitor.isNativePlatform()) return;
+    let cancelled = false;
+    import("../lib/wallpaper-bridge")
+      .then(({ WallpaperNative }) => WallpaperNative.isExactAlarmAllowed())
+      .then(({ allowed }) => {
+        if (!cancelled) setExactAlarmAllowed(allowed);
+      })
+      .catch(() => {
+        if (!cancelled) setExactAlarmAllowed(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [settingsOpen]);
+
+  const requestExactAlarmPermission = async () => {
+    try {
+      const { WallpaperNative } = await import("../lib/wallpaper-bridge");
+      await WallpaperNative.requestExactAlarmPermission();
+      showToast("Allow Alarms & reminders, then return to Grain");
+      window.setTimeout(async () => {
+        const { allowed } = await WallpaperNative.isExactAlarmAllowed();
+        setExactAlarmAllowed(allowed);
+      }, 700);
+    } catch {
+      toastError("Could not open Android alarm settings");
+    }
+  };
+
   const displayedHeatmap = useMemo(() => {
     const baseHeatmap = wallpaperSync ? heatmap : (wallpaperSnapshot ?? heatmap);
     if (activeGoalId && wallpaperHabitSet === "none") {
-      const goal = goals.find(g => g.id === activeGoalId);
+      const goal = goals.find((g) => g.id === activeGoalId);
       if (goal && goal.startDate && goal.targetDate) {
         const start = parseDateKey(goal.startDate);
         const target = parseDateKey(goal.targetDate);
@@ -981,7 +1195,7 @@ export function Dashboard({ user }: { user?: any }) {
   }, [wallpaperSync, heatmap, wallpaperSnapshot, activeGoalId, goals, wallpaperHabitSet]);
 
   // Override stats pill for goals
-  const activeGoal = useMemo(() => goals.find(g => g.id === activeGoalId), [goals, activeGoalId]);
+  const activeGoal = useMemo(() => goals.find((g) => g.id === activeGoalId), [goals, activeGoalId]);
   let displayedTotalStreak = heatmapStats.currentStreak;
   let displayedRate = heatmapStats.completionRate;
   if (activeGoal && activeGoal.startDate && activeGoal.targetDate) {
@@ -1003,24 +1217,37 @@ export function Dashboard({ user }: { user?: any }) {
     if (wallpaperGridStyle !== "goals") return [];
 
     // Find all goals that have target dates and are not completely in the past
-    const active = goals.filter(g => {
+    const active = goals.filter((g) => {
       if (!g.startDate || !g.targetDate) return false;
       const target = parseDateKey(g.targetDate);
       return target.getTime() >= new Date().setHours(0, 0, 0, 0);
     });
 
-    return active.map(goal => {
+    return active.map((goal) => {
       const start = parseDateKey(goal.startDate!);
       const target = parseDateKey(goal.targetDate!);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const totalDays = Math.max(1, Math.round((target.getTime() - start.getTime()) / 86400000) + 1);
-      const elapsedDays = Math.max(0, Math.round((today.getTime() - start.getTime()) / 86400000) + 1);
+      const totalDays = Math.max(
+        1,
+        Math.round((target.getTime() - start.getTime()) / 86400000) + 1,
+      );
+      const elapsedDays = Math.max(
+        0,
+        Math.round((today.getTime() - start.getTime()) / 86400000) + 1,
+      );
       const daysLeft = Math.max(0, totalDays - Math.min(elapsedDays, totalDays));
       const pct = Math.round((Math.min(elapsedDays, totalDays) / totalDays) * 100);
 
-      const boxes = Array.from({ length: daysLeft }, () => 1);
+      // Keep the entire goal journey visible. The old payload included only
+      // remaining days, so a short goal rendered as a flat, indistinguishable row.
+      const completedDays = Math.min(totalDays, Math.max(0, elapsedDays - 1));
+      const boxes = Array.from({ length: totalDays }, (_, dayIndex) => {
+        if (dayIndex < completedDays) return 2;
+        if (dayIndex === completedDays && elapsedDays > 0 && elapsedDays <= totalDays) return 3;
+        return 0;
+      });
 
       return {
         id: goal.id,
@@ -1028,7 +1255,7 @@ export function Dashboard({ user }: { user?: any }) {
         heatmap: [],
         boxes,
         currentStreak: daysLeft,
-        completionRate: pct
+        completionRate: pct,
       };
     });
   }, [wallpaperGridStyle, goals]);
@@ -1036,24 +1263,35 @@ export function Dashboard({ user }: { user?: any }) {
   const appliedStackedGoals = useMemo(() => {
     if (appliedWallpaper.wallpaperGridStyle !== "goals") return [];
 
-    const active = goals.filter(g => {
+    const active = goals.filter((g) => {
       if (!g.startDate || !g.targetDate) return false;
       const target = parseDateKey(g.targetDate);
       return target.getTime() >= new Date().setHours(0, 0, 0, 0);
     });
 
-    return active.map(goal => {
+    return active.map((goal) => {
       const start = parseDateKey(goal.startDate!);
       const target = parseDateKey(goal.targetDate!);
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
-      const totalDays = Math.max(1, Math.round((target.getTime() - start.getTime()) / 86400000) + 1);
-      const elapsedDays = Math.max(0, Math.round((today.getTime() - start.getTime()) / 86400000) + 1);
+      const totalDays = Math.max(
+        1,
+        Math.round((target.getTime() - start.getTime()) / 86400000) + 1,
+      );
+      const elapsedDays = Math.max(
+        0,
+        Math.round((today.getTime() - start.getTime()) / 86400000) + 1,
+      );
       const daysLeft = Math.max(0, totalDays - Math.min(elapsedDays, totalDays));
       const pct = Math.round((Math.min(elapsedDays, totalDays) / totalDays) * 100);
 
-      const boxes = Array.from({ length: daysLeft }, () => 1);
+      const completedDays = Math.min(totalDays, Math.max(0, elapsedDays - 1));
+      const boxes = Array.from({ length: totalDays }, (_, dayIndex) => {
+        if (dayIndex < completedDays) return 2;
+        if (dayIndex === completedDays && elapsedDays > 0 && elapsedDays <= totalDays) return 3;
+        return 0;
+      });
 
       return {
         id: goal.id,
@@ -1061,23 +1299,23 @@ export function Dashboard({ user }: { user?: any }) {
         heatmap: [],
         boxes,
         currentStreak: daysLeft,
-        completionRate: pct
+        completionRate: pct,
       };
     });
   }, [appliedWallpaper.wallpaperGridStyle, goals]);
 
   const topHabitNames = useMemo<string[]>(() => {
     if (wallpaperHabitSet !== "none") {
-      const set = HABIT_SETS.find(s => s.key === wallpaperHabitSet);
+      const set = HABIT_SETS.find((s) => s.key === wallpaperHabitSet);
       if (set?.habits?.length) return [...set.habits.slice(0, 3)];
     }
-    const activeHabitNames = flatHabits.slice(0, 3).map(h => h.name);
+    const activeHabitNames = flatHabits.slice(0, 3).map((h) => h.name);
     return activeHabitNames.length > 0 ? activeHabitNames : ["Focus", "Consistency", "Growth"];
   }, [wallpaperHabitSet, flatHabits]);
 
   const habitTextLines = useMemo(() => {
     if (wallpaperHabitSet !== "none") {
-      return HABIT_SETS.find(s => s.key === wallpaperHabitSet)?.habits as string[] | undefined;
+      return HABIT_SETS.find((s) => s.key === wallpaperHabitSet)?.habits as string[] | undefined;
     }
     if (wallpaperGridStyle === "widget") return topHabitNames;
     return undefined;
@@ -1085,7 +1323,8 @@ export function Dashboard({ user }: { user?: any }) {
 
   const appliedHabitTextLines = useMemo(() => {
     if (appliedWallpaper.wallpaperHabitSet !== "none") {
-      return HABIT_SETS.find(s => s.key === appliedWallpaper.wallpaperHabitSet)?.habits as string[] | undefined;
+      return HABIT_SETS.find((s) => s.key === appliedWallpaper.wallpaperHabitSet)?.habits as
+        string[] | undefined;
     }
     if (appliedWallpaper.wallpaperGridStyle === "widget") return topHabitNames;
     return undefined;
@@ -1099,13 +1338,18 @@ export function Dashboard({ user }: { user?: any }) {
     wallpaperTheme: appliedWallpaper.theme,
     previewWeeks: appliedWallpaper.previewWeeks,
     wallpaperSync: wallpaperSync && !wallpaperEditorOpen,
-    isGoalActive: !!(activeGoalId && goals.some(g => g.id === activeGoalId)),
-    accentColor: wallpaperTokens(appliedWallpaper.theme, appliedWallpaper.gridColorTheme, theme).accent,
+    isGoalActive: !!(activeGoalId && goals.some((g) => g.id === activeGoalId)),
+    accentColor: wallpaperTokens(appliedWallpaper.theme, appliedWallpaper.gridColorTheme, theme)
+      .accent,
     gridStyle: appliedWallpaper.wallpaperGridStyle,
-    customPhotoBase64: appliedWallpaper.theme === "custom" ? appliedWallpaper.wallpaperCustomPhoto : null,
+    customPhotoBase64:
+      appliedWallpaper.theme === "custom" ? appliedWallpaper.wallpaperCustomPhoto : null,
     photoOverlay: appliedWallpaper.wallpaperPhotoOverlay,
     statsAlignment: appliedWallpaper.wallpaperStatsAlign,
-    offsetY: typeof window !== "undefined" ? 50 + (appliedWallpaper.wallpaperOffset.y / window.innerHeight) * 100 : 54,
+    offsetY:
+      typeof window !== "undefined"
+        ? 50 + (appliedWallpaper.wallpaperOffset.y / window.innerHeight) * 100
+        : 54,
     offsetX: appliedWallpaper.wallpaperOffset.x,
     gridScale: appliedWallpaper.wallpaperScale,
     gridColorTheme: appliedWallpaper.gridColorTheme,
@@ -1123,8 +1367,10 @@ export function Dashboard({ user }: { user?: any }) {
       return;
     }
 
-    const scheduledTodayHabits = flatHabits.filter(h => isScheduledDay(h.frequency, h.customDays, selectedDate));
-    const uncompleted = scheduledTodayHabits.filter(h => !h.done).length;
+    const scheduledTodayHabits = flatHabits.filter((h) =>
+      isScheduledDay(h.frequency, h.customDays, selectedDate),
+    );
+    const uncompleted = scheduledTodayHabits.filter((h) => !h.done).length;
     const allDone = scheduledTodayHabits.length > 0 && uncompleted === 0;
 
     const timer = setTimeout(() => {
@@ -1135,18 +1381,18 @@ export function Dashboard({ user }: { user?: any }) {
         uncompletedCount: uncompleted,
         streak: displayedTotalStreak,
         allDone,
-        habits: flatHabits.map(h => ({
+        habits: flatHabits.map((h) => ({
           id: h.id,
           name: h.name,
           reminderTime: h.reminderTime || "",
-          done: h.done || false
+          done: h.done || false,
         })),
       });
 
       WidgetBridge.sync({
         completed: scheduledTodayHabits.length - uncompleted,
         total: scheduledTodayHabits.length,
-        streak: displayedTotalStreak
+        streak: displayedTotalStreak,
       });
     }, 400);
 
@@ -1193,11 +1439,12 @@ export function Dashboard({ user }: { user?: any }) {
             wallpaperPhotoOffset,
             wallpaperPhotoScale,
             wallpaperCustomPhoto,
-          }
-        } as any).catch(err => toastError("Failed to save wallpaper prefs"));
+          },
+        } as any).catch((err) => toastError("Failed to save wallpaper prefs"));
       }
 
       if (typeof window !== "undefined" && (window as any).Capacitor?.isNativePlatform()) {
+        const { WallpaperNative } = await import("../lib/wallpaper-bridge");
         const { supported } = await WallpaperNative.isLiveWallpaperSupported();
         if (supported && !forceStatic) {
           await WallpaperNative.setWallpaper({
@@ -1207,13 +1454,16 @@ export function Dashboard({ user }: { user?: any }) {
             previewWeeks,
             currentStreak: displayedTotalStreak,
             completionRate: displayedRate,
-            isGoalActive: !!(activeGoalId && goals.some(g => g.id === activeGoalId)),
+            isGoalActive: !!(activeGoalId && goals.some((g) => g.id === activeGoalId)),
             accentColor: wallpaperTokens(wallpaperTheme, gridColorTheme, theme).accent,
             gridStyle: wallpaperGridStyle,
             customPhotoBase64: wallpaperTheme === "custom" ? wallpaperCustomPhoto : null,
             photoOverlay: wallpaperPhotoOverlay,
             statsAlignment: wallpaperStatsAlign,
-            offsetY: typeof window !== "undefined" ? 50 + (wallpaperOffset.y / window.innerHeight) * 100 : 54,
+            offsetY:
+              typeof window !== "undefined"
+                ? 50 + (wallpaperOffset.y / window.innerHeight) * 100
+                : 54,
             offsetX: wallpaperOffset.x,
             gridScale: wallpaperScale,
             gridColorTheme: gridColorTheme,
@@ -1233,13 +1483,16 @@ export function Dashboard({ user }: { user?: any }) {
             previewWeeks,
             currentStreak: displayedTotalStreak,
             completionRate: displayedRate,
-            isGoalActive: !!(activeGoalId && goals.some(g => g.id === activeGoalId)),
+            isGoalActive: !!(activeGoalId && goals.some((g) => g.id === activeGoalId)),
             accentColor: wallpaperTokens(wallpaperTheme, gridColorTheme, theme).accent,
             gridStyle: wallpaperGridStyle,
             customPhotoBase64: wallpaperTheme === "custom" ? wallpaperCustomPhoto : null,
             photoOverlay: wallpaperPhotoOverlay,
             statsAlignment: wallpaperStatsAlign,
-            offsetY: typeof window !== "undefined" ? 50 + (wallpaperOffset.y / window.innerHeight) * 100 : 54,
+            offsetY:
+              typeof window !== "undefined"
+                ? 50 + (wallpaperOffset.y / window.innerHeight) * 100
+                : 54,
             offsetX: wallpaperOffset.x,
             gridScale: wallpaperScale,
             gridColorTheme: gridColorTheme,
@@ -1278,11 +1531,14 @@ export function Dashboard({ user }: { user?: any }) {
   const capturePreview = async (): Promise<{ blob: Blob; dataUrl: string } | null> => {
     const node = previewRef.current;
     if (!node) return null;
+    const { toPng } = await import("html-to-image");
     // Render at 3x for crisp wallpaper-quality output.
     const dataUrl = await toPng(node, {
       pixelRatio: 3,
       cacheBust: true,
-      backgroundColor: wallpaperThemeOf(wallpaperTheme, theme).bg.startsWith("#") ? wallpaperThemeOf(wallpaperTheme, theme).bg : "#000000",
+      backgroundColor: wallpaperThemeOf(wallpaperTheme, theme).bg.startsWith("#")
+        ? wallpaperThemeOf(wallpaperTheme, theme).bg
+        : "#000000",
       filter: (n) => !(n instanceof HTMLElement && n.dataset.noCapture !== undefined),
     });
     const res = await fetch(dataUrl);
@@ -1297,7 +1553,10 @@ export function Dashboard({ user }: { user?: any }) {
       const cap = await capturePreview();
       if (!cap) return;
       const file = new File([cap.blob], `grain-wallpaper.png`, { type: "image/png" });
-      const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean; share?: (d: ShareData) => Promise<void> };
+      const nav = navigator as Navigator & {
+        canShare?: (d: ShareData) => boolean;
+        share?: (d: ShareData) => Promise<void>;
+      };
       if (nav.canShare && nav.canShare({ files: [file] }) && nav.share) {
         await nav.share({
           files: [file],
@@ -1308,7 +1567,8 @@ export function Dashboard({ user }: { user?: any }) {
       } else {
         // Fallback: copy image to clipboard if possible, otherwise download.
         try {
-          const ClipboardItemCtor = (window as unknown as { ClipboardItem?: typeof ClipboardItem }).ClipboardItem;
+          const ClipboardItemCtor = (window as unknown as { ClipboardItem?: typeof ClipboardItem })
+            .ClipboardItem;
           if (ClipboardItemCtor && navigator.clipboard && "write" in navigator.clipboard) {
             await navigator.clipboard.write([new ClipboardItemCtor({ "image/png": cap.blob })]);
             showToast("Image copied — paste to share");
@@ -1344,9 +1604,23 @@ export function Dashboard({ user }: { user?: any }) {
       a.click();
       if (!user) return;
       try {
-        const db = getFirestore();
-        await updateDoc(doc(db, "users", user.uid), {
-          prefs: { wallpaperTheme, gridColorTheme, wallpaperHabitSet, wallpaperGridStyle, wallpaperScale, wallpaperPhotoOverlay, wallpaperStatsAlign, wallpaperSync, remindersOn, timeFilter, theme, previewWeeks, activeGoalId, wallpaperOffset, wallpaperPhotoOffset, wallpaperPhotoScale },
+        updateLocalPrefs(user.uid, {
+            wallpaperTheme,
+            gridColorTheme,
+            wallpaperHabitSet,
+            wallpaperGridStyle,
+            wallpaperScale,
+            wallpaperPhotoOverlay,
+            wallpaperStatsAlign,
+            wallpaperSync,
+            remindersOn,
+            timeFilter,
+            theme,
+            previewWeeks,
+            activeGoalId,
+            wallpaperOffset,
+            wallpaperPhotoOffset,
+            wallpaperPhotoScale,
         });
       } catch (err) {
         toastError("Failed to save wallpaper prefs");
@@ -1360,16 +1634,10 @@ export function Dashboard({ user }: { user?: any }) {
     }
   };
 
-
   const exportBackup = () => {
     try {
-      const payload = {
-        profile,
-        habits,
-        heatmap,
-        prefs: { wallpaperTheme, gridColorTheme, wallpaperHabitSet, wallpaperGridStyle, wallpaperScale, wallpaperPhotoOverlay, wallpaperStatsAlign, wallpaperSync, remindersOn, timeFilter, theme, previewWeeks, wallpaperOffset, wallpaperPhotoOffset, wallpaperPhotoScale },
-        exportedAt: new Date().toISOString(),
-      };
+      if (!userId) throw new Error("Not signed in");
+      const payload = exportLocalBackup(userId);
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -1377,22 +1645,32 @@ export function Dashboard({ user }: { user?: any }) {
       a.download = `grain-backup-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      showToast(`Exported ${flatHabits.length} habits`);
+      showToast(`Backup downloaded · ${flatHabits.length} habits`);
     } catch {
       showToast("Export failed");
     }
   };
 
+  const importBackup = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file || !userId) return;
+    try {
+      const payload = JSON.parse(await file.text());
+      importLocalBackup(userId, payload);
+      showToast("Backup restored · Reloading local data");
+      window.setTimeout(() => window.location.reload(), 500);
+    } catch (error) {
+      toastError(error instanceof Error ? error.message : "Backup could not be imported");
+    }
+  };
+
   const resetToday = async () => {
     try {
-      for (const h of flatHabits) {
-        const entry = completions[h.id];
-        // Clear done, restDay, and frozenStreak completions for today
-        if (entry?.done || entry?.restDay || entry?.frozenStreak) {
-          if (entry?.done) await toggleHabitDone(h.id); // toggles back to undone
-        }
-      }
-      try { navigator.vibrate?.([28, 60, 40]); } catch { }
+      if (userId) clearLocalCompletionDate(userId, formatDateKey(selectedDate));
+      try {
+        navigator.vibrate?.([28, 60, 40]);
+      } catch {}
       showToast("Today's progress cleared");
     } catch {
       showToast("Reset failed");
@@ -1414,36 +1692,59 @@ export function Dashboard({ user }: { user?: any }) {
     showToast("Habit updated");
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
-        const maxW = 1080;
-        const maxH = 1920;
-        let w = img.width;
-        let h = img.height;
-        if (w > maxW || h > maxH) {
-          const ratio = Math.min(maxW / w, maxH / h);
-          w = Math.floor(w * ratio);
-          h = Math.floor(h * ratio);
-        }
-        canvas.width = w;
-        canvas.height = h;
-        ctx?.drawImage(img, 0, 0, w, h);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
-        setWallpaperCustomPhoto(dataUrl);
-        setWallpaperTheme("custom");
-        showToast("Photo applied");
-      };
-      img.src = event.target?.result as string;
-    };
-    reader.readAsDataURL(file);
     e.target.value = "";
+    if (!file.type.startsWith("image/")) {
+      showToast("Choose an image file");
+      return;
+    }
+
+    try {
+      const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+      const maxW = 1080;
+      const maxH = 1920;
+      const ratio = Math.min(1, maxW / bitmap.width, maxH / bitmap.height);
+      const width = Math.max(1, Math.round(bitmap.width * ratio));
+      const height = Math.max(1, Math.round(bitmap.height * ratio));
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d", { alpha: false });
+      if (!ctx) throw new Error("Image processing is unavailable");
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(bitmap, 0, 0, width, height);
+      bitmap.close();
+
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (result) => (result ? resolve(result) : reject(new Error("Image compression failed"))),
+          "image/jpeg",
+          0.72,
+        );
+      });
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(reader.error ?? new Error("Image reading failed"));
+        reader.readAsDataURL(blob);
+      });
+
+      setWallpaperCustomPhoto(dataUrl);
+      // A new image starts with a clean crop, then immediately enters the
+      // adjustment mode so the user—not object-cover—chooses the framing.
+      setWallpaperPhotoOffset({ x: 0, y: 0 });
+      setWallpaperPhotoScale(1);
+      setWallpaperTheme("custom");
+      setIsRepositionMode(false);
+      setIsMovingPhoto(true);
+      showToast("Adjust the crop, then tap Done crop");
+    } catch (error) {
+      console.error("[wallpaper upload]", error);
+      showToast("Could not process that photo");
+    }
   };
   const bestStreak = heatmapStats.bestStreak;
 
@@ -1470,7 +1771,12 @@ export function Dashboard({ user }: { user?: any }) {
   });
 
   const handlePointerDown = (e: React.PointerEvent) => {
-    if (!isRepositionMode && !isMovingPhoto) return;
+    if (showGridGestureHint) {
+      setShowGridGestureHint(false);
+      try {
+        localStorage.setItem("grain_grid_gesture_learned", "true");
+      } catch {}
+    }
     const state = dragState.current;
     state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
@@ -1481,7 +1787,9 @@ export function Dashboard({ user }: { user?: any }) {
       state.startY = e.clientY;
       state.initialOffset = { ...wallpaperOffset };
       state.initialPhotoOffset = { ...wallpaperPhotoOffset };
-      try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { }
+      try {
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      } catch {}
     } else if (state.pointers.size === 2) {
       const pts = Array.from(state.pointers.values());
       const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
@@ -1492,7 +1800,6 @@ export function Dashboard({ user }: { user?: any }) {
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isRepositionMode && !isMovingPhoto) return;
     const state = dragState.current;
     if (!state.pointers.has(e.pointerId)) return;
     state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -1521,7 +1828,7 @@ export function Dashboard({ user }: { user?: any }) {
       const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
       const scaleDiff = dist / state.initialDistance;
       if (isMovingPhoto) {
-        const newScale = Math.max(0.1, Math.min(10, state.initialPhotoScale * scaleDiff));
+        const newScale = Math.max(1, Math.min(10, state.initialPhotoScale * scaleDiff));
         if (wallpaperPhotoRef.current) {
           wallpaperPhotoRef.current.style.transform = `translate(${wallpaperPhotoOffset.x}px, ${wallpaperPhotoOffset.y}px) scale(${newScale})`;
         }
@@ -1537,7 +1844,9 @@ export function Dashboard({ user }: { user?: any }) {
   const handlePointerUp = (e: React.PointerEvent) => {
     const state = dragState.current;
     state.pointers.delete(e.pointerId);
-    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { }
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
 
     if (state.pointers.size < 2) {
       if (state.initialDistance !== null) {
@@ -1557,10 +1866,14 @@ export function Dashboard({ user }: { user?: any }) {
       setIsDraggingWallpaper(false);
 
       if (isMovingPhoto) {
-        const match = wallpaperPhotoRef.current?.style.transform.match(/translate\(([^p]+)px,\s*([^p]+)px\)/);
+        const match = wallpaperPhotoRef.current?.style.transform.match(
+          /translate\(([^p]+)px,\s*([^p]+)px\)/,
+        );
         if (match) setWallpaperPhotoOffset({ x: parseFloat(match[1]), y: parseFloat(match[2]) });
       } else {
-        const match = wallpaperGridRef.current?.style.transform.match(/translate\(([^p]+)px,\s*([^p]+)px\)/);
+        const match = wallpaperGridRef.current?.style.transform.match(
+          /translate\(([^p]+)px,\s*([^p]+)px\)/,
+        );
         if (match) setWallpaperOffset({ x: parseFloat(match[1]), y: parseFloat(match[2]) });
       }
     } else if (state.pointers.size === 1) {
@@ -1569,13 +1882,17 @@ export function Dashboard({ user }: { user?: any }) {
       state.startY = remaining.y;
 
       if (isMovingPhoto) {
-        const match = wallpaperPhotoRef.current?.style.transform.match(/translate\(([^p]+)px,\s*([^p]+)px\)/);
+        const match = wallpaperPhotoRef.current?.style.transform.match(
+          /translate\(([^p]+)px,\s*([^p]+)px\)/,
+        );
         if (match) {
           state.initialPhotoOffset = { x: parseFloat(match[1]), y: parseFloat(match[2]) };
           setWallpaperPhotoOffset(state.initialPhotoOffset);
         }
       } else {
-        const match = wallpaperGridRef.current?.style.transform.match(/translate\(([^p]+)px,\s*([^p]+)px\)/);
+        const match = wallpaperGridRef.current?.style.transform.match(
+          /translate\(([^p]+)px,\s*([^p]+)px\)/,
+        );
         if (match) {
           state.initialOffset = { x: parseFloat(match[1]), y: parseFloat(match[2]) };
           setWallpaperOffset(state.initialOffset);
@@ -1587,9 +1904,9 @@ export function Dashboard({ user }: { user?: any }) {
   const handleWheel = (e: React.WheelEvent) => {
     const zoomSensitivity = 0.002;
     if (isMovingPhoto) {
-      setWallpaperPhotoScale(s => Math.max(0.1, Math.min(10, s - e.deltaY * zoomSensitivity)));
+      setWallpaperPhotoScale((s) => Math.max(1, Math.min(10, s - e.deltaY * zoomSensitivity)));
     } else {
-      setWallpaperScale(s => Math.max(0.2, Math.min(5, s - e.deltaY * zoomSensitivity)));
+      setWallpaperScale((s) => Math.max(0.2, Math.min(5, s - e.deltaY * zoomSensitivity)));
     }
   };
 
@@ -1600,13 +1917,23 @@ export function Dashboard({ user }: { user?: any }) {
   }, [wallpaperGridStyle, activeSettingTab]);
 
   const renderSettingsMenu = () => {
-    const tabs = ["theme", "style", "color", "habits", "stats", ...(wallpaperGridStyle === "weeks" ? ["size"] : [])] as const;
+    const tabs = [
+      "theme",
+      "style",
+      "color",
+      "habits",
+      "stats",
+      ...(wallpaperGridStyle === "weeks" ? ["size"] : []),
+    ] as const;
     return (
       <div className="flex flex-col gap-5 w-full animate-fade-in">
         {/* Category Tabs */}
         <div className="w-full">
           <WheelPicker
-            options={tabs.map(tab => ({ key: tab, label: tab === "size" ? "GRID SIZE" : tab.toUpperCase() }))}
+            options={tabs.map((tab) => ({
+              key: tab,
+              label: tab === "size" ? "GRID SIZE" : tab.toUpperCase(),
+            }))}
             value={activeSettingTab}
             onChange={(v) => setActiveSettingTab(v as any)}
             itemWidth={90}
@@ -1619,11 +1946,14 @@ export function Dashboard({ user }: { user?: any }) {
           {activeSettingTab === "theme" && (
             <div className="w-full animate-fade-in-right">
               <WheelPicker
-                options={WALLPAPER_THEMES.filter(t => t.key !== "custom").map(t => ({ key: t.key, label: t.label }))}
+                options={WALLPAPER_THEMES.filter((t) => t.key !== "custom").map((t) => ({
+                  key: t.key,
+                  label: t.label,
+                }))}
                 value={wallpaperTheme}
                 onChange={(v) => {
                   setWallpaperTheme(v);
-                  showToast(`${WALLPAPER_THEMES.find(t => t.key === v)?.label} applied`);
+                  showToast(`${WALLPAPER_THEMES.find((t) => t.key === v)?.label} applied`);
                 }}
                 itemWidth={110}
                 fontSizeClass="text-[14px]"
@@ -1643,17 +1973,21 @@ export function Dashboard({ user }: { user?: any }) {
                     }}
                     aria-label={t.label}
                     title={t.label}
-                    className={`h-8 w-8 rounded-full border transition-all shrink-0 snap-center ${active
-                      ? "border-white ring-2 ring-white ring-offset-2 ring-offset-black/50 scale-110 shadow-md"
-                      : "border-white/30 hover:scale-105"
-                      }`}
+                    className={`h-8 w-8 rounded-full border transition-all shrink-0 snap-center ${
+                      active
+                        ? "border-white ring-2 ring-white ring-offset-2 ring-offset-black/50 scale-110 shadow-md"
+                        : "border-white/30 hover:scale-105"
+                    }`}
                     style={{ background: t.color }}
                   />
                 );
               })}
               <label
-                className={`relative h-8 w-8 rounded-full border transition-all shrink-0 snap-center flex items-center justify-center bg-[conic-gradient(red,yellow,lime,aqua,blue,fuchsia,red)] ${gridColorTheme.startsWith("#") ? "border-white ring-2 ring-white ring-offset-2 ring-offset-black/50 scale-110 shadow-md" : "border-white/30 hover:scale-105"
-                  }`}
+                className={`relative h-8 w-8 rounded-full border transition-all shrink-0 snap-center flex items-center justify-center bg-[conic-gradient(red,yellow,lime,aqua,blue,fuchsia,red)] ${
+                  gridColorTheme.startsWith("#")
+                    ? "border-white ring-2 ring-white ring-offset-2 ring-offset-black/50 scale-110 shadow-md"
+                    : "border-white/30 hover:scale-105"
+                }`}
                 title="Custom Color"
               >
                 <input
@@ -1675,7 +2009,7 @@ export function Dashboard({ user }: { user?: any }) {
                 value={wallpaperHabitSet}
                 onChange={(v) => {
                   setWallpaperHabitSet(v);
-                  showToast(`${HABIT_SETS.find(h => h.key === v)?.label} habits`);
+                  showToast(`${HABIT_SETS.find((h) => h.key === v)?.label} habits`);
                 }}
                 itemWidth={75}
                 fontSizeClass="text-[14px]"
@@ -1694,7 +2028,9 @@ export function Dashboard({ user }: { user?: any }) {
                 value={wallpaperStatsAlign}
                 onChange={(v) => {
                   setWallpaperStatsAlign(v as any);
-                  showToast(`Stats align: ${v === 'left' ? 'Left' : v === 'center' ? 'Center' : 'Right'}`);
+                  showToast(
+                    `Stats align: ${v === "left" ? "Left" : v === "center" ? "Center" : "Right"}`,
+                  );
                 }}
                 itemWidth={75}
                 fontSizeClass="text-[14px]"
@@ -1715,7 +2051,9 @@ export function Dashboard({ user }: { user?: any }) {
                 value={wallpaperGridStyle}
                 onChange={(v) => {
                   setWallpaperGridStyle(v as any);
-                  showToast(`${v === 'weeks' ? 'Weeks' : v === 'month' ? 'Month Cal' : v === 'year' ? 'Year' : v === 'goals' ? 'Goals' : 'Widget'} layout`);
+                  showToast(
+                    `${v === "weeks" ? "Weeks" : v === "month" ? "Month Cal" : v === "year" ? "Year" : v === "goals" ? "Goals" : "Widget"} layout`,
+                  );
                 }}
                 itemWidth={95}
                 fontSizeClass="text-[14px]"
@@ -1723,33 +2061,42 @@ export function Dashboard({ user }: { user?: any }) {
             </div>
           )}
 
-          {activeSettingTab === "size" && (wallpaperGridStyle === "weeks" || wallpaperGridStyle === "widget") && (
-            <div className="w-full animate-fade-in-right">
-              <WheelPicker
-                options={GRID_SIZES.map(w => ({ key: w, label: w }))}
-                value={previewWeeks}
-                onChange={setPreviewWeeks}
-                itemWidth={55}
-                fontSizeClass="text-[18px]"
-              />
-            </div>
-          )}
+          {activeSettingTab === "size" &&
+            (wallpaperGridStyle === "weeks" || wallpaperGridStyle === "widget") && (
+              <div className="w-full animate-fade-in-right">
+                <WheelPicker
+                  options={GRID_SIZES.map((w) => ({ key: w, label: w }))}
+                  value={previewWeeks}
+                  onChange={setPreviewWeeks}
+                  itemWidth={55}
+                  fontSizeClass="text-[18px]"
+                />
+              </div>
+            )}
         </div>
       </div>
     );
   };
 
+  const appBackgroundImage =
+    theme === "light"
+      ? "/grain-light.jpg"
+      : wallpaperTheme === "custom" && wallpaperCustomPhoto
+        ? wallpaperCustomPhoto
+        : "/back2.jpg";
+  const backgroundExtensionImage = appBackgroundImage;
 
   return (
     <main
       data-theme={theme}
+      data-app-visible={pageVisible ? "true" : "false"}
       className="fixed inset-0 flex h-full w-full justify-center bg-[var(--backdrop)] overflow-hidden"
     >
       {/* Main app container - 100% Full Edge-to-Edge Responsive */}
       <div className="relative flex h-full w-full flex-col bg-canvas pt-safe pb-safe overflow-hidden">
         <div
           data-throttle={throttled ? "1" : "0"}
-          className="relative flex h-full w-full flex-1 flex-col overflow-hidden bg-canvas"
+          className="relative flex h-full w-full flex-1 flex-col overflow-hidden bg-transparent"
           style={(() => {
             const wt = wallpaperTokens(wallpaperTheme, gridColorTheme, theme);
             return {
@@ -1765,12 +2112,23 @@ export function Dashboard({ user }: { user?: any }) {
             } as Record<string, string>;
           })()}
         >
+          {/* Shared background extension for the app's floating glass surfaces. */}
+          {backgroundExtensionImage && (
+            <div className="background-extension background-extension-photo" aria-hidden="true">
+              <img
+                key={backgroundExtensionImage}
+                src={backgroundExtensionImage}
+                alt=""
+                className="background-extension-image"
+                style={{ objectPosition: "center center" }}
+              />
+              <div className="background-extension-scrim" />
+            </div>
+          )}
 
           {/* Liquid drifting blobs — animated blur gradient ambient light for all non-consistency screens (hidden in AMOLED theme for 120 FPS max performance) */}
           <div
-            className={`pointer-events-none absolute inset-0 overflow-hidden z-0 transition-opacity duration-700 ease-in-out ${
-              activeTab === "consistency" || theme === "amoled" || theme === "light" ? "opacity-0 pointer-events-none" : "opacity-100"
-            }`}
+            className={`pointer-events-none absolute inset-0 overflow-hidden z-0 transition-opacity duration-700 ease-in-out ${"ambient-paused opacity-0 pointer-events-none"}`}
           >
             <div
               className="liquid-blob absolute -left-24 -top-24 h-72 w-72 rounded-full"
@@ -1796,18 +2154,18 @@ export function Dashboard({ user }: { user?: any }) {
           </div>
 
           {/* Photographic Trekking Peak Background — Smoothly fades in ONLY for Consistency Tab */}
-          <div
-            className={`absolute inset-0 pointer-events-none z-0 overflow-hidden transition-all duration-700 ease-in-out ${activeTab === "consistency" ? "opacity-100 scale-100" : "opacity-0 scale-105"
-              }`}
-          >
+          <div className="absolute inset-0 pointer-events-none z-0 overflow-hidden opacity-100 scale-100 transition-all duration-700 ease-in-out">
             <img
-              src="/photo.jpg"
+              key={appBackgroundImage}
+              src={appBackgroundImage}
               alt=""
-              className="w-full h-full object-cover opacity-25 grayscale transition-transform duration-1000 ease-out"
+              className={`app-background-image w-full h-full object-cover transition-transform duration-1000 ease-out ${
+                theme === "light"
+                  ? "opacity-100 saturate-100 brightness-100"
+                  : "opacity-30 saturate-[0.82] brightness-[0.66]"
+              }`}
               style={{
-                maskImage: "linear-gradient(to bottom, black 0%, black 75%, transparent 100%)",
-                WebkitMaskImage: "linear-gradient(to bottom, black 0%, black 75%, transparent 100%)",
-                objectPosition: "center top",
+                objectPosition: "center center",
               }}
             />
           </div>
@@ -1820,8 +2178,9 @@ export function Dashboard({ user }: { user?: any }) {
             <button
               type="button"
               onClick={() => {
-                if (activeToast) {
-                  removeToast(activeToast.id);
+                if (pillNotice) {
+                  pillNotice.action?.onClick();
+                  if (activeToast) removeToast(activeToast.id);
                   return;
                 }
                 if (showTitlePill) {
@@ -1835,58 +2194,81 @@ export function Dashboard({ user }: { user?: any }) {
                   }, 2000);
                 }
               }}
-              className={`pointer-events-auto flex items-center justify-center rounded-full border border-[color:var(--hairline-mid)] p-1 pl-1 text-xs font-semibold backdrop-blur-xl shadow-lg transition-all duration-500 ease-out active:scale-95 ${
-                activeToast
-                  ? activeToast.type === "error"
-                    ? "gap-2 pr-3.5 bg-red-500/90 text-white border-red-500/20"
-                    : activeToast.type === "success"
-                    ? "gap-2 pr-3.5 bg-green-500/90 text-white border-green-500/20"
-                    : "gap-2 pr-3.5 bg-black/80 dark:bg-white/90 text-white dark:text-black border-white/10 dark:border-black/10"
+              className={`grain-title-pill pointer-events-auto flex items-center justify-center rounded-full border border-[color:var(--hairline-mid)] p-1 pl-1 text-xs font-semibold backdrop-blur-xl shadow-lg active:scale-95 ${
+                pillNotice
+                  ? pillNotice.type === "error"
+                    ? "max-h-12 max-w-[280px] gap-2 pr-3.5 bg-red-500/90 text-white border-red-500/20 opacity-100 translate-y-0 scale-100"
+                    : pillNotice.type === "success"
+                      ? "max-h-12 max-w-[280px] gap-2 pr-3.5 bg-green-500/90 text-white border-green-500/20 opacity-100 translate-y-0 scale-100"
+                      : "max-h-12 max-w-[280px] gap-2 pr-3.5 bg-[color:color-mix(in_srgb,var(--canvas)_94%,transparent)] text-ink border-[color:var(--hairline-mid)] opacity-100 translate-y-0 scale-100"
                   : showTitlePill
-                  ? "gap-2 pr-3.5 bg-canvas text-ink ring-1 ring-ink/10"
-                  : "gap-0 pr-1 bg-canvas/85 text-ink"
-              } opacity-100 scale-100`}
+                    ? "max-h-12 max-w-[280px] gap-2 pr-3.5 bg-canvas text-ink ring-1 ring-ink/10 opacity-100 translate-y-0 scale-100"
+                    : "pointer-events-none max-h-0 max-w-0 gap-0 border-transparent bg-transparent p-0 text-ink opacity-0 -translate-y-1 scale-75"
+              }`}
               aria-label="App logo and section title"
             >
               <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full overflow-hidden relative">
-                {showTitlePill || activeToast ? (
-                  <div className="absolute inset-0 bg-current opacity-10 rounded-full flex items-center justify-center animate-pulse" />
+                {showTitlePill || pillNotice ? (
+                  <div className="grain-title-pill-halo absolute inset-0 rounded-full bg-current opacity-10" />
                 ) : null}
-                <img
-                  src="/icon.png"
-                  alt="Grain logo"
-                  className={`h-full w-full object-contain object-center filter drop-shadow-sm scale-105 transition-all duration-500 ${
-                    activeToast
-                      ? (activeToast.type === "error" || activeToast.type === "success" || theme === "light")
-                        ? "brightness-0 invert"
-                        : "brightness-0" // for info in dark mode (white bg -> black text/icon)
-                      : (wallpaperThemeOf(wallpaperTheme, theme).bg === "#f5f5f5" || (wallpaperThemeOf(wallpaperTheme, theme).bg as string) === "#ffffff")
-                      ? "invert"
-                      : ""
-                  }`}
-                />
+                {theme === "light" ? (
+                  <Wheat
+                    className={`h-4 w-4 drop-shadow-sm ${
+                      pillNotice?.type === "error" || pillNotice?.type === "success"
+                        ? "text-white"
+                        : "text-ink"
+                    }`}
+                    strokeWidth={2.2}
+                    aria-label="Grain logo"
+                  />
+                ) : (
+                  <img
+                    src="/icon.png"
+                    alt="Grain logo"
+                    className={`h-full w-full object-contain object-center filter drop-shadow-sm scale-105 transition-all duration-500 ${
+                      pillNotice
+                        ? pillNotice.type === "error" || pillNotice.type === "success"
+                          ? "brightness-0 invert"
+                          : ""
+                        : wallpaperThemeOf(wallpaperTheme, theme).bg === "#f5f5f5" ||
+                            (wallpaperThemeOf(wallpaperTheme, theme).bg as string) === "#ffffff"
+                          ? "invert"
+                          : ""
+                    }`}
+                  />
+                )}
               </div>
               <span
-                className={`overflow-hidden transition-all duration-500 ease-out flex items-center gap-2 ${showTitlePill || activeToast ? "max-w-[240px] opacity-100" : "max-w-0 opacity-0"
-                  }`}
+                className={`overflow-hidden transition-[max-width,opacity] duration-500 ease-out flex items-center gap-2 ${
+                  showTitlePill || pillNotice ? "max-w-[240px] opacity-100" : "max-w-0 opacity-0"
+                }`}
               >
-                <span className={`h-3.5 w-px shrink-0 opacity-70 ${activeToast ? "bg-current opacity-30" : "bg-[color:var(--hairline-mid)]"}`} />
-                <span className={`font-medium text-[11px] leading-none shrink-0 whitespace-nowrap flex items-center ${activeToast ? "text-current" : "text-mute"}`}>
-                  {activeToast
-                    ? activeToast.message
+                <span
+                  className={`h-3.5 w-px shrink-0 opacity-70 ${pillNotice ? "bg-current opacity-30" : "bg-[color:var(--hairline-mid)]"}`}
+                />
+                <span
+                  key={pillNotice?.id ?? activeTab}
+                  className={`grain-title-pill-copy font-medium text-[11px] leading-none shrink-0 whitespace-nowrap flex items-center ${pillNotice ? "text-current" : "text-mute"}`}
+                >
+                  {pillNotice
+                    ? pillNotice.message
                     : activeTab === "today"
-                    ? `Daily habits · ${totalStreak}d streak`
-                    : activeTab === "consistency"
-                      ? `Consistency · ${totalStreak}d streak`
-                      : activeTab === "myday"
-                        ? "My Day"
-                        : activeTab === "goal"
-                          ? "Your goals"
-                          : "Live wallpaper"}
+                      ? `Daily habits · ${totalStreak}d streak`
+                      : activeTab === "consistency"
+                        ? `Consistency · ${totalStreak}d streak`
+                        : activeTab === "myday"
+                          ? "My Day"
+                          : activeTab === "goal"
+                            ? "Your goals"
+                            : "Live wallpaper"}
                 </span>
+                {pillNotice?.action && (
+                  <span className="rounded-full bg-current/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wide">
+                    {pillNotice.action.label}
+                  </span>
+                )}
               </span>
             </button>
-
 
             {/* Profile Button (Top Right) */}
             <button
@@ -1897,151 +2279,194 @@ export function Dashboard({ user }: { user?: any }) {
             </button>
           </div>
 
-
-
+          {dataError && (
+            <DataStatusBanner
+              message={dataError.message || "Some data could not sync. Your saved items are still shown."}
+              onRetry={retryData}
+            />
+          )}
 
           <div
-            ref={swipeContainerRef}
-            className="relative flex flex-1 w-full overflow-x-auto overflow-y-hidden snap-x snap-mandatory scrollbar-none"
-            style={{ touchAction: "pan-y", scrollBehavior: "smooth" }}
+            className="relative flex flex-1 w-full overflow-hidden"
+            style={{ touchAction: "pan-y" }}
+            onTouchStart={(event) => {
+              const touch = event.touches[0];
+              tabTouchStartRef.current = { x: touch.clientX, y: touch.clientY };
+            }}
+            onTouchEnd={(event) => {
+              const start = tabTouchStartRef.current;
+              tabTouchStartRef.current = null;
+              if (!start) return;
+              const touch = event.changedTouches[0];
+              const dx = touch.clientX - start.x;
+              const dy = touch.clientY - start.y;
+              if (Math.abs(dx) < 56 || Math.abs(dx) < Math.abs(dy) * 1.25) return;
+              const currentIndex = TAB_ORDER.indexOf(activeTab);
+              const nextIndex = dx < 0 ? currentIndex + 1 : currentIndex - 1;
+              const nextTab = TAB_ORDER[nextIndex];
+              if (nextTab) switchTab(nextTab);
+            }}
           >
-
-
-
             {/* TAB 1: TODAY */}
-            <div
-              data-tab-id="today"
-              className="w-full h-full flex-shrink-0 snap-start snap-always overflow-y-auto overflow-x-hidden relative scrollbar-none pb-28"
-              ref={activeTab === "today" ? scrollRef : undefined}
-            >
-              <div className="space-y-4 pt-16">
+            {activeTab === "today" && (
+              <div
+                data-tab-id="today"
+                className="w-full h-full flex-shrink-0 snap-start snap-always overflow-y-auto overflow-x-hidden relative scrollbar-none pb-52"
+                ref={activeTab === "today" ? scrollRef : undefined}
+              >
+                <div className="today-content space-y-4 pt-16">
+                  {/* Unified Hero: streak + ring + date selector */}
+                  <TodayHero
+                    streak={totalStreak}
+                    rate={rate}
+                    done={doneCount}
+                    total={totalCount}
+                    nextHabit={(() => {
+                      for (const q of QUADRANT_ORDER) {
+                        const next = scheduledHabitsByQuadrant[q].find(({ habit }) => !habit.done);
+                        if (next) return { q, i: next.index, habit: next.habit as any };
+                      }
+                      return null;
+                    })()}
+                    onCompleteNext={(q: Quadrant, i: number) => toggleDone(q, i)}
+                    dateSelectorSlot={
+                      <div className="relative">
+                        {dateStyle === "underline" && (
+                          <div className="flex items-center justify-between border-y border-[color:var(--hairline)] py-4">
+                            {getWeekDates(new Date()).map((date) => {
+                              const active = isSameDay(date, selectedDate);
+                              const isTodayDate = isSameDay(date, new Date());
+                              return (
+                                <button
+                                  key={date.toISOString()}
+                                  onClick={() => {
+                                    setSelectedDate(date);
+                                    if (!isTodayDate)
+                                      showToast(`Viewing ${shortDay(date)}, ${date.getDate()}`);
+                                  }}
+                                  className={`flex flex-col items-center gap-1 transition ${active ? "text-ink" : "text-body hover:text-ink"}`}
+                                >
+                                  <span
+                                    className={`text-[10px] font-black uppercase tracking-widest ${active ? "opacity-100" : "opacity-40"}`}
+                                  >
+                                    {shortDay(date)}
+                                  </span>
+                                  <span
+                                    className={`font-display text-lg font-black tabular-nums ${active ? "underline decoration-2 underline-offset-4" : ""}`}
+                                  >
+                                    {date.getDate()}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
 
-                {/* Unified Hero: streak + ring + date selector */}
-                <TodayHero
-                  streak={totalStreak}
-                  rate={rate}
-                  done={doneCount}
-                  total={totalCount}
-                  nextHabit={(() => {
-                    for (const q of QUADRANT_ORDER) {
-                      const idx = habits[q].findIndex((h) => !h.done);
-                      if (idx !== -1) return { q, i: idx, habit: habits[q][idx] as any };
+                        {dateStyle === "block" && (
+                          <div className="flex items-center justify-between py-2 px-1">
+                            {getWeekDates(new Date()).map((date) => {
+                              const active = isSameDay(date, selectedDate);
+                              const isTodayDate = isSameDay(date, new Date());
+                              return (
+                                <button
+                                  key={date.toISOString()}
+                                  onClick={() => {
+                                    setSelectedDate(date);
+                                    if (!isTodayDate)
+                                      showToast(`Viewing ${shortDay(date)}, ${date.getDate()}`);
+                                  }}
+                                  className={`flex flex-col items-center justify-center h-14 w-12 transition ${
+                                    active
+                                      ? "bg-ink text-[color:var(--canvas)] scale-110 shadow-lg"
+                                      : "text-mute hover:text-ink hover:bg-canvas-soft"
+                                  }`}
+                                >
+                                  <span
+                                    className={`text-[9px] font-black uppercase tracking-widest ${active ? "opacity-90" : ""}`}
+                                  >
+                                    {shortDay(date)}
+                                  </span>
+                                  <span
+                                    className={`font-display text-xl font-black tabular-nums mt-0.5`}
+                                  >
+                                    {date.getDate()}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {dateStyle === "mono" && (
+                          <div className="flex items-center justify-between border-2 border-ink p-1">
+                            {getWeekDates(new Date()).map((date) => {
+                              const active = isSameDay(date, selectedDate);
+                              const isTodayDate = isSameDay(date, new Date());
+                              return (
+                                <button
+                                  key={date.toISOString()}
+                                  onClick={() => {
+                                    setSelectedDate(date);
+                                    if (!isTodayDate)
+                                      showToast(`Viewing ${shortDay(date)}, ${date.getDate()}`);
+                                  }}
+                                  className={`flex flex-col items-center justify-center p-2 font-mono transition ${
+                                    active
+                                      ? "bg-ink text-[color:var(--canvas)]"
+                                      : "text-body hover:bg-ink/10"
+                                  }`}
+                                >
+                                  <span className="text-[10px] uppercase font-bold tracking-tighter">
+                                    {active ? `[${shortDay(date)}]` : shortDay(date)}
+                                  </span>
+                                  <span className="text-sm font-bold mt-1">
+                                    {date.getDate().toString().padStart(2, "0")}
+                                  </span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
                     }
-                    return null;
-                  })()}
-                  onCompleteNext={(q: Quadrant, i: number) => toggleDone(q, i)}
-                  dateSelectorSlot={
-                    <div className="relative">
-                      {dateStyle === "underline" && (
-                        <div className="flex items-center justify-between border-y border-[color:var(--hairline)] py-4">
-                          {getWeekDates(new Date()).map((date) => {
-                            const active = isSameDay(date, selectedDate);
-                            const isTodayDate = isSameDay(date, new Date());
-                            return (
-                              <button
-                                key={date.toISOString()}
-                                onClick={() => {
-                                  setSelectedDate(date);
-                                  if (!isTodayDate) showToast(`Viewing ${shortDay(date)}, ${date.getDate()}`);
-                                }}
-                                className={`flex flex-col items-center gap-1 transition ${active ? "text-ink" : "text-body hover:text-ink"}`}
-                              >
-                                <span className={`text-[10px] font-black uppercase tracking-widest ${active ? "opacity-100" : "opacity-40"}`}>
-                                  {shortDay(date)}
-                                </span>
-                                <span className={`font-display text-lg font-black tabular-nums ${active ? "underline decoration-2 underline-offset-4" : ""}`}>
-                                  {date.getDate()}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
+                  />
 
-                      {dateStyle === "block" && (
-                        <div className="flex items-center justify-between py-2 px-1">
-                          {getWeekDates(new Date()).map((date) => {
-                            const active = isSameDay(date, selectedDate);
-                            const isTodayDate = isSameDay(date, new Date());
-                            return (
-                              <button
-                                key={date.toISOString()}
-                                onClick={() => {
-                                  setSelectedDate(date);
-                                  if (!isTodayDate) showToast(`Viewing ${shortDay(date)}, ${date.getDate()}`);
-                                }}
-                                className={`flex flex-col items-center justify-center h-14 w-12 transition ${active
-                                  ? "bg-ink text-[color:var(--canvas)] scale-110 shadow-lg"
-                                  : "text-mute hover:text-ink hover:bg-canvas-soft"
-                                  }`}
-                              >
-                                <span className={`text-[9px] font-black uppercase tracking-widest ${active ? "opacity-90" : ""}`}>
-                                  {shortDay(date)}
-                                </span>
-                                <span className={`font-display text-xl font-black tabular-nums mt-0.5`}>
-                                  {date.getDate()}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {dateStyle === "mono" && (
-                        <div className="flex items-center justify-between border-2 border-ink p-1">
-                          {getWeekDates(new Date()).map((date) => {
-                            const active = isSameDay(date, selectedDate);
-                            const isTodayDate = isSameDay(date, new Date());
-                            return (
-                              <button
-                                key={date.toISOString()}
-                                onClick={() => {
-                                  setSelectedDate(date);
-                                  if (!isTodayDate) showToast(`Viewing ${shortDay(date)}, ${date.getDate()}`);
-                                }}
-                                className={`flex flex-col items-center justify-center p-2 font-mono transition ${active
-                                  ? "bg-ink text-[color:var(--canvas)]"
-                                  : "text-body hover:bg-ink/10"
-                                  }`}
-                              >
-                                <span className="text-[10px] uppercase font-bold tracking-tighter">
-                                  {active ? `[${shortDay(date)}]` : shortDay(date)}
-                                </span>
-                                <span className="text-sm font-bold mt-1">
-                                  {date.getDate().toString().padStart(2, '0')}
-                                </span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  }
-                />
-
-                {/* Habits checklist — no section header (info is in the Hero) */}
-                <section className="px-4">
-                  {totalCount === 0 ? (
-                    /* ── Empty state: invitation + ghost card ── */
-                    <div className="flex flex-col items-center gap-4 py-8">
-                      {/* Ghost habit card */}
-                      <div
-                        className="animate-breathe w-full rounded-2xl border-2 border-dashed border-[color:color-mix(in_srgb,var(--accent)_20%,transparent)] bg-[color:color-mix(in_srgb,var(--canvas)_50%,transparent)] backdrop-blur-2xl shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_15%,transparent),0_8px_24px_rgba(0,0,0,0.2)] p-4 flex items-center gap-3.5 cursor-pointer transition-all hover:bg-[color:color-mix(in_srgb,var(--canvas)_65%,transparent)] hover:border-[color:color-mix(in_srgb,var(--accent)_30%,transparent)]"
-                        onClick={() => setModalOpen(true)}
-                      >
-                        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-dashed border-[color:color-mix(in_srgb,var(--accent)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--canvas)_40%,transparent)]">
-                          <Plus className="h-4 w-4 text-ink" strokeWidth={2.5} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-semibold text-ink">Tap to add your first habit</p>
-                          <p className="text-[11px] text-body mt-0.5">Your streak starts with one check ✓</p>
+                  {/* Habits checklist — no section header (info is in the Hero) */}
+                  <section className="px-4">
+                    {habitsLoading ? (
+                      <div className="flex items-center justify-center gap-2 py-10 text-sm text-mute">
+                        <Loader2 className="h-4 w-4 animate-spin" /> Loading your habits…
+                      </div>
+                    ) : totalCount === 0 ? (
+                      /* ── Empty state: invitation + ghost card ── */
+                      <div className="flex flex-col items-center gap-4 py-8">
+                        {/* Ghost habit card */}
+                        <div
+                          className="animate-breathe w-full rounded-2xl border-2 border-dashed border-[color:color-mix(in_srgb,var(--accent)_20%,transparent)] bg-[color:color-mix(in_srgb,var(--canvas)_72%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_15%,transparent),0_8px_24px_rgba(0,0,0,0.2)] p-4 flex items-center gap-3.5 cursor-pointer transition-all hover:bg-[color:color-mix(in_srgb,var(--canvas)_82%,transparent)] hover:border-[color:color-mix(in_srgb,var(--accent)_30%,transparent)]"
+                          onClick={() => setModalOpen(true)}
+                        >
+                          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-dashed border-[color:color-mix(in_srgb,var(--accent)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--canvas)_40%,transparent)]">
+                            <Plus className="h-4 w-4 text-ink" strokeWidth={2.5} />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-ink">
+                              Tap to add your first habit
+                            </p>
+                            <p className="text-[11px] text-body mt-0.5">
+                              Your streak starts with one check ✓
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-2.5">
-                      {QUADRANT_ORDER.flatMap((q) =>
-                        habits[q].map((h, i) => (
+                    ) : (
+                      <div className="habit-list-surface overflow-hidden rounded-[24px]">
+                        {QUADRANT_ORDER.flatMap((q) =>
+                          scheduledHabitsByQuadrant[q].map(({ habit, index }) => ({
+                            q,
+                            habit,
+                            index,
+                          })),
+                        ).map(({ q, habit: h, index: i }, rowIndex, rows) => (
                           <HabitCard
                             key={`${q}-${i}-${(h as any).id || h.name}`}
                             habit={h}
@@ -2056,165 +2481,369 @@ export function Dashboard({ user }: { user?: any }) {
                             isSelected={selectedHabitIds.has(h.id)}
                             onSelectToggle={toggleSelectHabit}
                             onLongPress={handleHabitLongPress}
+                            showDivider={rowIndex < rows.length - 1}
                           />
-                        ))
-                      )}
-                    </div>
-                  )}
-                </section>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* TAB 2: CONSISTENCY */}
-            <div
-              data-tab-id="consistency"
-              className="w-full h-full flex-shrink-0 snap-start snap-always overflow-y-auto overflow-x-hidden relative scrollbar-none pb-28"
-              ref={activeTab === "consistency" ? scrollRef : undefined}
-            >
-              <div>
-                <ConsistencyTab
-                  heatmap={heatmap}
-                  selectedHabit={selectedHabit}
-                  setSelectedHabit={setSelectedHabit}
-                  doneCount={doneCount}
-                  totalCount={totalCount}
-                  totalStreak={totalStreak}
-                  rate={rate}
-                  weeklyInsights={weeklyInsights}
-                  showToast={showToast}
-                  onOpenWeeklyReview={() => setWeeklyReviewOpen(true)}
-                />
+            {activeTab === "consistency" && (
+              <div
+                data-tab-id="consistency"
+                className="w-full h-full flex-shrink-0 snap-start snap-always overflow-y-auto overflow-x-hidden relative scrollbar-none pb-28"
+                ref={activeTab === "consistency" ? scrollRef : undefined}
+              >
+                <div>
+                  <Suspense fallback={<DeferredTabFallback />}>
+                    <ConsistencyTab
+                      heatmap={heatmap}
+                      selectedHabit={selectedHabit}
+                      setSelectedHabit={setSelectedHabit}
+                      doneCount={doneCount}
+                      totalCount={totalCount}
+                      totalStreak={totalStreak}
+                      rate={rate}
+                      weeklyInsights={weeklyInsights}
+                      showToast={showToast}
+                      onOpenWeeklyReview={() => setWeeklyReviewOpen(true)}
+                    />
+                  </Suspense>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* TAB 3: MY DAY */}
-            <div
-              data-tab-id="myday"
-              className="w-full h-full flex-shrink-0 snap-start snap-always overflow-y-auto overflow-x-hidden relative scrollbar-none pb-28"
-              ref={activeTab === "myday" ? scrollRef : undefined}
-            >
-              <div className="pt-16 pb-32">
-                <section className="px-5">
-                  {totalCount === 0 ? (
-                    <div className="liquid-glass specular flex flex-col items-center justify-center gap-3 px-5 py-10 text-center rounded-3xl">
-                      <div className="grid h-12 w-12 place-items-center rounded-full bg-[color:color-mix(in_srgb,var(--canvas)_40%,transparent)] border border-[color:color-mix(in_srgb,var(--accent)_15%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_20%,transparent)]">
-                        <Sparkles className="h-5 w-5 text-ink" />
+            {activeTab === "myday" && (
+              <div
+                data-tab-id="myday"
+                className="w-full h-full flex-shrink-0 snap-start snap-always overflow-y-auto overflow-x-hidden relative scrollbar-none pb-28"
+                ref={activeTab === "myday" ? scrollRef : undefined}
+              >
+                <div className="pt-16 pb-32">
+                  <section className="px-5">
+                    {totalCount === 0 ? (
+                      <div className="liquid-glass specular flex flex-col items-center justify-center gap-3 px-5 py-10 text-center rounded-3xl">
+                        <div>
+                          <p className="font-display text-base font-bold text-ink">No habits yet</p>
+                          <p className="mt-1 max-w-[240px] text-[12px] text-body">
+                            Add your first habit to start a streak. It'll show up here in your daily
+                            routine.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setModalOpen(true)}
+                          className="pill mt-2 flex items-center gap-1.5 bg-ink px-5 py-2.5 text-[13px] font-semibold text-on-ink shadow-lg active:scale-95 transition"
+                          data-lg-press
+                        >
+                          <Plus className="h-4 w-4" strokeWidth={3} /> Create habit
+                        </button>
                       </div>
-                      <div>
-                        <p className="font-display text-base font-bold text-ink">No habits yet</p>
-                        <p className="mt-1 max-w-[240px] text-[12px] text-body">
-                          Add your first habit to start a streak. It'll show up here in your daily routine.
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => setModalOpen(true)}
-                        className="pill mt-2 flex items-center gap-1.5 bg-ink px-5 py-2.5 text-[13px] font-semibold text-on-ink shadow-lg active:scale-95 transition"
-                        data-lg-press
-                      >
-                        <Plus className="h-4 w-4" strokeWidth={3} /> Create habit
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-6">
-                      {TIME_ORDER.map((timeKey) => {
-                        const timeHabits = flatHabits.filter(h =>
-                          h.time === timeKey ||
-                          (!h.time && timeKey === "any")
-                        );
+                    ) : (
+                      <>
+                        {(() => {
+                          const pending = scheduledHabits.filter((habit) => !habit.done);
+                          const hour = new Date().getHours();
+                          const currentTime =
+                            hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening";
+                          const recommended =
+                            pending.find((habit) => habit.id === myDayOverrideId) ??
+                            pending.find((habit) => habit.time === currentTime && habit.pinned) ??
+                            pending.find((habit) => habit.time === currentTime) ??
+                            pending.find((habit) => habit.pinned) ??
+                            pending[0];
 
-                        if (timeHabits.length === 0) return null;
+                          if (!recommended) {
+                            return (
+                              <div className="absolute inset-x-5 top-1/2 flex -translate-y-1/2 flex-col items-center px-6 py-10 text-center animate-fade-in">
+                                <div className="grid h-14 w-14 place-items-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/20">
+                                  <Check className="h-7 w-7" strokeWidth={3} />
+                                </div>
+                                <h2 className="mt-4 font-display text-xl font-bold text-ink">
+                                  Today is complete
+                                </h2>
+                                <p className="mt-1 text-sm text-body">
+                                  You finished all {totalCount} habits. Enjoy the rest of your day.
+                                </p>
+                              </div>
+                            );
+                          }
 
-                        const timeIcons = {
-                          morning: <Sunrise className="w-[18px] h-[18px] text-[color:var(--brand)]" />,
-                          afternoon: <Sun className="w-[18px] h-[18px] text-[color:var(--brand)]" />,
-                          evening: <Moon className="w-[18px] h-[18px] text-[color:var(--brand)]" />,
-                          any: <Infinity className="w-[18px] h-[18px] text-[#3b82f6]" />
-                        };
-
-                        const timeTitles = {
-                          morning: "Morning",
-                          afternoon: "Afternoon",
-                          evening: "Evening",
-                          any: "Anytime"
-                        };
-
-                        return (
-                          <div key={timeKey} className="liquid-glass specular relative flex w-full flex-col overflow-hidden rounded-[24px] border border-[color:color-mix(in_srgb,var(--accent)_12%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_20%,transparent),0_8px_32px_rgba(0,0,0,0.3)] transition-all">
-                            <div className="flex items-center justify-between px-4 py-3 text-left">
-                              <h3 className="font-display text-sm font-bold text-ink flex items-center gap-2">
-                                {timeIcons[timeKey]}
-                                {timeTitles[timeKey]}
-                              </h3>
-                              <span className="text-[11px] font-medium tabular-nums text-mute">
-                                {timeHabits.filter(h => h.done).length}/{timeHabits.length}
-                              </span>
-                            </div>
-                            <div className="px-3 pb-3 pt-0 space-y-1.5">
-                              {timeHabits.map((h, i) => (
-                                <HabitRow
-                                  key={h.id}
-                                  habit={h}
-                                  justDone={false}
-                                  menuOpen={openMenuId === h.id}
-                                  onMenuToggle={() => setOpenMenuId(openMenuId === h.id ? null : h.id)}
-                                  onMenuClose={() => setOpenMenuId(null)}
-                                  onToggle={() => toggleHabitDone(h.id)}
-                                  onRest={() => setHabitRestDay(h.id)}
-                                  onPin={() => { togglePin(h.quadrant, habits[h.quadrant].findIndex(hx => hx.id === h.id)); setOpenMenuId(null); }}
-                                  onDelete={() => { deleteHabit(h.quadrant, habits[h.quadrant].findIndex(hx => hx.id === h.id)); setOpenMenuId(null); }}
-                                  onMove={() => { }}
-                                  onEdit={() => setEditHabitTarget({ q: h.quadrant, i: habits[h.quadrant].findIndex(hx => hx.id === h.id) })}
-                                  onAdjust={(dir) => adjustValue(h.quadrant, habits[h.quadrant].findIndex(hx => hx.id === h.id), dir)}
-                                  onSetValue={(val) => setHabitValue(h.id, val, h.target ?? 1)}
-                                  onOpenDetail={() => {
-                                    setDetail({ q: h.quadrant, i: habits[h.quadrant].findIndex(hx => hx.id === h.id) });
-                                    setNoteDraft("");
+                          const habitIndex = habits[recommended.quadrant].findIndex(
+                            (habit) => habit.id === recommended.id,
+                          );
+                          const isNumeric = Boolean(recommended.isNumeric || recommended.target);
+                          const completed = scheduledHabits.filter((habit) => habit.done);
+                          const completionPercent = totalCount
+                            ? Math.round((doneCount / totalCount) * 100)
+                            : 0;
+                          return (
+                            <div className="flex flex-col gap-5 animate-fade-in">
+                              <div className="flex items-end justify-between px-1">
+                                <div>
+                                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-mute">
+                                    Finish today
+                                  </p>
+                                  <h2 className="mt-1 font-display text-xl font-bold text-ink">
+                                    {pending.length} habit{pending.length === 1 ? "" : "s"} left
+                                  </h2>
+                                </div>
+                                <div
+                                  className="grid h-11 w-11 place-items-center rounded-full text-[10px] font-bold text-ink"
+                                  style={{
+                                    background: `conic-gradient(var(--ink) ${completionPercent}%, color-mix(in srgb, var(--ink) 12%, transparent) 0)`,
                                   }}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </section>
-              </div>
-            </div>
+                                  aria-label={`${doneCount} of ${totalCount} habits complete`}
+                                >
+                                  <span className="grid h-8 w-8 place-items-center rounded-full bg-canvas">
+                                    {doneCount}/{totalCount}
+                                  </span>
+                                </div>
+                              </div>
 
-            <div className="h-6" />
+                              <div className="settings-glass specular rounded-3xl p-4">
+                                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-mute">
+                                  Up next
+                                </p>
+                                <div className="mt-3">
+                                    <h3 className="font-display text-lg font-bold text-ink">
+                                      {recommended.name}
+                                    </h3>
+                                    <p className="mt-1 text-xs capitalize text-body">
+                                      {recommended.time || "anytime"} ·{" "}
+                                      {recommended.category || "Personal"}
+                                    </p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (isNumeric) {
+                                      setDetail({ q: recommended.quadrant, i: habitIndex });
+                                      setNoteDraft("");
+                                    } else {
+                                      void toggleHabitDone(recommended.id);
+                                      setMyDayOverrideId(null);
+                                    }
+                                  }}
+                                  className="settings-control mt-4 flex w-full items-center justify-center gap-2 rounded-2xl py-3 text-sm font-bold text-ink shadow-lg transition active:scale-[0.98] hover:brightness-110"
+                                >
+                                  <Check className="h-4 w-4" strokeWidth={3} />{" "}
+                                  {isNumeric ? "Log progress" : "Complete habit"}
+                                </button>
+                              </div>
+
+                              {pending.length > 1 && (
+                                <div>
+                                  <div className="mb-2 flex items-center justify-between px-1">
+                                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-mute">
+                                      Choose another
+                                    </p>
+                                    <span className="text-[11px] text-body">
+                                      Best for your {currentTime}
+                                    </span>
+                                  </div>
+                                  <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+                                    {pending
+                                      .filter((habit) => habit.id !== recommended.id)
+                                      .slice(0, 5)
+                                      .map((habit) => (
+                                        <button
+                                          key={habit.id}
+                                          type="button"
+                                          onClick={() => setMyDayOverrideId(habit.id)}
+                                          className="min-w-32 rounded-2xl border border-[color:var(--hairline)] bg-[color:color-mix(in_srgb,var(--canvas)_42%,transparent)] px-3 py-2.5 text-left opacity-75 transition hover:opacity-100 active:scale-95"
+                                        >
+                                          <p className="truncate text-xs font-bold text-ink">
+                                            {habit.name}
+                                          </p>
+                                          <p className="mt-1 text-[10px] capitalize text-mute">
+                                            {habit.time || "anytime"}
+                                          </p>
+                                        </button>
+                                      ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {completed.length > 0 && (
+                                <div className="settings-glass overflow-hidden rounded-2xl">
+                                  <button
+                                    type="button"
+                                    onClick={() => setMyDayCompletedOpen((open) => !open)}
+                                    className="flex w-full items-center justify-between px-4 py-3 text-left text-xs font-semibold text-body"
+                                  >
+                                    <span>{completed.length} completed today</span>
+                                    <span className="text-mute">
+                                      {myDayCompletedOpen ? "Hide" : "View"}
+                                    </span>
+                                  </button>
+                                  {myDayCompletedOpen && (
+                                    <div className="border-t border-[color:var(--hairline)] px-4 py-2 animate-fade-in">
+                                      {completed.map((habit) => (
+                                        <p
+                                          key={habit.id}
+                                          className="py-1 text-xs text-mute line-through"
+                                        >
+                                          {habit.name}
+                                        </p>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              <p className="hidden text-center text-xs text-body">
+                                {doneCount} completed today · Your completed habits stay out of the
+                                way.
+                              </p>
+                            </div>
+                          );
+                        })()}
+
+                        <div className="hidden">
+                          {TIME_ORDER.map((timeKey) => {
+                            const timeHabits = scheduledHabits.filter(
+                              (h) => h.time === timeKey || (!h.time && timeKey === "any"),
+                            );
+
+                            if (timeHabits.length === 0) return null;
+
+                            const timeIcons = {
+                              morning: (
+                                <Sunrise className="w-[18px] h-[18px] text-[color:var(--brand)]" />
+                              ),
+                              afternoon: (
+                                <Sun className="w-[18px] h-[18px] text-[color:var(--brand)]" />
+                              ),
+                              evening: (
+                                <Moon className="w-[18px] h-[18px] text-[color:var(--brand)]" />
+                              ),
+                              any: <Infinity className="w-[18px] h-[18px] text-[#3b82f6]" />,
+                            };
+
+                            const timeTitles = {
+                              morning: "Morning",
+                              afternoon: "Afternoon",
+                              evening: "Evening",
+                              any: "Anytime",
+                            };
+
+                            return (
+                              <div
+                                key={timeKey}
+                                className="habit-list-surface relative flex w-full flex-col overflow-hidden rounded-[24px] transition-all"
+                              >
+                                <div className="flex items-center justify-between px-4 py-3 text-left">
+                                  <h3 className="font-display text-sm font-bold text-ink flex items-center gap-2">
+                                    {timeIcons[timeKey]}
+                                    {timeTitles[timeKey]}
+                                  </h3>
+                                  <span className="text-[11px] font-medium tabular-nums text-mute">
+                                    {timeHabits.filter((h) => h.done).length}/{timeHabits.length}
+                                  </span>
+                                </div>
+                                <div className="px-3 pb-3 pt-0 space-y-1.5">
+                                  {timeHabits.map((h, i) => (
+                                    <HabitRow
+                                      key={h.id}
+                                      habit={h}
+                                      justDone={false}
+                                      menuOpen={openMenuId === h.id}
+                                      onMenuToggle={() =>
+                                        setOpenMenuId(openMenuId === h.id ? null : h.id)
+                                      }
+                                      onMenuClose={() => setOpenMenuId(null)}
+                                      onToggle={() => toggleHabitDone(h.id)}
+                                      onRest={() => setHabitRestDay(h.id)}
+                                      onPin={() => {
+                                        togglePin(
+                                          h.quadrant,
+                                          habits[h.quadrant].findIndex((hx) => hx.id === h.id),
+                                        );
+                                        setOpenMenuId(null);
+                                      }}
+                                      onDelete={() => {
+                                        deleteHabit(
+                                          h.quadrant,
+                                          habits[h.quadrant].findIndex((hx) => hx.id === h.id),
+                                        );
+                                        setOpenMenuId(null);
+                                      }}
+                                      onMove={() =>
+                                        moveHabit(
+                                          h.quadrant,
+                                          habits[h.quadrant].findIndex((hx) => hx.id === h.id),
+                                        )
+                                      }
+                                      onEdit={() =>
+                                        setEditHabitTarget({
+                                          q: h.quadrant,
+                                          i: habits[h.quadrant].findIndex((hx) => hx.id === h.id),
+                                        })
+                                      }
+                                      onAdjust={(dir) =>
+                                        adjustValue(
+                                          h.quadrant,
+                                          habits[h.quadrant].findIndex((hx) => hx.id === h.id),
+                                          dir,
+                                        )
+                                      }
+                                      onSetValue={(val) => setHabitValue(h.id, val, h.target ?? 1)}
+                                      onOpenDetail={() => {
+                                        setDetail({
+                                          q: h.quadrant,
+                                          i: habits[h.quadrant].findIndex((hx) => hx.id === h.id),
+                                        });
+                                        setNoteDraft("");
+                                      }}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </>
+                    )}
+                  </section>
+                </div>
+              </div>
+            )}
 
             {/* Goal Tab */}
-            <div
-              data-tab-id="goal"
-              className="w-full h-full flex-shrink-0 snap-start snap-always overflow-y-auto overflow-x-hidden relative scrollbar-none pb-28"
-              ref={activeTab === "goal" ? scrollRef : undefined}
-            >
-              <div className="pt-16 pb-32">
-                <GoalTab
-                  goals={goals}
-                  onDelete={async (id) => {
-                    if (id === activeGoalId) {
-                      setActiveGoalId(null);
-                      if (userId) {
-                        await updateDoc(doc(getFirestore(), "users", userId), {
-                          "prefs.activeGoalId": null
-                        }).catch(err => toastError("An error occurred"));
-                      }
-                    }
-                    await deleteGoal(userId!, id);
-                  }}
-                  onSetActiveGoal={async (id) => {
-                    setActiveGoalId(id);
-                    if (userId) {
-                      await updateDoc(doc(getFirestore(), "users", userId), {
-                        "prefs.activeGoalId": id
-                      }).catch(err => toastError("An error occurred"));
-                    }
-                  }}
-                />
+            {activeTab === "goal" && (
+              <div
+                data-tab-id="goal"
+                className="w-full h-full flex-shrink-0 snap-start snap-always overflow-y-auto overflow-x-hidden relative scrollbar-none pb-28"
+                ref={activeTab === "goal" ? scrollRef : undefined}
+              >
+                <div className="pt-16 pb-32">
+                  <Suspense fallback={<DeferredTabFallback />}>
+                    <GoalTab
+                      goals={goals}
+                      onDelete={async (id) => {
+                        if (id === activeGoalId) {
+                          setActiveGoalId(null);
+                          if (userId) {
+                            updateLocalPrefs(userId, { activeGoalId: null });
+                          }
+                        }
+                        await deleteGoal(userId!, id);
+                      }}
+                      onSetActiveGoal={async (id) => {
+                        setActiveGoalId(id);
+                        if (userId) {
+                          updateLocalPrefs(userId, { activeGoalId: id });
+                        }
+                      }}
+                    />
+                  </Suspense>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Liquid Glass Bulk Action Bar (When selecting habits) */}
@@ -2225,7 +2854,9 @@ export function Dashboard({ user }: { user?: any }) {
                   <button
                     type="button"
                     onClick={() => {
-                      try { navigator.vibrate?.(10); } catch { }
+                      try {
+                        navigator.vibrate?.(10);
+                      } catch {}
                       setIsSelectionMode(false);
                       setSelectedHabitIds(new Set());
                     }}
@@ -2243,8 +2874,10 @@ export function Dashboard({ user }: { user?: any }) {
                   <button
                     type="button"
                     onClick={() => {
-                      try { navigator.vibrate?.(10); } catch { }
-                      const allIds = flatHabits.map(h => h.id).filter(Boolean);
+                      try {
+                        navigator.vibrate?.(10);
+                      } catch {}
+                      const allIds = flatHabits.map((h) => h.id).filter(Boolean);
                       if (selectedHabitIds.size === allIds.length) {
                         setSelectedHabitIds(new Set());
                         setIsSelectionMode(false);
@@ -2262,13 +2895,16 @@ export function Dashboard({ user }: { user?: any }) {
                     disabled={selectedHabitIds.size === 0}
                     onClick={() => {
                       if (selectedHabitIds.size === 0) return;
-                      try { navigator.vibrate?.(15); } catch { }
+                      try {
+                        navigator.vibrate?.(15);
+                      } catch {}
                       setBulkDeleteConfirmOpen(true);
                     }}
-                    className={`flex items-center gap-1 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all shadow-md active:scale-95 ${selectedHabitIds.size > 0
-                      ? "bg-red-500 text-white hover:bg-red-600 shadow-red-500/30"
-                      : "bg-canvas-soft text-mute opacity-50 cursor-not-allowed"
-                      }`}
+                    className={`flex items-center gap-1 rounded-full px-3.5 py-1.5 text-xs font-bold transition-all shadow-md active:scale-95 ${
+                      selectedHabitIds.size > 0
+                        ? "bg-red-500 text-white hover:bg-red-600 shadow-red-500/30"
+                        : "bg-canvas-soft text-mute opacity-50 cursor-not-allowed"
+                    }`}
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                     <span>Delete ({selectedHabitIds.size})</span>
@@ -2277,48 +2913,19 @@ export function Dashboard({ user }: { user?: any }) {
               </nav>
             </div>
           ) : (
-            /* Liquid Glass Bottom Navigation Bar */
-            <div className="absolute bottom-3 left-0 right-0 z-40 mx-4 pointer-events-none">
-              <nav className="pointer-events-auto mx-auto flex max-w-[340px] items-center justify-center gap-1 rounded-full border border-[color:var(--hairline)] bg-canvas/40 p-1.5 backdrop-blur-2xl shadow-2xl specular relative overflow-hidden">
-                {([
-                  { id: "today", label: "Today", icon: Flame },
-                  { id: "consistency", label: "Consistency", icon: CalendarDays },
-                  { id: "deck", label: "Deck", icon: Layers, isAction: true },
-                  { id: "myday", label: "My Day", icon: Sun },
-                  { id: "goal", label: "Goals", icon: Target },
-                ] as const).map((t) => {
-                  const active = activeTab === t.id;
-                  const Icon = t.icon;
-                  return (
-                    <button
-                      key={t.id}
-                      onClick={() => {
-                        if ("isAction" in t && t.isAction) {
-                          setSwipeMode(true);
-                        } else {
-                          switchTab(t.id as AppTab);
-                        }
-                        try { navigator.vibrate?.(10); } catch { }
-                      }}
-                      className={`flex flex-1 flex-col items-center justify-center gap-0.5 rounded-full py-2 px-1 text-[11px] font-medium transition-all duration-200 ${active
-                        ? "bg-ink text-on-ink shadow-lg scale-105"
-                        : "text-body hover:text-ink active:scale-95"
-                        }`}
-                    >
-                      <Icon className="h-4 w-4" strokeWidth={active ? 2.5 : 1.75} />
-                      <span className="text-[10px] leading-none">{t.label}</span>
-                    </button>
-                  );
-                })}
-              </nav>
-            </div>
+            <BottomNavigation
+              activeTab={activeTab}
+              onSwitchTab={switchTab}
+              onOpenDeck={openDeck}
+              advancedFeaturesUnlocked={habitsLoading || rawHabits.length > 0}
+            />
           )}
 
           {/* FAB */}
           {!isSelectionMode && activeTab === "today" && (
             <button
               onClick={() => setModalOpen(true)}
-              className="absolute bottom-20 right-5 z-30 mb-safe grid h-14 w-14 place-items-center rounded-full bg-ink text-on-ink shadow-[0_10px_30px_-5px_rgba(0,0,0,0.4)] transition active:scale-95 hover:scale-105"
+              className="liquid-fab floating-deck-aligned fixed bottom-[96px] z-30 mb-safe grid h-14 w-14 place-items-center rounded-full text-ink transition active:scale-95 hover:scale-105"
               aria-label="Add habit"
             >
               <Plus className="h-6 w-6" strokeWidth={2.25} />
@@ -2329,40 +2936,42 @@ export function Dashboard({ user }: { user?: any }) {
 
           {/* Fullscreen wallpaper lock-screen preview removed */}
 
-
-
           {/* Swipe Mode Full Screen */}
           {swipeMode && (
-            <SwipeModeView
-              habits={habits}
-              onClose={() => setSwipeMode(false)}
-              onToggleDone={(habitId) => {
-                for (const q of QUADRANT_ORDER) {
-                  const i = habits[q].findIndex(h => h.id === habitId);
-                  if (i !== -1) {
-                    toggleDone(q, i);
-                    break;
+            <Suspense fallback={null}>
+              <SwipeModeView
+                habits={habits}
+                onClose={() => setSwipeMode(false)}
+                onToggleDone={(habitId) => {
+                  for (const q of QUADRANT_ORDER) {
+                    const i = habits[q].findIndex((h) => h.id === habitId);
+                    if (i !== -1) {
+                      toggleDone(q, i);
+                      break;
+                    }
                   }
-                }
-              }}
-              onMarkSkipped={(habitId) => {
-                markHabitSkipped(habitId);
-              }}
-            />
+                }}
+                onMarkSkipped={(habitId) => {
+                  markHabitSkipped(habitId);
+                }}
+              />
+            </Suspense>
           )}
 
           {/* Settings Full Screen */}
           {settingsOpen && (
-            <div className="fixed inset-0 z-50 flex flex-col bg-canvas backdrop-blur-2xl animate-fade-in-up">
+            <div className="fixed inset-0 z-50 flex flex-col bg-canvas animate-fade-in-up">
               {/* Header */}
-              <div 
-                className="flex items-center justify-between px-5 pb-3"
-                style={{ paddingTop: 'calc(max(var(--sa-top, env(safe-area-inset-top)), 24px) + 16px)' }}
+              <div
+                className="flex items-center justify-between px-4 pb-3"
+                style={{
+                  paddingTop: "calc(max(var(--sa-top, env(safe-area-inset-top)), 24px) + 16px)",
+                }}
               >
                 <h1 className="font-display text-xl font-bold text-ink tracking-tight">Settings</h1>
                 <button
                   onClick={() => setSettingsOpen(false)}
-                  className="grid h-8 w-8 place-items-center rounded-md text-mute hover:text-ink hover:bg-ink/8 transition active:scale-95"
+                  className="liquid-control grid h-8 w-8 place-items-center rounded-full text-ink transition hover:brightness-110 active:scale-95"
                   aria-label="Close settings"
                 >
                   <X className="h-4 w-4" />
@@ -2370,10 +2979,9 @@ export function Dashboard({ user }: { user?: any }) {
               </div>
 
               {/* Scrollable Content */}
-              <div className="flex-1 overflow-y-auto scrollbar-none pb-safe">
-
+              <div className="flex-1 overflow-y-auto scrollbar-none px-4 pb-safe">
                 {/* Profile strip */}
-                <div className="flex items-center gap-3 px-5 py-4 border-b border-[color:var(--hairline)]">
+                <div className="settings-glass mt-2 flex items-center gap-3 rounded-3xl p-4">
                   <div className="relative shrink-0">
                     <div className="grid h-11 w-11 place-items-center rounded-full bg-ink text-on-ink font-display text-base font-bold">
                       {profile.initials}
@@ -2384,14 +2992,20 @@ export function Dashboard({ user }: { user?: any }) {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">
-                      <span className="font-semibold text-sm text-ink truncate">{profile.name}</span>
-                      <span className="rounded-full bg-gradient-to-r from-indigo-500/20 to-purple-500/20 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-widest text-ink border border-indigo-500/30 shrink-0">Pro</span>
+                      <span className="font-semibold text-sm text-ink truncate">
+                        {profile.name}
+                      </span>
+                      <span className="rounded-full bg-gradient-to-r from-indigo-500/20 to-purple-500/20 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-widest text-ink border border-indigo-500/30 shrink-0">
+                        Pro
+                      </span>
                     </div>
-                    <p className="text-xs text-mute truncate">{totalStreak} day streak · {rate}% today</p>
+                    <p className="text-xs text-mute truncate">
+                      {totalStreak} day streak · {rate}% today
+                    </p>
                   </div>
                   <button
                     onClick={() => setProfileEditOpen(true)}
-                    className="shrink-0 px-3 py-1.5 rounded-md bg-ink/8 text-xs font-semibold text-ink hover:bg-ink/15 transition active:scale-95"
+                    className="settings-control shrink-0 rounded-xl px-3 py-2 text-xs font-semibold text-ink transition active:scale-95"
                     aria-label="Edit profile"
                   >
                     Edit
@@ -2399,41 +3013,58 @@ export function Dashboard({ user }: { user?: any }) {
                 </div>
 
                 {/* Quick actions row */}
-                <div className="flex items-center gap-2 px-5 py-2 border-b border-[color:var(--hairline)]">
+                <div className="my-3 grid grid-cols-3 gap-2">
                   <button
                     type="button"
-                    onClick={() => { setSettingsOpen(false); setAiCoachOpen(true); }}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 text-[11px] font-semibold text-ink transition active:scale-95 hover:bg-ink/5 rounded-lg"
+                    onClick={() => {
+                      setSettingsOpen(false);
+                      setAiCoachOpen(true);
+                    }}
+                    className="settings-glass flex min-h-20 flex-col items-center justify-center gap-2 rounded-2xl py-3 text-[11px] font-semibold text-ink transition active:scale-95"
                   >
                     <MessageSquare className="h-4 w-4 text-mute" strokeWidth={2} /> Coach
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setSettingsOpen(false); setBadgesOpen(true); }}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 text-[11px] font-semibold text-ink transition active:scale-95 hover:bg-ink/5 rounded-lg"
+                    onClick={() => {
+                      setSettingsOpen(false);
+                      setBadgesOpen(true);
+                    }}
+                    className="settings-glass flex min-h-20 flex-col items-center justify-center gap-2 rounded-2xl py-3 text-[11px] font-semibold text-ink transition active:scale-95"
                   >
                     <Hexagon className="h-4 w-4 text-mute" strokeWidth={2} /> Badges
                   </button>
                   <button
                     type="button"
-                    onClick={() => { setSettingsOpen(false); setShareStreakOpen(true); }}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 text-[11px] font-semibold text-ink transition active:scale-95 hover:bg-ink/5 rounded-lg"
+                    onClick={() => {
+                      setSettingsOpen(false);
+                      setShareStreakOpen(true);
+                    }}
+                    className="settings-glass flex min-h-20 flex-col items-center justify-center gap-2 rounded-2xl py-3 text-[11px] font-semibold text-ink transition active:scale-95"
                   >
                     <ArrowUpRight className="h-4 w-4 text-mute" strokeWidth={2} /> Share
                   </button>
                 </div>
 
                 {/* Section: Appearance */}
-                <div className="pt-5 pb-1 px-5">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-mute">Appearance</p>
+                <div className="pt-4 pb-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-mute">
+                    Appearance
+                  </p>
                 </div>
-                <div className="divide-y divide-[color:var(--hairline)] border-t border-b border-[color:var(--hairline)]">
+                <div className="settings-glass relative z-10 divide-y divide-[color:var(--hairline)] overflow-visible rounded-3xl">
                   <Row
                     label={<span className="text-sm font-medium text-ink">App Theme</span>}
                     action={
-                      <div className="flex items-center gap-0.5">
+                      <div
+                        className="theme-segmented-control"
+                        style={{
+                          "--theme-index": theme === "dark" ? 0 : theme === "amoled" ? 1 : 2,
+                        } as React.CSSProperties}
+                      >
+                        <span className="theme-segmented-selection" aria-hidden="true" />
                         {[
-                          { key: "dark" as const, label: "Auto" },
+                          { key: "dark" as const, label: "Dark" },
                           { key: "amoled" as const, label: "AMOLED" },
                           { key: "light" as const, label: "Light" },
                         ].map((opt) => {
@@ -2445,14 +3076,18 @@ export function Dashboard({ user }: { user?: any }) {
                               onClick={() => {
                                 setTheme(opt.key);
                                 if (typeof window !== "undefined") {
-                                  try { localStorage.setItem("grain_app_theme", opt.key); } catch {}
+                                  try {
+                                    localStorage.setItem("grain_app_theme", opt.key);
+                                  } catch {}
                                 }
                                 if (userId) updateUserProfile(userId, { theme: opt.key });
-                                try { navigator.vibrate?.(10); } catch {}
+                                try {
+                                  navigator.vibrate?.(10);
+                                } catch {}
                               }}
-                              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                              className={`theme-segmented-option ${
                                 active
-                                  ? "bg-ink text-on-ink shadow-sm"
+                                  ? "theme-segmented-option--active"
                                   : "text-mute hover:text-ink"
                               }`}
                             >
@@ -2466,25 +3101,69 @@ export function Dashboard({ user }: { user?: any }) {
                   <Row
                     label={
                       <div className="flex items-center gap-2">
-                        <Wallpaper className="h-4 w-4 text-mute" />
+                        <div
+                          className="relative w-[32vw] max-w-[132px] shrink-0 aspect-[9/16] overflow-hidden rounded-[18px] border border-[color:var(--hairline-mid)] shadow-[0_8px_20px_rgba(0,0,0,0.24)]"
+                          style={{ background: wallpaperThemeOf(wallpaperTheme, theme).bg }}
+                          aria-hidden="true"
+                        >
+                          <img
+                            src={appBackgroundImage}
+                            alt=""
+                            className="absolute inset-0 h-full w-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/35" />
+                          <div
+                            className="absolute inset-x-[12%] top-[8%] h-px opacity-70"
+                            style={{ backgroundColor: wallpaperThemeOf(wallpaperTheme, theme).fg }}
+                          />
+                          <div className="absolute inset-x-[12%] top-[13%] text-center text-[7px] font-bold tracking-[0.16em] opacity-80" style={{ color: wallpaperThemeOf(wallpaperTheme, theme).fg }}>
+                            GRAIN
+                          </div>
+                          <div className="absolute inset-x-[12%] top-[25%] grid aspect-[5/6] grid-cols-5 grid-rows-6 gap-[3px]">
+                            {Array.from({ length: 30 }, (_, index) => (
+                              <span
+                                key={index}
+                                className="aspect-square rounded-[1px]"
+                                style={{
+                                  backgroundColor: gridColorOf(gridColorTheme).color,
+                                  opacity: index % 5 === 0 ? 0.25 : index % 3 === 0 ? 0.55 : 0.9,
+                                }}
+                              />
+                            ))}
+                          </div>
+                          <div
+                            className="absolute inset-x-[12%] bottom-[10%] h-1.5 rounded-full opacity-75"
+                            style={{ backgroundColor: wallpaperThemeOf(wallpaperTheme, theme).fg }}
+                          />
+                          <div
+                            className="absolute bottom-[5%] left-[12%] right-[12%] h-px opacity-40"
+                            style={{ backgroundColor: wallpaperThemeOf(wallpaperTheme, theme).fg }}
+                          />
+                        </div>
                         <div>
                           <span className="text-sm font-medium text-ink block">Lock Screen</span>
-                          <p className="text-[10px] text-mute">{wallpaperGridStyle} · {gridColorTheme}</p>
+                          <p className="text-[11px] text-mute">
+                            {wallpaperGridStyle} · {gridColorTheme}
+                          </p>
                         </div>
                       </div>
                     }
                     action={
                       <button
                         type="button"
-                        onClick={() => { setWallpaperEditorOpen(true); }}
-                        className="px-3 py-1.5 rounded-md bg-ink text-on-ink text-xs font-semibold active:scale-95 transition shadow-sm"
+                        onClick={() => {
+                          setWallpaperEditorOpen(true);
+                        }}
+                        className="settings-control rounded-xl px-3 py-2 text-xs font-semibold text-ink transition active:scale-95"
                       >
                         Customize
                       </button>
                     }
                   />
                   <Row
-                    label={<span className="text-sm font-medium text-ink">Live wallpaper sync</span>}
+                    label={
+                      <span className="text-sm font-medium text-ink">Live wallpaper sync</span>
+                    }
                     action={
                       <Toggle
                         checked={wallpaperSync}
@@ -2493,8 +3172,39 @@ export function Dashboard({ user }: { user?: any }) {
                       />
                     }
                   />
+                  {Capacitor.isNativePlatform() && (
+                    <Row
+                      label={
+                        <div>
+                          <span className="text-sm font-medium text-ink block">Precise daily refresh</span>
+                          <p className="text-[11px] text-mute">
+                            {exactAlarmAllowed
+                              ? "Updates static wallpaper shortly after midnight"
+                              : "Allow Exact Alarms to prevent delayed daily updates"}
+                          </p>
+                        </div>
+                      }
+                      action={
+                        exactAlarmAllowed ? (
+                          <span className="rounded-full bg-emerald-500/15 px-2.5 py-1 text-[10px] font-bold text-emerald-500">
+                            On
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={requestExactAlarmPermission}
+                            className="settings-control rounded-xl px-3 py-2 text-xs font-semibold text-ink transition active:scale-95"
+                          >
+                            Allow
+                          </button>
+                        )
+                      }
+                    />
+                  )}
                   <Row
-                    label={<span className="text-sm font-medium text-ink">Date selector style</span>}
+                    label={
+                      <span className="text-sm font-medium text-ink">Date selector style</span>
+                    }
                     action={
                       <div className="relative">
                         <button
@@ -2502,12 +3212,23 @@ export function Dashboard({ user }: { user?: any }) {
                           className="flex items-center gap-1 text-xs font-semibold text-mute hover:text-ink transition"
                         >
                           <span className="capitalize">{dateStyle}</span>
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                          <svg
+                            className="w-3 h-3"
+                            fill="none"
+                            viewBox="0 0 24 24"
+                            stroke="currentColor"
+                            strokeWidth={2.5}
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                          </svg>
                         </button>
                         {dateDropdownOpen && (
-                          <>
-                            <div className="fixed inset-0 z-40" onClick={() => setDateDropdownOpen(false)} />
-                            <div className="absolute right-0 top-full mt-2 w-32 rounded-xl bg-canvas shadow-xl border border-[color:var(--hairline-strong)] z-50 overflow-hidden flex flex-col py-1 animate-in fade-in zoom-in-95 duration-150">
+                          <div className="fixed inset-0 z-40" onClick={() => setDateDropdownOpen(false)} />
+                        )}
+                        <DropdownMotion
+                          open={dateDropdownOpen}
+                          className="absolute right-0 top-full mt-2 z-50 flex w-32 flex-col overflow-hidden rounded-xl border border-[color:var(--hairline-strong)] bg-canvas py-1 shadow-xl"
+                        >
                               {["underline", "block", "mono"].map((styleOpt) => (
                                 <button
                                   key={styleOpt}
@@ -2520,19 +3241,19 @@ export function Dashboard({ user }: { user?: any }) {
                                   {styleOpt}
                                 </button>
                               ))}
-                            </div>
-                          </>
-                        )}
+                        </DropdownMotion>
                       </div>
                     }
                   />
                 </div>
 
                 {/* Section: Reminders */}
-                <div className="pt-5 pb-1 px-5">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-mute">Reminders</p>
+                <div className="pt-5 pb-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-mute">
+                    Reminders
+                  </p>
                 </div>
-                <div className="divide-y divide-[color:var(--hairline)] border-t border-b border-[color:var(--hairline)]">
+                <div className="settings-glass divide-y divide-[color:var(--hairline)] overflow-hidden rounded-3xl">
                   <Row
                     label={
                       <span className="flex items-center gap-2 text-sm font-medium text-ink">
@@ -2544,13 +3265,19 @@ export function Dashboard({ user }: { user?: any }) {
                         checked={remindersOn}
                         onChange={async () => {
                           const next = !remindersOn;
+                          if (next && !Capacitor.isNativePlatform()) {
+                            showToast("Scheduled reminders are available in the Grain mobile app.");
+                            return;
+                          }
                           setRemindersOn(next);
-                          if (userId) updateUserProfile(userId, { remindersOn: next });
+                          if (userId) await updateUserProfile(userId, { remindersOn: next });
                           if (next) {
                             const granted = await requestNotificationPermission();
                             if (granted) {
                               showToast(`Reminders enabled for ${reminderTime}`);
                             } else {
+                              setRemindersOn(false);
+                              if (userId) await updateUserProfile(userId, { remindersOn: false });
                               showToast("Notification permission required");
                             }
                           } else {
@@ -2575,7 +3302,7 @@ export function Dashboard({ user }: { user?: any }) {
                           let newH24 = newH12;
                           if (newAmpm === "PM" && newH12 < 12) newH24 += 12;
                           if (newAmpm === "AM" && newH12 === 12) newH24 = 0;
-                          const timeStr = `${newH24.toString().padStart(2, '0')}:${newMin}`;
+                          const timeStr = `${newH24.toString().padStart(2, "0")}:${newMin}`;
                           if (timeStr !== (reminderTime || "20:00")) {
                             setReminderTime(timeStr);
                             if (userId) updateUserProfile(userId, { reminderTime: timeStr });
@@ -2584,7 +3311,7 @@ export function Dashboard({ user }: { user?: any }) {
 
                         const handleScroll = (
                           e: React.UIEvent<HTMLDivElement>,
-                          callback: (index: number) => void
+                          callback: (index: number) => void,
                         ) => {
                           const target = e.currentTarget;
                           if (target.dataset.timeout) clearTimeout(Number(target.dataset.timeout));
@@ -2600,36 +3327,102 @@ export function Dashboard({ user }: { user?: any }) {
                             <div className="flex justify-center gap-4 w-full h-full [mask-image:linear-gradient(to_bottom,transparent,black_20%,black_80%,transparent)]">
                               <div
                                 className="flex flex-col overflow-y-auto scrollbar-none snap-y snap-mandatory py-[3rem] px-2 scroll-smooth"
-                                ref={(el) => { if (el && !el.dataset.initialized) { el.scrollTop = (currentH12 - 1) * 32; el.dataset.initialized = 'true'; } }}
-                                onScroll={(e) => handleScroll(e, (idx) => updateTime(Math.min(12, Math.max(1, idx + 1)), mStr, currentAmpm))}
+                                ref={(el) => {
+                                  if (el && !el.dataset.initialized) {
+                                    el.scrollTop = (currentH12 - 1) * 32;
+                                    el.dataset.initialized = "true";
+                                  }
+                                }}
+                                onScroll={(e) =>
+                                  handleScroll(e, (idx) =>
+                                    updateTime(
+                                      Math.min(12, Math.max(1, idx + 1)),
+                                      mStr,
+                                      currentAmpm,
+                                    ),
+                                  )
+                                }
                               >
                                 {Array.from({ length: 12 }, (_, i) => i + 1).map((h) => (
-                                  <button key={`h-${h}`} type="button" onClick={() => updateTime(h, mStr, currentAmpm)} className="shrink-0 h-8 flex items-center justify-center text-lg font-bold snap-center">
-                                    <span className={`transition-all duration-200 ${currentH12 === h ? "text-ink scale-110" : "text-mute opacity-20"}`}>{h}</span>
+                                  <button
+                                    key={`h-${h}`}
+                                    type="button"
+                                    onClick={() => updateTime(h, mStr, currentAmpm)}
+                                    className="shrink-0 h-8 flex items-center justify-center text-lg font-bold snap-center"
+                                  >
+                                    <span
+                                      className={`transition-all duration-200 ${currentH12 === h ? "text-ink scale-110" : "text-mute opacity-20"}`}
+                                    >
+                                      {h}
+                                    </span>
                                   </button>
                                 ))}
                               </div>
-                              <div className="flex flex-col justify-center items-center font-bold text-ink text-lg opacity-40">:</div>
+                              <div className="flex flex-col justify-center items-center font-bold text-ink text-lg opacity-40">
+                                :
+                              </div>
                               <div
                                 className="flex flex-col overflow-y-auto scrollbar-none snap-y snap-mandatory py-[3rem] px-2 scroll-smooth"
-                                ref={(el) => { if (el && !el.dataset.initialized) { el.scrollTop = parseInt(mStr, 10) * 32; el.dataset.initialized = 'true'; } }}
-                                onScroll={(e) => handleScroll(e, (idx) => updateTime(currentH12, Math.min(59, Math.max(0, idx)).toString().padStart(2, '0'), currentAmpm))}
+                                ref={(el) => {
+                                  if (el && !el.dataset.initialized) {
+                                    el.scrollTop = parseInt(mStr, 10) * 32;
+                                    el.dataset.initialized = "true";
+                                  }
+                                }}
+                                onScroll={(e) =>
+                                  handleScroll(e, (idx) =>
+                                    updateTime(
+                                      currentH12,
+                                      Math.min(59, Math.max(0, idx)).toString().padStart(2, "0"),
+                                      currentAmpm,
+                                    ),
+                                  )
+                                }
                               >
-                                {Array.from({ length: 60 }, (_, i) => i.toString().padStart(2, '0')).map((m) => (
-                                  <button key={`m-${m}`} type="button" onClick={() => updateTime(currentH12, m, currentAmpm)} className="shrink-0 h-8 flex items-center justify-center text-lg font-bold snap-center">
-                                    <span className={`transition-all duration-200 ${mStr === m ? "text-ink scale-110" : "text-mute opacity-20"}`}>{m}</span>
+                                {Array.from({ length: 60 }, (_, i) =>
+                                  i.toString().padStart(2, "0"),
+                                ).map((m) => (
+                                  <button
+                                    key={`m-${m}`}
+                                    type="button"
+                                    onClick={() => updateTime(currentH12, m, currentAmpm)}
+                                    className="shrink-0 h-8 flex items-center justify-center text-lg font-bold snap-center"
+                                  >
+                                    <span
+                                      className={`transition-all duration-200 ${mStr === m ? "text-ink scale-110" : "text-mute opacity-20"}`}
+                                    >
+                                      {m}
+                                    </span>
                                   </button>
                                 ))}
                               </div>
                               <div className="w-3" />
                               <div
                                 className="flex flex-col overflow-y-auto scrollbar-none snap-y snap-mandatory py-[3rem] px-2 scroll-smooth"
-                                ref={(el) => { if (el && !el.dataset.initialized) { el.scrollTop = currentAmpm === "AM" ? 0 : 32; el.dataset.initialized = 'true'; } }}
-                                onScroll={(e) => handleScroll(e, (idx) => updateTime(currentH12, mStr, idx === 0 ? "AM" : "PM"))}
+                                ref={(el) => {
+                                  if (el && !el.dataset.initialized) {
+                                    el.scrollTop = currentAmpm === "AM" ? 0 : 32;
+                                    el.dataset.initialized = "true";
+                                  }
+                                }}
+                                onScroll={(e) =>
+                                  handleScroll(e, (idx) =>
+                                    updateTime(currentH12, mStr, idx === 0 ? "AM" : "PM"),
+                                  )
+                                }
                               >
                                 {["AM", "PM"].map((meridiem) => (
-                                  <button key={meridiem} type="button" onClick={() => updateTime(currentH12, mStr, meridiem)} className="shrink-0 h-8 flex items-center justify-center text-sm font-bold snap-center">
-                                    <span className={`transition-all duration-200 ${currentAmpm === meridiem ? "text-ink scale-110" : "text-mute opacity-20"}`}>{meridiem}</span>
+                                  <button
+                                    key={meridiem}
+                                    type="button"
+                                    onClick={() => updateTime(currentH12, mStr, meridiem)}
+                                    className="shrink-0 h-8 flex items-center justify-center text-sm font-bold snap-center"
+                                  >
+                                    <span
+                                      className={`transition-all duration-200 ${currentAmpm === meridiem ? "text-ink scale-110" : "text-mute opacity-20"}`}
+                                    >
+                                      {meridiem}
+                                    </span>
                                   </button>
                                 ))}
                               </div>
@@ -2648,7 +3441,9 @@ export function Dashboard({ user }: { user?: any }) {
                             const next = !morningKickoff;
                             setMorningKickoff(next);
                             if (userId) updateUserProfile(userId, { morningKickoff: next });
-                            showToast(next ? "Morning kickoff enabled" : "Morning kickoff disabled");
+                            showToast(
+                              next ? "Morning kickoff enabled" : "Morning kickoff disabled",
+                            );
                           }}
                           ariaLabel="Toggle morning kickoff"
                         />
@@ -2657,10 +3452,13 @@ export function Dashboard({ user }: { user?: any }) {
                       <button
                         type="button"
                         onClick={async () => {
-                          try { navigator.vibrate?.(15); } catch {}
+                          try {
+                            navigator.vibrate?.(15);
+                          } catch {}
                           showToast("Sending test notification in 2 seconds...");
                           const ok = await sendTestNotification();
-                          if (!ok) showToast("Please allow notification permission in system settings");
+                          if (!ok)
+                            showToast("Please allow notification permission in system settings");
                         }}
                         className="w-full flex items-center justify-between py-3 group hover:bg-ink/4 transition"
                       >
@@ -2674,16 +3472,21 @@ export function Dashboard({ user }: { user?: any }) {
                 </div>
 
                 {/* Section: More */}
-                <div className="pt-5 pb-1 px-5">
+                <div className="pt-5 pb-2">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-mute">More</p>
                 </div>
-                <div className="divide-y divide-[color:var(--hairline)] border-t border-b border-[color:var(--hairline)]">
+                <div className="settings-glass divide-y divide-[color:var(--hairline)] overflow-hidden rounded-3xl">
                   <button
                     data-lg-press
-                    onClick={() => { setSettingsOpen(false); setOnboardingOpen(true); }}
+                    onClick={() => {
+                      setSettingsOpen(false);
+                      setOnboardingOpen(true);
+                    }}
                     className="flex w-full items-center justify-between px-5 py-3.5 group hover:bg-ink/4 active:scale-[0.99] transition"
                   >
-                    <span className="text-sm font-medium text-ink">Starter Packs & Walkthrough</span>
+                    <span className="text-sm font-medium text-ink">
+                      Starter Packs & Walkthrough
+                    </span>
                     <ArrowRight className="h-4 w-4 text-mute group-hover:translate-x-0.5 transition-transform" />
                   </button>
                   <button
@@ -2708,6 +3511,20 @@ export function Dashboard({ user }: { user?: any }) {
                   </button>
                   <button
                     data-lg-press
+                    onClick={() => backupInputRef.current?.click()}
+                    className="flex w-full items-center justify-between px-5 py-3.5 group hover:bg-ink/4 active:scale-[0.99] transition"
+                  >
+                    <span className="flex items-center gap-2.5 text-sm font-medium text-ink">
+                      <Download className="h-4 w-4 rotate-180 text-mute" /> Import backup
+                    </span>
+                    <ArrowRight className="h-4 w-4 text-mute group-hover:translate-x-0.5 transition-transform" />
+                  </button>
+                  <input ref={backupInputRef} type="file" accept="application/json,.json" className="hidden" onChange={importBackup} />
+                  <div className="mx-5 mb-2 rounded-2xl border border-amber-500/25 bg-amber-500/8 px-3.5 py-3 text-[11px] leading-relaxed text-body">
+                    <strong className="text-ink">Local data only.</strong> Your account remains online, but habits and progress stay on this device. Download a backup before uninstalling or changing phones.
+                  </div>
+                  <button
+                    data-lg-press
                     onClick={() => setResetConfirmOpen(true)}
                     className="flex w-full items-center justify-between px-5 py-3.5 group hover:bg-ink/4 active:scale-[0.99] transition"
                   >
@@ -2718,11 +3535,11 @@ export function Dashboard({ user }: { user?: any }) {
                   </button>
                 </div>
 
-                <div className="px-5 py-4">
+                <div className="py-4">
                   <button
                     data-lg-press
                     onClick={() => setSignOutOpen(true)}
-                    className="w-full flex items-center justify-center gap-2 py-3 rounded-lg text-red-500 text-sm font-semibold hover:bg-red-500/8 active:scale-[0.98] transition"
+                    className="w-full flex items-center justify-center gap-2 rounded-2xl border border-red-500/20 bg-red-500/5 py-3 text-sm font-semibold text-red-500 transition hover:bg-red-500/10 active:scale-[0.98]"
                   >
                     <LogOut className="h-4 w-4" /> Sign out
                   </button>
@@ -2742,7 +3559,9 @@ export function Dashboard({ user }: { user?: any }) {
               confirmLabel={`Delete (${selectedHabitIds.size})`}
               destructive
               onConfirm={async () => {
-                try { navigator.vibrate?.([30, 80, 50]); } catch { }
+                try {
+                  navigator.vibrate?.([30, 80, 50]);
+                } catch {}
                 const idsToDelete = Array.from(selectedHabitIds);
                 setBulkDeleteConfirmOpen(false);
                 setIsSelectionMode(false);
@@ -2755,14 +3574,18 @@ export function Dashboard({ user }: { user?: any }) {
                     {
                       label: "Undo",
                       onClick: async () => {
-                        try { navigator.vibrate?.(10); } catch { }
+                        try {
+                          navigator.vibrate?.(10);
+                        } catch {}
                         for (const doc of removedDocs) {
                           await restoreHabitDoc(doc);
                         }
-                        showToast(`Restored ${removedDocs.length} habit${removedDocs.length > 1 ? "s" : ""}`);
+                        showToast(
+                          `Restored ${removedDocs.length} habit${removedDocs.length > 1 ? "s" : ""}`,
+                        );
                       },
                     },
-                    6000
+                    6000,
                   );
                 } catch (err) {
                   toastError("Bulk delete failed");
@@ -2781,11 +3604,13 @@ export function Dashboard({ user }: { user?: any }) {
               confirmLabel="Sign out"
               destructive
               onConfirm={() => {
-                try { navigator.vibrate?.(18); } catch { }
+                try {
+                  navigator.vibrate?.(18);
+                } catch {}
                 try {
                   localStorage.removeItem("grain_onboarded");
                   sessionStorage.removeItem("grain_onboarded");
-                } catch { }
+                } catch {}
                 signOut();
               }}
             />
@@ -2812,36 +3637,40 @@ export function Dashboard({ user }: { user?: any }) {
               onClose={() => setProfileEditOpen(false)}
               onSave={(next) => {
                 setProfileEditOpen(false);
-                saveProfile(next).catch(err => toastError("An error occurred"));
+                saveProfile(next).catch((err) => toastError("An error occurred"));
               }}
             />
           )}
 
           {feedbackOpen && (
-            <FeedbackSheet
-              onClose={() => setFeedbackOpen(false)}
-              userId={userId}
-              userEmail={profile.email}
-              userName={profile.name}
-              onToast={showToast}
-            />
+            <Suspense fallback={null}>
+              <FeedbackSheet
+                onClose={() => setFeedbackOpen(false)}
+                userId={userId}
+                userEmail={profile.email}
+                userName={profile.name}
+                onToast={showToast}
+              />
+            </Suspense>
           )}
 
           {/* Dedicated Full-Screen Wallpaper Customizer Modal */}
           {wallpaperEditorOpen && (
             <div className="fixed inset-0 z-50 flex flex-col bg-black text-white animate-fade-in-up select-none">
               {/* Controls overlay at top of Full Screen Preview */}
-              <div className="absolute top-[env(safe-area-inset-top,24px)] mt-4 left-0 right-0 flex items-center justify-between px-6 z-50 pointer-events-none">
+              <div className="absolute top-[env(safe-area-inset-top,24px)] mt-3 left-0 right-0 flex items-center justify-between px-4 z-50 pointer-events-none">
                 <div className="flex items-center gap-2 pointer-events-auto">
                   <button
                     type="button"
                     onClick={() => {
-                      try { navigator.vibrate?.(10); } catch { }
+                      try {
+                        navigator.vibrate?.(10);
+                      } catch {}
                       setWallpaperEditorOpen(false);
                       setIsRepositionMode(false);
                       setIsMovingPhoto(false);
                     }}
-                    className="flex items-center justify-center h-9 w-9 rounded-full bg-black/50 backdrop-blur-xl border border-white/20 text-white active:scale-95 transition hover:bg-black/70 shadow-lg"
+                    className="wallpaper-glass-control flex h-9 w-9 items-center justify-center rounded-full text-white active:scale-95"
                     aria-label="Close wallpaper customizer"
                   >
                     <X size={18} />
@@ -2850,62 +3679,45 @@ export function Dashboard({ user }: { user?: any }) {
                   <button
                     type="button"
                     onClick={() => photoInputRef.current?.click()}
-                    className="flex items-center justify-center h-9 w-9 rounded-full bg-black/40 backdrop-blur-xl border border-white/15 text-white/80 cursor-pointer active:scale-95 transition-all hover:bg-black/60 hover:text-white shadow-lg"
+                    className="wallpaper-glass-control flex h-9 w-9 cursor-pointer items-center justify-center rounded-full text-white/85 active:scale-95"
                     aria-label="Upload custom wallpaper photo"
                   >
                     <ImagePlus size={16} />
                   </button>
-                  <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} onClick={(e) => e.stopPropagation()} />
-
-                  {wallpaperTheme === "custom" && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        try { navigator.vibrate?.(10); } catch { }
-                        setIsMovingPhoto(prev => !prev);
-                        if (!isMovingPhoto) setIsRepositionMode(false);
-                      }}
-                      className={`flex items-center gap-1.5 h-9 px-3.5 rounded-full backdrop-blur-xl border font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg ${isMovingPhoto
-                        ? "bg-white/25 border-white/50 text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)] ring-1 ring-white/30"
-                        : "bg-black/40 border-white/15 text-white/70 hover:text-white hover:bg-black/60"
-                        }`}
-                    >
-                      <Move size={13} className={isMovingPhoto ? "text-white animate-pulse" : ""} />
-                      <span>{isMovingPhoto ? "Done Photo" : "Move Photo"}</span>
-                    </button>
-                  )}
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handlePhotoUpload}
+                    onClick={(e) => e.stopPropagation()}
+                  />
 
                   <button
                     type="button"
-                    onClick={() => {
-                      try { navigator.vibrate?.(10); } catch { }
-                      setIsRepositionMode(prev => !prev);
-                      if (!isRepositionMode) setIsMovingPhoto(false);
-                    }}
-                    className={`flex items-center gap-1.5 h-9 px-3.5 rounded-full backdrop-blur-xl border font-bold text-xs uppercase tracking-wider transition-all active:scale-95 shadow-lg ${isRepositionMode
-                      ? "bg-white/25 border-white/50 text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)] ring-1 ring-white/30"
-                      : "bg-black/40 border-white/15 text-white/70 hover:text-white hover:bg-black/60"
-                      }`}
+                    onClick={() => setWallpaperActionMenuOpen((open) => !open)}
+                    className="wallpaper-glass-control absolute right-4 flex h-9 w-9 items-center justify-center rounded-full text-white/85 active:scale-95"
+                    aria-label="Wallpaper actions"
                   >
-                    <Move size={13} className={isRepositionMode ? "text-white animate-pulse" : ""} />
-                    <span>{isRepositionMode ? "Done" : "Reposition"}</span>
+                    <MoreVertical size={18} />
                   </button>
 
-                  {(wallpaperOffset.x !== 0 || wallpaperOffset.y !== 0 || wallpaperScale !== 1) && (
+                  <DropdownMotion open={wallpaperActionMenuOpen} className="wallpaper-glass-panel absolute right-4 top-11 w-44 overflow-hidden rounded-2xl p-1.5 shadow-xl">
                     <button
                       type="button"
                       onClick={() => {
-                        try { navigator.vibrate?.(10); } catch { }
                         setWallpaperOffset({ x: 0, y: 0 });
                         setWallpaperScale(1);
-                        showToast("Position reset");
+                        setWallpaperPhotoOffset({ x: 0, y: 0 });
+                        setWallpaperPhotoScale(1);
+                        setWallpaperActionMenuOpen(false);
+                        showToast("Crop and position reset");
                       }}
-                      className="flex items-center justify-center h-9 w-9 rounded-full bg-black/40 backdrop-blur-xl border border-white/15 text-white/70 active:scale-95 transition-all hover:bg-black/60 hover:text-white shadow-lg"
-                      title="Reset position"
+                      className="flex w-full items-center gap-2 rounded-xl px-3 py-2.5 text-left text-xs font-semibold text-white hover:bg-white/10"
                     >
-                      <RotateCcw size={15} />
+                      <RotateCcw size={14} /> Reset framing
                     </button>
-                  )}
+                  </DropdownMotion>
                 </div>
               </div>
 
@@ -2920,53 +3732,91 @@ export function Dashboard({ user }: { user?: any }) {
                   ["--on-ink" as string]: wallpaperThemeOf(wallpaperTheme, theme).fg,
                   ["--wp-bg" as string]: wallpaperTokens(wallpaperTheme, gridColorTheme, theme).bg,
                   ["--wp-fg" as string]: wallpaperTokens(wallpaperTheme, gridColorTheme, theme).fg,
-                  ["--wp-accent" as string]: wallpaperTokens(wallpaperTheme, gridColorTheme, theme).accent,
-                  ["--wp-empty" as string]: wallpaperTokens(wallpaperTheme, gridColorTheme, theme).empty,
-                  ["--wp-low" as string]: wallpaperTokens(wallpaperTheme, gridColorTheme, theme).low,
-                  ["--wp-mid" as string]: wallpaperTokens(wallpaperTheme, gridColorTheme, theme).mid,
+                  ["--wp-accent" as string]: wallpaperTokens(wallpaperTheme, gridColorTheme, theme)
+                    .accent,
+                  ["--wp-empty" as string]: wallpaperTokens(wallpaperTheme, gridColorTheme, theme)
+                    .empty,
+                  ["--wp-low" as string]: wallpaperTokens(wallpaperTheme, gridColorTheme, theme)
+                    .low,
+                  ["--wp-mid" as string]: wallpaperTokens(wallpaperTheme, gridColorTheme, theme)
+                    .mid,
                   ["--wp-hi" as string]: wallpaperTokens(wallpaperTheme, gridColorTheme, theme).hi,
                   color: wallpaperThemeOf(wallpaperTheme, theme).fg,
                 }}
               >
                 {/* Snapping Crosshairs */}
-                {isDraggingWallpaper && isRepositionMode && (wallpaperGridStyle === "month" || wallpaperGridStyle === "year" || wallpaperGridStyle === "weeks" || wallpaperGridStyle === "widget") && (
-                  <>
-                    <div className={`absolute top-0 bottom-0 left-1/2 w-[1px] -translate-x-1/2 z-0 transition-colors duration-200 ${wallpaperOffset.x === 0 ? "bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.8)]" : "bg-white/20"}`} />
-                    <div className={`absolute left-0 right-0 top-1/2 h-[1px] -translate-y-1/2 z-0 transition-colors duration-200 ${wallpaperOffset.y === 0 ? "bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.8)]" : "bg-white/20"}`} />
-                  </>
-                )}
-
+                {isDraggingWallpaper &&
+                  isRepositionMode &&
+                  (wallpaperGridStyle === "month" ||
+                    wallpaperGridStyle === "year" ||
+                    wallpaperGridStyle === "weeks" ||
+                    wallpaperGridStyle === "widget") && (
+                    <>
+                      <div
+                        className={`absolute top-0 bottom-0 left-1/2 w-[1px] -translate-x-1/2 z-0 transition-colors duration-200 ${wallpaperOffset.x === 0 ? "bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.8)]" : "bg-white/20"}`}
+                      />
+                      <div
+                        className={`absolute left-0 right-0 top-1/2 h-[1px] -translate-y-1/2 z-0 transition-colors duration-200 ${wallpaperOffset.y === 0 ? "bg-red-500/80 shadow-[0_0_8px_rgba(239,68,68,0.8)]" : "bg-white/20"}`}
+                      />
+                    </>
+                  )}
                 {wallpaperTheme === "custom" && wallpaperCustomPhoto && (
                   <>
                     <img
                       ref={wallpaperPhotoRef}
                       src={wallpaperCustomPhoto}
-                      className="absolute inset-0 w-full h-full object-cover pointer-events-none transition-transform"
+                      className={`absolute inset-0 h-full w-full object-contain pointer-events-none ${isMovingPhoto ? "" : "transition-transform"}`}
                       style={{
-                        transform: `translate(${wallpaperPhotoOffset.x}px, ${wallpaperPhotoOffset.y}px) scale(${wallpaperPhotoScale})`
+                        transform: `translate(${wallpaperPhotoOffset.x}px, ${wallpaperPhotoOffset.y}px) scale(${wallpaperPhotoScale})`,
                       }}
                       alt=""
                     />
-                    <div className="absolute inset-0 pointer-events-none bg-black transition-opacity" style={{ opacity: wallpaperPhotoOverlay }} />
+                    <div
+                      className="absolute inset-0 pointer-events-none bg-black transition-opacity"
+                      style={{ opacity: wallpaperPhotoOverlay }}
+                    />
                   </>
+                )}
+                {showGridGestureHint && !isMovingPhoto && !isRepositionMode && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowGridGestureHint(false);
+                      try {
+                        localStorage.setItem("grain_grid_gesture_learned", "true");
+                      } catch {}
+                    }}
+                    className="wallpaper-glass-hint absolute left-1/2 top-[calc(env(safe-area-inset-top,24px)+76px)] z-40 -translate-x-1/2 whitespace-nowrap px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-white"
+                  >
+                    Drag the grid to move · Pinch to resize · Tap to dismiss
+                  </button>
                 )}
                 {/* Overlay hint */}
                 {(isRepositionMode || isMovingPhoto) && (
                   <div className="absolute top-[env(safe-area-inset-top,24px)] mt-24 left-0 right-0 flex justify-center pointer-events-none z-40 animate-fade-in">
-                    <span className="bg-black/70 text-white px-3.5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest backdrop-blur-md border border-white/20 shadow-lg">
-                      {isMovingPhoto ? "Drag to reposition photo · Pinch to resize" : "Drag to reposition grid · Pinch to resize"}
+                    <span className="wallpaper-glass-hint px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-widest text-white">
+                      {isMovingPhoto
+                        ? "Drag to reposition photo · Pinch to resize"
+                        : "Drag to reposition grid · Pinch to resize"}
                     </span>
                   </div>
                 )}
-
+                {isMovingPhoto && (
+                  <div className="pointer-events-none absolute inset-3 z-30 border border-white/70 shadow-[0_0_0_9999px_rgba(0,0,0,0.14)]">
+                    <span className="absolute top-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-[9px] font-bold uppercase tracking-[0.18em] text-white/85">
+                      Wallpaper crop
+                    </span>
+                  </div>
+                )}
                 {/* Draggable container */}
                 <div
                   ref={wallpaperGridRef}
-                  className={`relative w-full h-full flex flex-col items-center justify-center ${isRepositionMode || isMovingPhoto ? "cursor-move pointer-events-auto" : "pointer-events-none"
-                    }`}
+                  className={`relative h-full w-full flex flex-col items-center justify-center ${
+                    "cursor-move pointer-events-auto"
+                  }`}
                   style={{
                     transform: `translate(${wallpaperOffset.x}px, ${wallpaperOffset.y}px) scale(${wallpaperScale})`,
-                    touchAction: isRepositionMode || isMovingPhoto ? "none" : "auto",
+                    touchAction: "none",
                   }}
                   onPointerDown={handlePointerDown}
                   onPointerMove={handlePointerMove}
@@ -2980,14 +3830,20 @@ export function Dashboard({ user }: { user?: any }) {
                       const today = new Date();
                       const year = today.getFullYear();
                       const months = Array.from({ length: 12 }, (_, m) => {
-                        const monthName = new Date(year, m, 1).toLocaleString("default", { month: "short" });
+                        const monthName = new Date(year, m, 1).toLocaleString("default", {
+                          month: "short",
+                        });
                         const daysInMonth = new Date(year, m + 1, 0).getDate();
                         const firstDow = (new Date(year, m, 1).getDay() + 6) % 7; // 0=Mon
                         return { m, monthName, daysInMonth, firstDow };
                       });
-                      const totalDays = new Date(year, 12, 0).getDate() + (new Date(year, 0, 1).getDay());
-                      const daysInYear = (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) ? 366 : 365;
-                      const dayOfYear = Math.floor((today.getTime() - new Date(year, 0, 1).getTime()) / 86400000) + 1;
+                      const totalDays =
+                        new Date(year, 12, 0).getDate() + new Date(year, 0, 1).getDay();
+                      const daysInYear =
+                        year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0) ? 366 : 365;
+                      const dayOfYear =
+                        Math.floor((today.getTime() - new Date(year, 0, 1).getTime()) / 86400000) +
+                        1;
                       const daysLeft = daysInYear - dayOfYear;
                       const pct = Math.round((dayOfYear / daysInYear) * 100);
                       const themeColors = wallpaperTokens(wallpaperTheme, gridColorTheme, theme);
@@ -3006,14 +3862,23 @@ export function Dashboard({ user }: { user?: any }) {
 
                       return (
                         <div className="w-full flex flex-col items-center justify-center -mt-8">
-                          <div className="grid gap-x-6 gap-y-7" style={{ gridTemplateColumns: "repeat(3, max-content)", justifyContent: "center" }}>
+                          <div
+                            className="grid gap-x-6 gap-y-7"
+                            style={{
+                              gridTemplateColumns: "repeat(3, max-content)",
+                              justifyContent: "center",
+                            }}
+                          >
                             {months.map(({ m, monthName, daysInMonth, firstDow }) => {
                               const cells = [];
                               for (let e = 0; e < firstDow; e++) {
                                 cells.push(<div key={`e-${e}`} style={{ width: 8, height: 8 }} />);
                               }
                               for (let d = 1; d <= daysInMonth; d++) {
-                                const isToday = today.getFullYear() === year && today.getMonth() === m && today.getDate() === d;
+                                const isToday =
+                                  today.getFullYear() === year &&
+                                  today.getMonth() === m &&
+                                  today.getDate() === d;
                                 const isFuture = new Date(year, m, d) > today;
                                 const key = `${year}-${m}-${d}`;
                                 const v = completionMap.get(key) ?? 0;
@@ -3021,7 +3886,14 @@ export function Dashboard({ user }: { user?: any }) {
                                 if (isFuture) {
                                   bg = "rgba(255,255,255,0.04)";
                                 } else {
-                                  bg = v === 0 ? themeColors.empty : v === 1 ? themeColors.low : v === 2 ? themeColors.mid : themeColors.hi;
+                                  bg =
+                                    v === 0
+                                      ? themeColors.empty
+                                      : v === 1
+                                        ? themeColors.low
+                                        : v === 2
+                                          ? themeColors.mid
+                                          : themeColors.hi;
                                 }
                                 cells.push(
                                   <div
@@ -3031,19 +3903,38 @@ export function Dashboard({ user }: { user?: any }) {
                                       height: 8,
                                       borderRadius: 2,
                                       background: bg,
-                                      border: isToday ? `1px solid ${themeColors.accent}` : undefined,
-                                      boxShadow: isToday ? `0 0 6px ${themeColors.accent}` : undefined,
+                                      border: isToday
+                                        ? `1px solid ${themeColors.accent}`
+                                        : undefined,
+                                      boxShadow: isToday
+                                        ? `0 0 6px ${themeColors.accent}`
+                                        : undefined,
                                       flexShrink: 0,
                                     }}
-                                  />
+                                  />,
                                 );
                               }
                               return (
                                 <div key={m} className="flex flex-col gap-1.5">
-                                  <span style={{ fontSize: 9, opacity: 0.55, letterSpacing: "0.02em", fontWeight: 500, textTransform: "capitalize", paddingLeft: 1 }}>
+                                  <span
+                                    style={{
+                                      fontSize: 9,
+                                      opacity: 0.55,
+                                      letterSpacing: "0.02em",
+                                      fontWeight: 500,
+                                      textTransform: "capitalize",
+                                      paddingLeft: 1,
+                                    }}
+                                  >
                                     {monthName}
                                   </span>
-                                  <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 8px)", gap: 3 }}>
+                                  <div
+                                    style={{
+                                      display: "grid",
+                                      gridTemplateColumns: "repeat(7, 8px)",
+                                      gap: 3,
+                                    }}
+                                  >
                                     {cells}
                                   </div>
                                 </div>
@@ -3059,7 +3950,9 @@ export function Dashboard({ user }: { user?: any }) {
                       const today = new Date();
                       const year = today.getFullYear();
                       const month = today.getMonth();
-                      const monthName = today.toLocaleString("default", { month: "long" }).toUpperCase();
+                      const monthName = today
+                        .toLocaleString("default", { month: "long" })
+                        .toUpperCase();
                       const daysInMonth = new Date(year, month + 1, 0).getDate();
                       const firstDow = (new Date(year, month, 1).getDay() + 6) % 7; // 0=Mon
                       const fg = wallpaperThemeOf(wallpaperTheme, theme).fg;
@@ -3080,7 +3973,12 @@ export function Dashboard({ user }: { user?: any }) {
                       // Build calendar cells (leading blanks + day cells)
                       const totalCells = firstDow + daysInMonth;
                       const rows = Math.ceil(totalCells / 7);
-                      const cells: { day: number | null; isToday: boolean; isFuture: boolean; v: number }[] = [];
+                      const cells: {
+                        day: number | null;
+                        isToday: boolean;
+                        isFuture: boolean;
+                        v: number;
+                      }[] = [];
                       for (let i = 0; i < rows * 7; i++) {
                         const dayNum = i - firstDow + 1;
                         if (dayNum < 1 || dayNum > daysInMonth) {
@@ -3100,26 +3998,66 @@ export function Dashboard({ user }: { user?: any }) {
 
                       return (
                         <div className="w-full flex flex-col items-center justify-center -mt-6">
-                          <div className="flex flex-col items-center" style={{ width: "max-content" }}>
+                          <div
+                            className="flex flex-col items-center"
+                            style={{ width: "max-content" }}
+                          >
                             {/* Month name */}
-                            <div className="text-center mb-6" style={{ fontSize: 14, fontWeight: 700, letterSpacing: "0.25em", color: fg, opacity: 0.8 }}>
+                            <div
+                              className="text-center mb-6"
+                              style={{
+                                fontSize: 14,
+                                fontWeight: 700,
+                                letterSpacing: "0.25em",
+                                color: fg,
+                                opacity: 0.8,
+                              }}
+                            >
                               {monthName}
                             </div>
 
                             {/* Day headers */}
-                            <div style={{ display: "grid", gridTemplateColumns: `repeat(7, ${CELL_SIZE}px)`, gap: `${GAP}px`, marginBottom: 8 }}>
+                            <div
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: `repeat(7, ${CELL_SIZE}px)`,
+                                gap: `${GAP}px`,
+                                marginBottom: 8,
+                              }}
+                            >
                               {DAY_HEADERS.map((h) => (
-                                <div key={h} style={{ textAlign: "center", fontSize: 10, fontWeight: 700, letterSpacing: "0.05em", color: fg, opacity: 0.45 }}>
+                                <div
+                                  key={h}
+                                  style={{
+                                    textAlign: "center",
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    letterSpacing: "0.05em",
+                                    color: fg,
+                                    opacity: 0.45,
+                                  }}
+                                >
                                   {h}
                                 </div>
                               ))}
                             </div>
 
                             {/* Day grid */}
-                            <div style={{ display: "grid", gridTemplateColumns: `repeat(7, ${CELL_SIZE}px)`, gap: `${GAP}px` }}>
+                            <div
+                              style={{
+                                display: "grid",
+                                gridTemplateColumns: `repeat(7, ${CELL_SIZE}px)`,
+                                gap: `${GAP}px`,
+                              }}
+                            >
                               {cells.map((cell, idx) => {
                                 if (cell.day === null) {
-                                  return <div key={idx} style={{ width: CELL_SIZE, height: CELL_SIZE }} />;
+                                  return (
+                                    <div
+                                      key={idx}
+                                      style={{ width: CELL_SIZE, height: CELL_SIZE }}
+                                    />
+                                  );
                                 }
                                 const textOpacity = cell.isFuture ? 0.25 : cell.isToday ? 1 : 0.85;
 
@@ -3137,40 +4075,54 @@ export function Dashboard({ user }: { user?: any }) {
                                   >
                                     {/* Today circle ring */}
                                     {cell.isToday && (
-                                      <div style={{
-                                        position: "absolute",
-                                        inset: 3,
-                                        borderRadius: "50%",
-                                        border: `1.5px solid ${themeColors.accent}`,
-                                        opacity: 0.9,
-                                        pointerEvents: "none",
-                                      }} />
+                                      <div
+                                        style={{
+                                          position: "absolute",
+                                          inset: 3,
+                                          borderRadius: "50%",
+                                          border: `1.5px solid ${themeColors.accent}`,
+                                          opacity: 0.9,
+                                          pointerEvents: "none",
+                                        }}
+                                      />
                                     )}
 
                                     {/* Day number - fixed vertical center across all days */}
-                                    <span style={{
-                                      fontSize: 15,
-                                      fontWeight: cell.isToday ? 700 : 400,
-                                      color: fg,
-                                      opacity: textOpacity,
-                                      lineHeight: 1,
-                                      fontVariantNumeric: "tabular-nums",
-                                    }}>
+                                    <span
+                                      style={{
+                                        fontSize: 15,
+                                        fontWeight: cell.isToday ? 700 : 400,
+                                        color: fg,
+                                        opacity: textOpacity,
+                                        lineHeight: 1,
+                                        fontVariantNumeric: "tabular-nums",
+                                      }}
+                                    >
                                       {cell.day}
                                     </span>
 
                                     {/* Completion dot - absolute bottom position to prevent baseline shifts */}
                                     {!cell.isFuture && (
-                                      <div style={{
-                                        position: "absolute",
-                                        bottom: 5,
-                                        left: "50%",
-                                        transform: "translateX(-50%)",
-                                        width: 4,
-                                        height: 4,
-                                        borderRadius: "50%",
-                                        background: cell.isToday ? themeColors.accent : (cell.v === 0 ? themeColors.empty : cell.v === 1 ? themeColors.low : cell.v === 2 ? themeColors.mid : themeColors.hi),
-                                      }} />
+                                      <div
+                                        style={{
+                                          position: "absolute",
+                                          bottom: 5,
+                                          left: "50%",
+                                          transform: "translateX(-50%)",
+                                          width: 4,
+                                          height: 4,
+                                          borderRadius: "50%",
+                                          background: cell.isToday
+                                            ? themeColors.accent
+                                            : cell.v === 0
+                                              ? themeColors.empty
+                                              : cell.v === 1
+                                                ? themeColors.low
+                                                : cell.v === 2
+                                                  ? themeColors.mid
+                                                  : themeColors.hi,
+                                        }}
+                                      />
                                     )}
                                   </div>
                                 );
@@ -3182,7 +4134,9 @@ export function Dashboard({ user }: { user?: any }) {
                     })()
                   ) : wallpaperGridStyle === "weeks" ? (
                     /* ── Weeks Portrait 7-Day Calendar Grid ── */
-                    <div className={`flex flex-col items-center mt-6 ${wallpaperSync ? "" : "opacity-60"}`}>
+                    <div
+                      className={`flex flex-col items-center mt-6 ${wallpaperSync ? "" : "opacity-60"}`}
+                    >
                       {/* Day headers: M T W T F S S */}
                       <div className="flex items-center mb-2" style={{ gap: "4px" }}>
                         <div className="w-7 shrink-0" />
@@ -3191,7 +4145,14 @@ export function Dashboard({ user }: { user?: any }) {
                             key={i}
                             className="text-[10px] font-bold text-center opacity-40 uppercase"
                             style={(() => {
-                              const cellSize = previewWeeks > 32 ? 10 : previewWeeks > 20 ? 14 : previewWeeks > 12 ? 18 : 24;
+                              const cellSize =
+                                previewWeeks > 32
+                                  ? 10
+                                  : previewWeeks > 20
+                                    ? 14
+                                    : previewWeeks > 12
+                                      ? 18
+                                      : 24;
                               return { width: `${cellSize}px` };
                             })()}
                           >
@@ -3204,13 +4165,39 @@ export function Dashboard({ user }: { user?: any }) {
                       <div className="flex flex-col" style={{ gap: "4px" }}>
                         {displayedHeatmap.slice(-previewWeeks).map((col, ci) => {
                           const absCi = 52 - previewWeeks + ci;
-                          const weekStartDate = new Date(heatmapStartDate().getTime() + (absCi * 7) * 86400000);
-                          const prevWeekStartDate = ci > 0 ? new Date(heatmapStartDate().getTime() + ((absCi - 1) * 7) * 86400000) : null;
-                          const isNewMonth = ci === 0 || (prevWeekStartDate && weekStartDate.getMonth() !== prevWeekStartDate.getMonth());
-                          const monthName = weekStartDate.toLocaleDateString("en-US", { month: "short" });
-                          const cellSize = previewWeeks > 32 ? 10 : previewWeeks > 20 ? 14 : previewWeeks > 12 ? 18 : 24;
+                          const weekStartDate = new Date(
+                            heatmapStartDate().getTime() + absCi * 7 * 86400000,
+                          );
+                          const prevWeekStartDate =
+                            ci > 0
+                              ? new Date(heatmapStartDate().getTime() + (absCi - 1) * 7 * 86400000)
+                              : null;
+                          const weekLabelDate = heatmapWeekLabelDate(weekStartDate);
+                          const prevWeekLabelDate = prevWeekStartDate
+                            ? heatmapWeekLabelDate(prevWeekStartDate)
+                            : null;
+                          const isNewMonth =
+                            ci === 0 ||
+                            (prevWeekLabelDate &&
+                              (weekLabelDate.getMonth() !== prevWeekLabelDate.getMonth() ||
+                                weekLabelDate.getFullYear() !== prevWeekLabelDate.getFullYear()));
+                          const monthName = weekLabelDate.toLocaleDateString("en-US", {
+                            month: "short",
+                          });
+                          const cellSize =
+                            previewWeeks > 32
+                              ? 10
+                              : previewWeeks > 20
+                                ? 14
+                                : previewWeeks > 12
+                                  ? 18
+                                  : 24;
                           const radius = cellSize > 16 ? 5 : 3;
-                          const themeColors = wallpaperTokens(wallpaperTheme, gridColorTheme, theme);
+                          const themeColors = wallpaperTokens(
+                            wallpaperTheme,
+                            gridColorTheme,
+                            theme,
+                          );
 
                           return (
                             <div key={ci} className="flex items-center" style={{ gap: "4px" }}>
@@ -3257,8 +4244,10 @@ export function Dashboard({ user }: { user?: any }) {
                       className={`w-full max-w-[320px] mx-auto rounded-[28px] p-5 backdrop-blur-2xl border shadow-2xl flex flex-col gap-3.5 mt-8 ${wallpaperSync ? "" : "opacity-60"}`}
                       style={{
                         background: "color-mix(in srgb, var(--wp-bg) 65%, transparent)",
-                        borderColor: "color-mix(in srgb, var(--wp-accent) 25%, rgba(255, 255, 255, 0.12))",
-                        boxShadow: "0 20px 45px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.15)",
+                        borderColor:
+                          "color-mix(in srgb, var(--wp-accent) 25%, rgba(255, 255, 255, 0.12))",
+                        boxShadow:
+                          "0 20px 45px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.15)",
                       }}
                     >
                       {/* Widget Header: Streak Flame + Completion Rate */}
@@ -3278,7 +4267,10 @@ export function Dashboard({ user }: { user?: any }) {
                         </div>
                       </div>
 
-                      <div className="h-px w-full" style={{ background: "color-mix(in srgb, var(--wp-fg) 10%, transparent)" }} />
+                      <div
+                        className="h-px w-full"
+                        style={{ background: "color-mix(in srgb, var(--wp-fg) 10%, transparent)" }}
+                      />
 
                       {/* Widget Mini Heatmap Grid (7 columns × min(previewWeeks, 12) rows) */}
                       <div className="flex flex-col items-center">
@@ -3331,7 +4323,10 @@ export function Dashboard({ user }: { user?: any }) {
                         </div>
                       </div>
 
-                      <div className="h-px w-full" style={{ background: "color-mix(in srgb, var(--wp-fg) 10%, transparent)" }} />
+                      <div
+                        className="h-px w-full"
+                        style={{ background: "color-mix(in srgb, var(--wp-fg) 10%, transparent)" }}
+                      />
 
                       {/* Widget Habit Footer */}
                       <div className="flex items-center justify-center gap-2 text-[10px] font-semibold tracking-wider uppercase opacity-75 px-1 truncate">
@@ -3345,7 +4340,9 @@ export function Dashboard({ user }: { user?: any }) {
                     </div>
                   ) : (
                     /* ── Stacked Goals View ── */
-                    <div className={`flex flex-col items-center gap-12 mt-16 w-full ${wallpaperSync ? "" : "opacity-60"}`}>
+                    <div
+                      className={`flex flex-col items-center gap-12 mt-16 w-full ${wallpaperSync ? "" : "opacity-60"}`}
+                    >
                       {stackedGoals.length === 0 ? (
                         <div className="text-[14px] opacity-50 font-semibold uppercase tracking-widest text-center mt-20">
                           No active goals
@@ -3353,29 +4350,39 @@ export function Dashboard({ user }: { user?: any }) {
                       ) : (
                         stackedGoals.map((sg) => (
                           <div key={sg.id} className="flex flex-col items-center w-full">
-                            <div className="flex flex-wrap gap-1 justify-center px-4 mb-4 max-w-[320px] mx-auto">
-                              {sg.boxes && sg.boxes.map((v: number, i: number) => (
-                                <div
-                                  key={i}
-                                  className="h-2 w-2 rounded-[2px] transition-colors"
-                                  style={{
-                                    background:
-                                      v === 0
-                                        ? "rgba(255, 255, 255, 0.08)"
-                                        : v === 1
-                                          ? "var(--wp-low)"
-                                          : v === 2
-                                            ? "var(--wp-mid)"
-                                            : "var(--wp-hi)",
-                                  }}
-                                />
-                              ))}
+                            <div
+                              className="grid grid-cols-7 gap-1 justify-center px-4 mb-4 mx-auto"
+                              aria-label={`${sg.title} goal progress`}
+                            >
+                              {sg.boxes &&
+                                sg.boxes.map((v: number, i: number) => (
+                                  <div
+                                    key={i}
+                                    className="h-2 w-2 rounded-[2px] transition-colors"
+                                    style={{
+                                      background:
+                                        v === 0
+                                          ? "rgba(255, 255, 255, 0.08)"
+                                          : v === 1
+                                            ? "var(--wp-low)"
+                                            : v === 2
+                                              ? "var(--wp-mid)"
+                                              : "var(--wp-hi)",
+                                    }}
+                                  />
+                                ))}
                             </div>
                             <div className="flex flex-col items-center gap-1">
                               <span className="text-[12px] uppercase tracking-widest font-bold opacity-80">
                                 {sg.title}
                               </span>
-                              <span style={{ color: "rgba(255, 255, 255, 0.5)", fontWeight: 700, fontSize: "11px" }}>
+                              <span
+                                style={{
+                                  color: "rgba(255, 255, 255, 0.5)",
+                                  fontWeight: 700,
+                                  fontSize: "11px",
+                                }}
+                              >
                                 {sg.currentStreak}d left - {sg.completionRate}%
                               </span>
                             </div>
@@ -3386,19 +4393,33 @@ export function Dashboard({ user }: { user?: any }) {
                   )}
 
                   {wallpaperHabitSet !== "none" && (
-                    <div className={`mt-8 flex flex-col gap-1.5 opacity-80 w-full px-12 ${wallpaperStatsAlign === 'left' ? 'items-start text-left' :
-                      wallpaperStatsAlign === 'right' ? 'items-end text-right' :
-                        'items-center text-center'
-                      }`}>
-                      {(HABIT_SETS.find(s => s.key === wallpaperHabitSet)?.habits || []).map((h, i) => (
-                        <span key={i} className="text-[12px] uppercase tracking-widest font-semibold">{h}</span>
-                      ))}
+                    <div
+                      className={`mt-8 flex flex-col gap-1.5 opacity-80 w-full px-12 ${
+                        wallpaperStatsAlign === "left"
+                          ? "items-start text-left"
+                          : wallpaperStatsAlign === "right"
+                            ? "items-end text-right"
+                            : "items-center text-center"
+                      }`}
+                    >
+                      {(HABIT_SETS.find((s) => s.key === wallpaperHabitSet)?.habits || []).map(
+                        (h, i) => (
+                          <span
+                            key={i}
+                            className="text-[12px] uppercase tracking-widest font-semibold"
+                          >
+                            {h}
+                          </span>
+                        ),
+                      )}
                     </div>
                   )}
 
                   {wallpaperGridStyle !== "widget" && (
-                    <div className={`mt-6 w-full px-12 text-[11px] font-semibold opacity-70 ${wallpaperStatsAlign === 'left' ? 'text-left' : wallpaperStatsAlign === 'right' ? 'text-right' : 'text-center'}`}>
-                      {activeGoalId && goals.some(g => g.id === activeGoalId) ? (
+                    <div
+                      className={`mt-6 w-full px-12 text-[11px] font-semibold opacity-70 ${wallpaperStatsAlign === "left" ? "text-left" : wallpaperStatsAlign === "right" ? "text-right" : "text-center"}`}
+                    >
+                      {activeGoalId && goals.some((g) => g.id === activeGoalId) ? (
                         <span className="opacity-80 font-bold tracking-wide text-[11px]">
                           {displayedTotalStreak}d left - {displayedRate}%
                         </span>
@@ -3408,41 +4429,33 @@ export function Dashboard({ user }: { user?: any }) {
                         </span>
                       )}
                       <br />
-                      <span className="opacity-50 mt-1 block">{wallpaperSync ? "LIVE SYNC ON" : "SNAPSHOT PAUSED"}</span>
+                      <span className="opacity-50 mt-1 block">
+                        {wallpaperSync ? "LIVE SYNC ON" : "SNAPSHOT PAUSED"}
+                      </span>
                     </div>
                   )}
-
-                </div> {/* End Draggable Container */}
+                </div>{" "}
+                {/* End Draggable Container */}
               </div>
 
-              {/* Floating Bottom Customizer & Apply Buttons */}
-              <div className="absolute bottom-6 left-0 right-0 flex flex-col items-center gap-3.5 z-50 animate-fade-in-up px-4 pointer-events-none pb-safe">
-                {/* Category Tabs & WheelPickers Card */}
-                <div className="w-full max-w-[420px] pointer-events-auto rounded-[28px] p-3.5 shadow-2xl border border-white/15 backdrop-blur-3xl bg-black/50">
-                  {renderSettingsMenu()}
-                </div>
-
-                {/* Apply Actions */}
-                <div className="flex items-center gap-2.5 pointer-events-auto">
-                  <button
-                    onClick={() => applyWallpaper(false)}
-                    className="flex items-center gap-2 px-6 h-11 rounded-full bg-white text-black font-bold text-xs uppercase tracking-wider shadow-2xl active:scale-95 transition hover:bg-neutral-200"
-                  >
-                    <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.8)]" />
-                    Apply Live Wallpaper
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setShowStaticTargetSelector(true);
-                    }}
-                    className="flex items-center gap-1.5 px-4 h-11 rounded-full bg-black/60 text-white font-bold text-xs uppercase tracking-wider border border-white/20 backdrop-blur-xl shadow-xl active:scale-95 transition hover:bg-black/80"
-                  >
-                    Set Static
-                  </button>
-                </div>
-              </div>
+              <WallpaperEditorControls
+                editingPhoto={isMovingPhoto}
+                editingGrid={isRepositionMode}
+                customPhoto={wallpaperTheme === "custom"}
+                expanded={wallpaperMenuExpanded}
+                settings={renderSettingsMenu()}
+                onFinishEditing={() => {
+                  setIsMovingPhoto(false);
+                  setIsRepositionMode(false);
+                }}
+                onToggleExpanded={() => setWallpaperMenuExpanded((expanded) => !expanded)}
+                onAdjustCrop={() => {
+                  setIsRepositionMode(false);
+                  setIsMovingPhoto(true);
+                }}
+                onApplyLive={() => applyWallpaper(false)}
+                onSetStatic={() => setShowStaticTargetSelector(true)}
+              />
             </div>
           )}
 
@@ -3455,11 +4468,15 @@ export function Dashboard({ user }: { user?: any }) {
               <div className="space-y-4">
                 <div className="grid grid-cols-3 gap-2">
                   <div className="rounded-2xl bg-canvas-soft p-3 text-center">
-                    <p className="font-display text-xl font-bold text-ink tabular-nums">{totalStreak}</p>
+                    <p className="font-display text-xl font-bold text-ink tabular-nums">
+                      {totalStreak}
+                    </p>
                     <p className="mt-1 text-[10px] uppercase tracking-wider text-body">Current</p>
                   </div>
                   <div className="rounded-2xl bg-canvas-soft p-3 text-center">
-                    <p className="font-display text-xl font-bold text-ink tabular-nums">{bestStreak || "—"}</p>
+                    <p className="font-display text-xl font-bold text-ink tabular-nums">
+                      {bestStreak || "—"}
+                    </p>
                     <p className="mt-1 text-[10px] uppercase tracking-wider text-body">Best</p>
                   </div>
                   <div className="rounded-2xl bg-canvas-soft p-3 text-center">
@@ -3520,36 +4537,36 @@ export function Dashboard({ user }: { user?: any }) {
             </SheetShell>
           )}
 
-          {editHabitTarget && (() => {
-            const t = editHabitTarget;
-            const h = habits[t.q]?.[t.i];
-            if (!h) return null;
-            return (
-              <EditHabitSheet
-                habit={h}
-                quadrant={t.q}
-                onClose={() => setEditHabitTarget(null)}
-                onSave={(patch, newQ) => {
-                  setEditHabitTarget(null);
-                  (async () => {
-                    try {
-                      const updates: Partial<Omit<HabitDoc, "id" | "createdAt">> = { ...patch };
-                      if (newQ && newQ !== t.q) updates.quadrant = newQ;
-                      await updateHabitDoc(h.id, updates);
-                      showToast("Habit updated");
-                    } catch (err) {
-                      toastError("Failed to update habit");
-                    }
-                  })();
-                }}
-                onDelete={() => {
-                  deleteHabit(t.q, t.i);
-                  setEditHabitTarget(null);
-                }}
-              />
-            );
-          })()}
-
+          {editHabitTarget &&
+            (() => {
+              const t = editHabitTarget;
+              const h = habits[t.q]?.[t.i];
+              if (!h) return null;
+              return (
+                <EditHabitSheet
+                  habit={h}
+                  quadrant={t.q}
+                  onClose={() => setEditHabitTarget(null)}
+                  onSave={(patch, newQ) => {
+                    setEditHabitTarget(null);
+                    (async () => {
+                      try {
+                        const updates: Partial<Omit<HabitDoc, "id" | "createdAt">> = { ...patch };
+                        if (newQ && newQ !== t.q) updates.quadrant = newQ;
+                        await updateHabitDoc(h.id, updates);
+                        showToast("Habit updated");
+                      } catch (err) {
+                        toastError("Failed to update habit");
+                      }
+                    })();
+                  }}
+                  onDelete={() => {
+                    deleteHabit(t.q, t.i);
+                    setEditHabitTarget(null);
+                  }}
+                />
+              );
+            })()}
 
           {/* Modal */}
           {modalOpen && (
@@ -3576,10 +4593,11 @@ export function Dashboard({ user }: { user?: any }) {
                         <button
                           key={q}
                           onClick={() => setSelectedQuadrant(q)}
-                          className={`pill px-3 py-2.5 text-left text-xs font-medium transition ${active
-                            ? "bg-ink text-on-ink"
-                            : "liquid-input text-ink hover:bg-[color:var(--surface-pressed)]"
-                            }`}
+                          className={`pill px-3 py-2.5 text-left text-xs font-medium transition ${
+                            active
+                              ? "bg-ink text-on-ink"
+                              : "liquid-input text-ink hover:bg-[color:var(--surface-pressed)]"
+                          }`}
                         >
                           {QUADRANTS[q].title}
                         </button>
@@ -3596,8 +4614,9 @@ export function Dashboard({ user }: { user?: any }) {
                         <button
                           key={c}
                           onClick={() => setNewCategory(c)}
-                          className={`pill px-3 py-1.5 text-[11px] font-medium transition ${active ? "bg-ink text-on-ink" : "liquid-input text-ink"
-                            }`}
+                          className={`pill px-3 py-1.5 text-[11px] font-medium transition ${
+                            active ? "bg-ink text-on-ink" : "liquid-input text-ink"
+                          }`}
                         >
                           {c}
                         </button>
@@ -3608,12 +4627,14 @@ export function Dashboard({ user }: { user?: any }) {
 
                 <Field label="Time of day">
                   <div className="flex flex-wrap gap-1.5">
-                    {([
-                      { key: "any", label: "Anytime" },
-                      { key: "morning", label: "Morning" },
-                      { key: "afternoon", label: "Afternoon" },
-                      { key: "evening", label: "Evening" },
-                    ] as const).map((t) => {
+                    {(
+                      [
+                        { key: "any", label: "Anytime" },
+                        { key: "morning", label: "Morning" },
+                        { key: "afternoon", label: "Afternoon" },
+                        { key: "evening", label: "Evening" },
+                      ] as const
+                    ).map((t) => {
                       const active = (newTime ?? "any") === t.key;
                       return (
                         <button
@@ -3621,8 +4642,9 @@ export function Dashboard({ user }: { user?: any }) {
                           onClick={() =>
                             setNewTime(t.key === "any" ? undefined : (t.key as Habit["time"]))
                           }
-                          className={`pill px-3 py-1.5 text-[11px] font-medium transition ${active ? "bg-ink text-on-ink" : "liquid-input text-ink"
-                            }`}
+                          className={`pill px-3 py-1.5 text-[11px] font-medium transition ${
+                            active ? "bg-ink text-on-ink" : "liquid-input text-ink"
+                          }`}
                         >
                           {t.label}
                         </button>
@@ -3638,24 +4660,30 @@ export function Dashboard({ user }: { user?: any }) {
                   className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-[12px] font-semibold text-mute transition hover:text-ink hover:bg-[color:var(--canvas-soft)]"
                 >
                   <span>Customize</span>
-                  <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showCustomize ? "rotate-180" : ""}`} />
+                  <ChevronDown
+                    className={`h-4 w-4 transition-transform duration-200 ${showCustomize ? "rotate-180" : ""}`}
+                  />
                 </button>
 
-                <div className={`overflow-hidden transition-all duration-300 ease-out ${showCustomize ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"}`}>
+                <div
+                  className={`overflow-hidden transition-all duration-300 ease-out ${showCustomize ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"}`}
+                >
                   <div className="space-y-4 pt-1">
                     <Field label="Type">
                       <div className="grid grid-cols-2 gap-2">
                         <button
                           onClick={() => setNewIsNumeric(false)}
-                          className={`pill px-3 py-2.5 text-xs font-medium transition ${!newIsNumeric ? "bg-ink text-on-ink" : "liquid-input text-ink"
-                            }`}
+                          className={`pill px-3 py-2.5 text-xs font-medium transition ${
+                            !newIsNumeric ? "bg-ink text-on-ink" : "liquid-input text-ink"
+                          }`}
                         >
                           Binary
                         </button>
                         <button
                           onClick={() => setNewIsNumeric(true)}
-                          className={`pill px-3 py-2.5 text-xs font-medium transition ${newIsNumeric ? "bg-ink text-on-ink" : "liquid-input text-ink"
-                            }`}
+                          className={`pill px-3 py-2.5 text-xs font-medium transition ${
+                            newIsNumeric ? "bg-ink text-on-ink" : "liquid-input text-ink"
+                          }`}
                         >
                           Numeric
                         </button>
@@ -3693,10 +4721,11 @@ export function Dashboard({ user }: { user?: any }) {
                             <button
                               key={f}
                               onClick={() => setNewFreq(f)}
-                              className={`pill flex-1 px-3 py-2 text-xs font-medium transition ${active
-                                ? "bg-ink text-on-ink"
-                                : "liquid-input text-ink hover:bg-[color:var(--surface-pressed)]"
-                                }`}
+                              className={`pill flex-1 px-3 py-2 text-xs font-medium transition ${
+                                active
+                                  ? "bg-ink text-on-ink"
+                                  : "liquid-input text-ink hover:bg-[color:var(--surface-pressed)]"
+                              }`}
                             >
                               {f}
                             </button>
@@ -3704,6 +4733,30 @@ export function Dashboard({ user }: { user?: any }) {
                         })}
                       </div>
                     </Field>
+                    {newFreq === "Custom" && (
+                      <Field label="Repeat on">
+                        <div className="grid grid-cols-7 gap-1.5">
+                          {["M", "T", "W", "T", "F", "S", "S"].map((day, index) => {
+                            const active = newCustomDays.includes(index);
+                            return (
+                              <button
+                                key={`${day}-${index}`}
+                                type="button"
+                                onClick={() =>
+                                  setNewCustomDays((days) =>
+                                    active ? days.filter((d) => d !== index) : [...days, index],
+                                  )
+                                }
+                                className={`h-8 rounded-full text-[11px] font-bold ${active ? "bg-ink text-on-ink" : "liquid-input text-mute"}`}
+                                aria-pressed={active}
+                              >
+                                {day}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </Field>
+                    )}
 
                     <div className="grid grid-cols-2 gap-3">
                       <Field label="Shade">
@@ -3719,8 +4772,11 @@ export function Dashboard({ user }: { user?: any }) {
                               key={i}
                               onClick={() => setNewShade(i)}
                               style={{ background: c }}
-                              className={`h-8 w-8 rounded-full border border-[color:var(--hairline)] transition ${i === newShade ? "ring-2 ring-ink ring-offset-2 ring-offset-[color:var(--canvas)]" : ""
-                                }`}
+                              className={`h-8 w-8 rounded-full border border-[color:var(--hairline)] transition ${
+                                i === newShade
+                                  ? "ring-2 ring-ink ring-offset-2 ring-offset-[color:var(--canvas)]"
+                                  : ""
+                              }`}
                             />
                           ))}
                         </div>
@@ -3731,8 +4787,9 @@ export function Dashboard({ user }: { user?: any }) {
                             <button
                               key={i}
                               onClick={() => setNewIcon(i)}
-                              className={`grid h-8 w-8 place-items-center rounded-lg transition ${i === newIcon ? "bg-ink text-on-ink" : "liquid-input text-ink"
-                                }`}
+                              className={`grid h-8 w-8 place-items-center rounded-lg transition ${
+                                i === newIcon ? "bg-ink text-on-ink" : "liquid-input text-ink"
+                              }`}
                             >
                               <I className="h-3.5 w-3.5" />
                             </button>
@@ -3745,196 +4802,217 @@ export function Dashboard({ user }: { user?: any }) {
 
                 <button
                   onClick={createHabit}
-                  disabled={!newName.trim()}
-                  className={`mt-2 flex w-full items-center justify-center rounded-xl bg-ink/10 backdrop-blur-[40px] border border-ink/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] py-3 text-[14px] font-bold text-ink shadow-lg active:scale-[0.98] transition ${!newName.trim() ? "opacity-50 cursor-not-allowed" : ""}`}
+                  disabled={!newName.trim() || isCreatingHabit}
+                  className={`mt-2 flex w-full items-center justify-center rounded-xl bg-ink/10 backdrop-blur-[40px] border border-ink/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] py-3 text-[14px] font-bold text-ink shadow-lg active:scale-[0.98] transition ${!newName.trim() || isCreatingHabit ? "opacity-50 cursor-not-allowed" : ""}`}
                 >
-                  Create habit
+                  {isCreatingHabit ? "Saving…" : "Create habit"}
                 </button>
               </div>
             </SheetShell>
           )}
 
           {/* Habit detail modal */}
-          {detail && (() => {
-            const h = habits[detail.q][detail.i];
-            if (!h) return null;
-            // Build real 30-day completion history from Firestore completions
-            const todayDate = new Date();
-            return (
-              <SheetShell
-                onClose={() => setDetail(null)}
-                title={h.name}
-                subtitle={QUADRANTS[detail.q].title}
-              >
-                <div className="space-y-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${catClass(h.category)}`}>
-                      {h.category}
-                    </span>
-                    {h.time && (
-                      <span className="rounded-full bg-canvas-soft px-2 py-0.5 text-[10px] font-medium text-body capitalize">
-                        {h.time}
+          {detail &&
+            (() => {
+              const h = habits[detail.q][detail.i];
+              if (!h) return null;
+              // Build real 30-day completion history from Firestore completions
+              const todayDate = new Date();
+              return (
+                <SheetShell
+                  onClose={() => setDetail(null)}
+                  title={h.name}
+                  subtitle={QUADRANTS[detail.q].title}
+                >
+                  <div className="space-y-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${catClass(h.category)}`}
+                      >
+                        {h.category}
                       </span>
-                    )}
-                    {h.target !== null && h.target !== undefined && (
-                      <span className="rounded-full bg-canvas-soft px-2 py-0.5 text-[10px] font-medium text-body">
-                        {completions[h.id]?.value ?? 0}/{h.target} {h.unit ?? ""}
-                      </span>
-                    )}
-                  </div>
+                      {h.time && (
+                        <span className="rounded-full bg-canvas-soft px-2 py-0.5 text-[10px] font-medium text-body capitalize">
+                          {h.time}
+                        </span>
+                      )}
+                      {h.target !== null && h.target !== undefined && (
+                        <span className="rounded-full bg-canvas-soft px-2 py-0.5 text-[10px] font-medium text-body">
+                          {completions[h.id]?.value ?? 0}/{h.target} {h.unit ?? ""}
+                        </span>
+                      )}
+                    </div>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="rounded-2xl bg-canvas-soft px-4 py-3">
-                      <div className="text-[10px] uppercase tracking-wider text-body">Current</div>
-                      <div className="font-display text-xl font-bold text-ink">{h.streak}d</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-2xl bg-canvas-soft px-4 py-3">
+                        <div className="text-[10px] uppercase tracking-wider text-body">
+                          Current
+                        </div>
+                        <div className="font-display text-xl font-bold text-ink">{h.streak}d</div>
+                      </div>
+                      <div className="rounded-2xl bg-canvas-soft px-4 py-3">
+                        <div className="text-[10px] uppercase tracking-wider text-body">Best</div>
+                        <div className="font-display text-xl font-bold text-ink">
+                          {h.best ?? h.streak}d
+                        </div>
+                      </div>
                     </div>
-                    <div className="rounded-2xl bg-canvas-soft px-4 py-3">
-                      <div className="text-[10px] uppercase tracking-wider text-body">Best</div>
-                      <div className="font-display text-xl font-bold text-ink">{h.best ?? h.streak}d</div>
-                    </div>
-                  </div>
 
-                  <div>
-                    <div className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-body">
-                      <CalendarDays className="h-3.5 w-3.5" /> Last 30 days
-                    </div>
-                    <div className="grid grid-cols-7 gap-1.5">
-                      {Array.from({ length: 30 }).map((_, i) => {
-                        const dayOffset = 29 - i;
-                        const d = new Date(todayDate);
-                        d.setDate(d.getDate() - dayOffset);
-                        const isFuture = d > todayDate;
-                        const dk = formatDateKey(d);
-                        const entry = completionsMap[dk]?.[h.id];
-                        const done = Boolean(entry && (entry.done || entry.restDay || entry.frozenStreak));
-                        const restDay = Boolean(entry?.restDay);
-                        const frozen = Boolean(entry?.frozenStreak);
-                        return (
-                          <div
-                            key={i}
-                            title={`${dk}: ${done ? (restDay ? "Rest day" : frozen ? "Streak frozen" : "Completed") : "Missed"}`}
-                            className={`aspect-square rounded-md text-[9px] font-semibold grid place-items-center ${isFuture
-                              ? "bg-canvas-soft/50 text-mute"
-                              : done
-                                ? restDay
-                                  ? "bg-sky-500/25 text-sky-200 border border-sky-400/30"
-                                  : frozen
-                                    ? "bg-amber-500/25 text-amber-200 border border-amber-400/30"
-                                    : "bg-emerald-500/25 text-emerald-200 border border-emerald-400/30"
-                                : "bg-rose-500/15 text-rose-300/80 border border-rose-400/20"
+                    <div>
+                      <div className="mb-2 flex items-center gap-1.5 text-[11px] font-medium text-body">
+                        <CalendarDays className="h-3.5 w-3.5" /> Last 30 days
+                      </div>
+                      <div className="grid grid-cols-7 gap-1.5">
+                        {Array.from({ length: 30 }).map((_, i) => {
+                          const dayOffset = 29 - i;
+                          const d = new Date(todayDate);
+                          d.setDate(d.getDate() - dayOffset);
+                          const isFuture = d > todayDate;
+                          const dk = formatDateKey(d);
+                          const entry = completionsMap[dk]?.[h.id];
+                          const done = Boolean(
+                            entry && (entry.done || entry.restDay || entry.frozenStreak),
+                          );
+                          const restDay = Boolean(entry?.restDay);
+                          const frozen = Boolean(entry?.frozenStreak);
+                          return (
+                            <div
+                              key={i}
+                              title={`${dk}: ${done ? (restDay ? "Rest day" : frozen ? "Streak frozen" : "Completed") : "Missed"}`}
+                              className={`aspect-square rounded-md text-[9px] font-semibold grid place-items-center ${
+                                isFuture
+                                  ? "bg-canvas-soft/50 text-mute"
+                                  : done
+                                    ? restDay
+                                      ? "bg-sky-500/25 text-sky-200 border border-sky-400/30"
+                                      : frozen
+                                        ? "bg-amber-500/25 text-amber-200 border border-amber-400/30"
+                                        : "bg-emerald-500/25 text-emerald-200 border border-emerald-400/30"
+                                    : "bg-rose-500/15 text-rose-300/80 border border-rose-400/20"
                               }`}
-                          >
-                            {d.getDate()}
-                          </div>
-                        );
-                      })}
+                            >
+                              {d.getDate()}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="mt-1 text-[10px] text-mute">
+                        Today shown in real-time · historical data via heatmap
+                      </p>
                     </div>
-                    <p className="mt-1 text-[10px] text-mute">Today shown in real-time · historical data via heatmap</p>
-                  </div>
 
-                  <Field label="Daily note">
-                    <input
-                      value={noteDraft}
-                      onChange={(e) => setNoteDraft(e.target.value)}
-                      placeholder="How did it go today?"
-                      className="w-full rounded-2xl bg-canvas-soft px-4 py-3 text-sm text-ink outline-none placeholder:text-mute focus:bg-[color:var(--canvas-softer)]"
-                    />
-                  </Field>
+                    <Field label="Daily note">
+                      <input
+                        value={noteDraft}
+                        onChange={(e) => setNoteDraft(e.target.value)}
+                        placeholder="How did it go today?"
+                        className="w-full rounded-2xl bg-canvas-soft px-4 py-3 text-sm text-ink outline-none placeholder:text-mute focus:bg-[color:var(--canvas-softer)]"
+                      />
+                    </Field>
 
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => freezeStreak(detail.q, detail.i)}
-                      className="flex items-center justify-center gap-1.5 rounded-2xl bg-canvas-soft px-4 py-3 text-xs font-semibold text-ink hover:bg-[color:var(--surface-pressed)]"
-                    >
-                      <Snowflake className="h-3.5 w-3.5" /> Freeze today
-                    </button>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => freezeStreak(detail.q, detail.i)}
+                        className="flex items-center justify-center gap-1.5 rounded-2xl bg-canvas-soft px-4 py-3 text-xs font-semibold text-ink hover:bg-[color:var(--surface-pressed)]"
+                      >
+                        <Snowflake className="h-3.5 w-3.5" /> Freeze today
+                      </button>
+                      <button
+                        onClick={() => {
+                          try {
+                            // Persist note to Firestore first (fire and forget)
+                            if (noteDraft.trim()) {
+                              saveHabitNote(h.id, noteDraft.trim()).catch((err) =>
+                                toastError(err.message || "An error occurred"),
+                              );
+                            }
+                            if (!h.done) {
+                              toggleHabitDone(h.id).catch((err) =>
+                                toastError(err.message || "An error occurred"),
+                              );
+                            }
+                            showToast(
+                              noteDraft.trim() ? "Note saved & marked done" : "Marked done",
+                            );
+                          } finally {
+                            setDetail(null);
+                          }
+                        }}
+                        className="btn-primary-uber py-3 text-xs"
+                      >
+                        Save
+                      </button>
+                    </div>
+
                     <button
                       onClick={() => {
-                        try {
-                          // Persist note to Firestore first (fire and forget)
-                          if (noteDraft.trim()) {
-                            saveHabitNote(h.id, noteDraft.trim()).catch(err => toastError(err.message || "An error occurred"));
-                          }
-                          if (!h.done) {
-                            toggleHabitDone(h.id).catch(err => toastError(err.message || "An error occurred"));
-                          }
-                          showToast(noteDraft.trim() ? "Note saved & marked done" : "Marked done");
-                        } finally {
-                          setDetail(null);
-                        }
+                        deleteHabit(detail.q, detail.i);
+                        setDetail(null);
                       }}
-                      className="btn-primary-uber py-3 text-xs"
+                      className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-rose-500/20 bg-rose-500/10 py-2.5 text-xs font-semibold text-rose-400 transition hover:bg-rose-500/20 active:scale-98 mt-1"
                     >
-                      Save
+                      <Trash2 className="h-3.5 w-3.5" /> Delete habit
                     </button>
                   </div>
-
-                  <button
-                    onClick={() => {
-                      deleteHabit(detail.q, detail.i);
-                      setDetail(null);
-                    }}
-                    className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-rose-500/20 bg-rose-500/10 py-2.5 text-xs font-semibold text-rose-400 transition hover:bg-rose-500/20 active:scale-98 mt-1"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" /> Delete habit
-                  </button>
-                </div>
-              </SheetShell>
-            );
-          })()}
+                </SheetShell>
+              );
+            })()}
 
           {/* Podium Feature Modals */}
-          {aiCoachOpen && (
-            <InsightsCoachModal
-              onClose={() => setAiCoachOpen(false)}
-              insights={weeklyInsights}
-              currentStreak={totalStreak}
-              doneCount={doneCount}
-              totalCount={totalCount}
-            />
-          )}
+          <Suspense fallback={null}>
+            {aiCoachOpen && (
+              <InsightsCoachModal
+                onClose={() => setAiCoachOpen(false)}
+                insights={weeklyInsights}
+                currentStreak={totalStreak}
+                doneCount={doneCount}
+                totalCount={totalCount}
+              />
+            )}
 
-          {badgesOpen && (
-            <BadgesModal
-              onClose={() => setBadgesOpen(false)}
-              currentStreak={totalStreak}
-              bestStreak={bestStreak}
-            />
-          )}
+            {badgesOpen && (
+              <BadgesModal
+                onClose={() => setBadgesOpen(false)}
+                currentStreak={totalStreak}
+                bestStreak={bestStreak}
+              />
+            )}
 
-          {shareStreakOpen && (
-            <ShareStreakModal
-              onClose={() => setShareStreakOpen(false)}
-              userName={profile.name}
-              currentStreak={totalStreak}
-              bestStreak={bestStreak}
-              totalCompletions={heatmapStats.totalCompletions}
-              rate={rate}
-              onShowToast={showToast}
-            />
-          )}
+            {shareStreakOpen && (
+              <ShareStreakModal
+                onClose={() => setShareStreakOpen(false)}
+                userName={profile.name}
+                currentStreak={totalStreak}
+                bestStreak={bestStreak}
+                totalCompletions={heatmapStats.totalCompletions}
+                rate={rate}
+                onShowToast={showToast}
+              />
+            )}
 
-          {weeklyReviewOpen && (
-            <WeeklyReviewModal
-              onClose={() => setWeeklyReviewOpen(false)}
-              habits={flatHabits}
-              completionsMap={completionsMap}
-              habitStreaks={habitStreaks}
-              onShowToast={showToast}
-            />
-          )}
+            {weeklyReviewOpen && (
+              <WeeklyReviewModal
+                onClose={() => setWeeklyReviewOpen(false)}
+                habits={flatHabits}
+                completionsMap={completionsMap}
+                habitStreaks={habitStreaks}
+                onShowToast={showToast}
+              />
+            )}
 
-          {onboardingOpen && (
-            <OnboardingModal
-              onClose={() => setOnboardingOpen(false)}
-              onAddHabits={async (newHabits) => {
-                for (const h of newHabits) {
-                  await addHabit(h);
-                }
-                showToast(`Added ${newHabits.length} starter habits!`);
-              }}
-            />
-          )}
+            {onboardingOpen && (
+              <OnboardingModal
+                onClose={() => setOnboardingOpen(false)}
+                storageKey={onboardingStorageKey}
+                onAddHabits={async (newHabits) => {
+                  for (const h of newHabits) {
+                    await addHabit(h);
+                  }
+                  showToast(`Added ${newHabits.length} starter habits!`);
+                }}
+              />
+            )}
+          </Suspense>
         </div>
       </div>
 
@@ -3943,31 +5021,44 @@ export function Dashboard({ user }: { user?: any }) {
           {/* Backdrop */}
           <div
             className="absolute inset-0 backdrop-blur-sm"
-            style={{ background: 'color-mix(in srgb, var(--ink) 30%, transparent)' }}
+            style={{ background: "color-mix(in srgb, var(--ink) 30%, transparent)" }}
             onClick={() => setShowStaticTargetSelector(false)}
           />
           {/* Content */}
-          <div className="relative liquid-glass specular rounded-t-[32px] p-6 pb-12 shadow-2xl animate-sheet-slide-up border border-[color:var(--hairline-strong)]">
+          <div className="relative liquid-glass sheet-glass specular rounded-t-[32px] p-6 pb-12 shadow-2xl animate-sheet-slide-up border border-[color:var(--hairline-strong)]">
             <div className="mx-auto mt-0 mb-6 h-1.5 w-12 rounded-full bg-[color:var(--hairline-strong)]" />
 
-            <h2 className="text-xl font-bold text-center text-[color:var(--ink)] mb-2">Set Static Wallpaper</h2>
-            <p className="text-center text-[color:var(--mute)] mb-6 text-sm">Choose where to apply the wallpaper.</p>
+            <h2 className="text-xl font-bold text-center text-[color:var(--ink)] mb-2">
+              Set Static Wallpaper
+            </h2>
+            <p className="text-center text-[color:var(--mute)] mb-6 text-sm">
+              Choose where to apply the wallpaper.
+            </p>
 
             <div className="flex flex-col gap-3 max-w-sm mx-auto">
               <button
-                onClick={() => { setShowStaticTargetSelector(false); applyWallpaper(true, 'home'); }}
+                onClick={() => {
+                  setShowStaticTargetSelector(false);
+                  applyWallpaper(true, "home");
+                }}
                 className="w-full bg-[color:var(--canvas-soft)] text-[color:var(--ink)] font-bold h-14 rounded-2xl flex items-center justify-center border border-[color:var(--hairline)] active:scale-[0.98] transition-all hover:bg-[color:var(--canvas-softer)]"
               >
                 Home Screen
               </button>
               <button
-                onClick={() => { setShowStaticTargetSelector(false); applyWallpaper(true, 'lock'); }}
+                onClick={() => {
+                  setShowStaticTargetSelector(false);
+                  applyWallpaper(true, "lock");
+                }}
                 className="w-full bg-[color:var(--canvas-soft)] text-[color:var(--ink)] font-bold h-14 rounded-2xl flex items-center justify-center border border-[color:var(--hairline)] active:scale-[0.98] transition-all hover:bg-[color:var(--canvas-softer)]"
               >
                 Lock Screen
               </button>
               <button
-                onClick={() => { setShowStaticTargetSelector(false); applyWallpaper(true, 'both'); }}
+                onClick={() => {
+                  setShowStaticTargetSelector(false);
+                  applyWallpaper(true, "both");
+                }}
                 className="w-full bg-ink text-on-ink font-bold h-14 rounded-2xl flex items-center justify-center active:scale-[0.98] transition-all hover:opacity-90 shadow-lg"
               >
                 Both Screens
@@ -4027,7 +5118,9 @@ function SheetShell({
       setDragY(deltaY);
       if (deltaY >= DISMISS_THRESHOLD && !hapticFired.current) {
         hapticFired.current = true;
-        try { navigator.vibrate?.(18); } catch { }
+        try {
+          navigator.vibrate?.(18);
+        } catch {}
       }
     } else {
       setDragY(deltaY * 0.2);
@@ -4036,7 +5129,9 @@ function SheetShell({
 
   const onPointerUp = (e: React.PointerEvent) => {
     if (startY.current === null) return;
-    try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch { }
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
 
     if (dragY >= DISMISS_THRESHOLD) {
       onClose();
@@ -4061,7 +5156,7 @@ function SheetShell({
           transform: `translate3d(0, ${Math.max(0, dragY)}px, 0)`,
           transition: isDragging ? "none" : "transform 250ms cubic-bezier(0.2, 0.9, 0.3, 1)",
         }}
-        className="w-full max-h-[85vh] overflow-y-auto rounded-t-[24px] liquid-glass p-5 select-none animate-sheet-slide-up"
+        className="w-full max-h-[85vh] overflow-y-auto rounded-t-[24px] liquid-glass sheet-glass p-5 select-none animate-sheet-slide-up"
       >
         {/* Drag Handle & Header Drag Area */}
         <div
@@ -4072,12 +5167,13 @@ function SheetShell({
           className="group cursor-grab active:cursor-grabbing touch-none pb-2"
         >
           <div
-            className={`mx-auto mb-3 h-1.5 rounded-full transition-all duration-200 ${dragY >= DISMISS_THRESHOLD
-              ? "w-20 bg-rose-500"
-              : isDragging
-                ? "w-16 bg-ink"
-                : "w-12 bg-[color:var(--surface-pressed)] group-hover:bg-[color:var(--hairline-mid)]"
-              }`}
+            className={`mx-auto mb-3 h-1.5 rounded-full transition-all duration-200 ${
+              dragY >= DISMISS_THRESHOLD
+                ? "w-20 bg-rose-500"
+                : isDragging
+                  ? "w-16 bg-ink"
+                  : "w-12 bg-[color:var(--surface-pressed)] group-hover:bg-[color:var(--hairline-mid)]"
+            }`}
           />
           <div className="flex items-center justify-between">
             <div>
@@ -4100,10 +5196,9 @@ function SheetShell({
   );
 }
 
-
 function Row({ label, action }: { label: React.ReactNode; action: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between px-5 py-3.5 group transition">
+    <div className="flex items-center justify-between gap-3 px-4 py-3 group transition">
       <div className="text-sm font-medium text-ink">{label}</div>
       {action}
     </div>
@@ -4127,17 +5222,15 @@ function Toggle({
       aria-label={ariaLabel}
       data-lg-press
       onClick={onChange}
-      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-ink/30 ${checked
-        ? "bg-ink border-ink"
-        : "bg-canvas border-[color:var(--hairline)]"
-        }`}
+      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-ink/30 ${
+        checked ? "bg-ink border-ink" : "bg-canvas border-[color:var(--hairline)]"
+      }`}
     >
       <span
         aria-hidden
-        className={`inline-block h-5 w-5 rounded-full shadow-sm transition-all duration-200 ${checked
-          ? "translate-x-[22px] bg-on-ink"
-          : "translate-x-[3px] bg-ink"
-          }`}
+        className={`inline-block h-5 w-5 rounded-full shadow-sm transition-all duration-200 ${
+          checked ? "translate-x-[22px] bg-on-ink" : "translate-x-[3px] bg-ink"
+        }`}
       />
     </button>
   );
@@ -4179,14 +5272,15 @@ function ConfirmDialog({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="liquid-glass specular relative w-full max-w-[320px] overflow-hidden rounded-3xl p-6 text-center animate-modal-scale-enter"
+        className="liquid-glass sheet-glass specular relative w-full max-w-[320px] overflow-hidden rounded-3xl p-6 text-center animate-modal-scale-enter"
       >
         {icon && (
           <div
-            className={`mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl ${destructive
-              ? "bg-red-500/10 text-red-500 border border-red-500/25"
-              : "bg-canvas-soft text-ink border border-[color:var(--hairline)]"
-              }`}
+            className={`mx-auto mb-3 grid h-12 w-12 place-items-center rounded-2xl ${
+              destructive
+                ? "bg-red-500/10 text-red-500 border border-red-500/25"
+                : "bg-canvas-soft text-ink border border-[color:var(--hairline)]"
+            }`}
           >
             {icon}
           </div>
@@ -4194,9 +5288,7 @@ function ConfirmDialog({
         <h4 id="confirm-title" className="font-display text-lg font-bold text-ink">
           {title}
         </h4>
-        {description && (
-          <p className="mt-2 text-[13px] leading-relaxed text-body">{description}</p>
-        )}
+        {description && <p className="mt-2 text-[13px] leading-relaxed text-body">{description}</p>}
         <div className="mt-5 flex flex-col gap-2">
           <button
             type="button"
@@ -4205,10 +5297,9 @@ function ConfirmDialog({
               onConfirm();
               onClose();
             }}
-            className={`pill w-full py-3 text-[14px] font-semibold transition ${destructive
-              ? "bg-red-500 text-white hover:bg-red-500/90"
-              : "bg-ink text-on-ink"
-              }`}
+            className={`pill w-full py-3 text-[14px] font-semibold transition ${
+              destructive ? "bg-red-500 text-white hover:bg-red-500/90" : "bg-ink text-on-ink"
+            }`}
           >
             {confirmLabel}
           </button>
@@ -4235,7 +5326,15 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Stat({ label, value, pulseKey }: { label: string; value: string; pulseKey?: number | string }) {
+function Stat({
+  label,
+  value,
+  pulseKey,
+}: {
+  label: string;
+  value: string;
+  pulseKey?: number | string;
+}) {
   return (
     <div className="text-center">
       <div
@@ -4274,7 +5373,6 @@ function QuadrantCard({
   onAdjust: (i: number, dir: 1 | -1) => void;
   onOpenDetail: (i: number) => void;
 }) {
-  const { setNodeRef } = useDroppable({ id: q });
   const meta = QUADRANTS[q];
   const [collapsed, setCollapsed] = useState(false);
   const [openMenu, setOpenMenu] = useState<number | null>(null);
@@ -4306,9 +5404,7 @@ function QuadrantCard({
       >
         <div className="flex items-center gap-2 min-w-0 flex-1 pr-2">
           <h3 className="font-display text-sm font-bold text-ink">{meta.title}</h3>
-          <span className="text-[10px] font-medium tracking-wider text-mute">
-            · {meta.sub}
-          </span>
+          <span className="text-[10px] font-medium tracking-wider text-mute">· {meta.sub}</span>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
@@ -4316,8 +5412,9 @@ function QuadrantCard({
             {doneCount}/{visible.length}
           </span>
           <ChevronDown
-            className={`h-4 w-4 text-mute transition-transform duration-200 ${collapsed ? "-rotate-90" : "rotate-0"
-              }`}
+            className={`h-4 w-4 text-mute transition-transform duration-200 ${
+              collapsed ? "-rotate-90" : "rotate-0"
+            }`}
           />
         </div>
       </button>
@@ -4355,289 +5452,343 @@ function QuadrantCard({
 }
 
 // ---------------- Habit Row (swipe-to-complete / rest) ----------------
-export const HabitRow = memo(function HabitRow({
-  habit: h,
-  justDone,
-  menuOpen,
-  onMenuToggle,
-  onMenuClose,
-  onToggle,
-  onRest,
-  onPin,
-  onDelete,
-  onMove,
-  onEdit,
-  onAdjust,
-  onSetValue,
-  onOpenDetail,
-}: {
-  habit: Habit;
-  justDone: boolean;
-  menuOpen: boolean;
-  onMenuToggle: () => void;
-  onMenuClose: () => void;
-  onToggle: () => void;
-  onRest: () => void;
-  onPin: () => void;
-  onDelete: () => void;
-  onMove: () => void;
-  onEdit: () => void;
-  onAdjust: (dir: 1 | -1) => void;
-  onSetValue?: (val: number) => void;
-  onOpenDetail: () => void;
-}) {
-  const isNumeric = h.target !== undefined;
-  
-  const rawVal = h.value ?? 0;
-  const targetVal = h.target || 1;
-  const pct = isNumeric ? Math.min(100, Math.round((rawVal / targetVal) * 100)) : (h.done ? 100 : 0);
-  const isDone = isNumeric ? rawVal >= targetVal || h.done : h.done;
-  const stepVal = h.step ?? (targetVal >= 500 ? 250 : targetVal >= 60 ? 30 : targetVal >= 10 ? 5 : 1);
-  const unitLabel = h.unit ? ` ${h.unit}` : "";
+export const HabitRow = memo(
+  function HabitRow({
+    habit: h,
+    justDone,
+    menuOpen,
+    onMenuToggle,
+    onMenuClose,
+    onToggle,
+    onRest,
+    onPin,
+    onDelete,
+    onMove,
+    onEdit,
+    onAdjust,
+    onSetValue,
+    onOpenDetail,
+  }: {
+    habit: Habit;
+    justDone: boolean;
+    menuOpen: boolean;
+    onMenuToggle: () => void;
+    onMenuClose: () => void;
+    onToggle: () => void;
+    onRest: () => void;
+    onPin: () => void;
+    onDelete: () => void;
+    onMove: () => void;
+    onEdit: () => void;
+    onAdjust: (dir: 1 | -1) => void;
+    onSetValue?: (val: number) => void;
+    onOpenDetail: () => void;
+  }) {
+    const isNumeric = h.type === "numeric";
 
-  const [isExpanded, setIsExpanded] = useState(false);
+    const rawVal = h.value ?? 0;
+    const targetVal = h.target || 1;
+    const pct = isNumeric
+      ? Math.min(100, Math.round((rawVal / targetVal) * 100))
+      : h.done
+        ? 100
+        : 0;
+    const isDone = isNumeric ? rawVal >= targetVal || h.done : h.done;
+    const stepVal =
+      h.step ?? (targetVal >= 500 ? 250 : targetVal >= 60 ? 30 : targetVal >= 10 ? 5 : 1);
+    const unitLabel = h.unit ? ` ${h.unit}` : "";
 
-  const handleRowClick = (e: React.MouseEvent) => {
-    // If it's boolean, tapping row checks it off. If numeric, expands it.
-    if (!isNumeric) {
-      onToggle();
-    } else {
-      setIsExpanded(!isExpanded);
-    }
-  };
+    const [isExpanded, setIsExpanded] = useState(false);
 
-  return (
-    <div
-      className={`group relative rounded-2xl transition-all duration-300 ${
-        isExpanded ? "bg-white/5 shadow-md border-[color:var(--hairline-strong)] pb-2" : "bg-transparent hover:bg-[color:var(--canvas-softer)]"
-      } ${isDone && !isExpanded ? "opacity-70" : ""} ${justDone ? "animate-sync-pulse" : ""}`}
-    >
-      {/* Top Row (Compact View) */}
+    const handleRowClick = (e: React.MouseEvent) => {
+      // If it's boolean, tapping row checks it off. If numeric, expands it.
+      if (!isNumeric) {
+        onToggle();
+      } else {
+        setIsExpanded(!isExpanded);
+      }
+    };
+
+    return (
       <div
-        onClick={handleRowClick}
-        className="relative flex cursor-pointer items-center gap-3 liquid-glass p-3 rounded-2xl"
+        className={`virtualized-row group relative rounded-2xl transition-all duration-300 ${
+          isExpanded
+            ? "bg-white/5 shadow-md border-[color:var(--hairline-strong)] pb-2"
+            : "bg-transparent hover:bg-[color:var(--canvas-softer)]"
+        } ${isDone && !isExpanded ? "opacity-70" : ""} ${justDone ? "animate-sync-pulse" : ""}`}
       >
-        {isNumeric ? (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              // For numeric, tapping the left icon still just expands it (or maybe increments?)
-              // Let's have it expand for consistency, or increment if we want fast logging.
-              // Fast logging is better:
-              if (isDone) {
-                onSetValue?.(0);
-              } else {
-                onSetValue?.(Math.min(targetVal, rawVal + stepVal));
-              }
-            }}
-            className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border transition ${
-              isDone ? "border-emerald-500 bg-emerald-500/20 text-emerald-400" : "border-[color:var(--hairline-strong)] text-ink hover:border-ink hover:bg-ink/5"
-            }`}
-          >
-            {isDone ? <Check className="h-3.5 w-3.5 animate-scale-in" strokeWidth={3} /> : <Droplets className="h-3 w-3" />}
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onToggle();
-            }}
-            className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border transition ${
-              h.done ? "border-ink bg-ink text-on-ink" : "border-[color:var(--hairline-strong)] hover:border-ink hover:bg-ink/5"
-            }`}
-            aria-label={h.done ? `Undo ${h.name}` : `Mark ${h.name} done`}
-          >
-            {h.done && <Check className="h-3.5 w-3.5 animate-scale-in" strokeWidth={3} />}
-          </button>
-        )}
-
-        <div className="min-w-0 flex-1">
-          <p className={`truncate text-[13px] font-semibold leading-tight ${isDone && !isNumeric ? "line-through text-mute" : "text-ink"}`}>
-            {h.name}
-          </p>
-          <div className="mt-1 flex items-center gap-1.5">
-            <span className={`rounded-full px-1.5 py-px text-[9px] font-bold ${catClass(h.category)}`}>
-              {h.category}
-            </span>
-            {h.streak > 0 && (
-              <span className="flex items-center gap-0.5 rounded-full bg-amber-500/15 border border-amber-500/25 px-1.5 py-0.5 text-[8px] font-bold text-amber-400">
-                <Flame className="h-2 w-2 fill-amber-400" />
-                {h.streak}d
-              </span>
-            )}
-            {isNumeric && (
-              <span className="text-[9px] font-medium text-mute tabular-nums ml-1">
-                {rawVal}/{targetVal}{unitLabel}
-              </span>
-            )}
-          </div>
-        </div>
-        
-        <div className="flex shrink-0 items-center gap-0.5">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onPin();
-            }}
-            className={`grid h-7 w-7 place-items-center rounded-lg transition ${h.pinned ? "text-ink bg-ink/10" : "text-mute hover:text-ink hover:bg-[color:var(--canvas-soft)]"
-              }`}
-            aria-label="Pin to wallpaper"
-          >
-            <Pin className="h-3.5 w-3.5" fill={h.pinned ? "currentColor" : "none"} />
-          </button>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              onMenuToggle();
-            }}
-            className="grid h-7 w-7 place-items-center rounded-lg text-mute hover:text-ink hover:bg-[color:var(--canvas-soft)]"
-            aria-label="More"
-          >
-            <MoreVertical className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
-
-      {/* Expanded Area (For Numeric) */}
-      {isNumeric && (
-        <div 
-          className={`overflow-hidden transition-all duration-300 ease-out px-3 ${isExpanded ? "max-h-32 opacity-100" : "max-h-0 opacity-0"}`}
+        {/* Top Row (Compact View) */}
+        <div
+          onClick={handleRowClick}
+          className="relative flex cursor-pointer items-center gap-3 liquid-glass p-3 rounded-2xl"
         >
-          {/* Progress Bar */}
-          <div className="relative w-full h-1.5 rounded-full bg-[color:var(--hairline-strong)] overflow-hidden my-2.5">
-            <div
-              className={`absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out ${
-                isDone
-                  ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
-                  : "bg-ink shadow-[0_0_6px_color-mix(in_srgb,var(--ink)_30%,transparent)]"
-              }`}
-              style={{ width: `${pct}%` }}
-            />
-          </div>
-          
-          {/* Stepper Controls */}
-          <div className="flex items-center justify-between gap-1.5 pt-1 pb-1">
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={rawVal <= 0}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  try { navigator.vibrate?.(10); } catch {}
-                  onSetValue?.(Math.max(0, rawVal - stepVal));
-                }}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none shadow-sm bg-[color:var(--canvas-soft)] border-[color:var(--hairline)] hover:bg-[color:var(--canvas-softer)] text-mute hover:text-ink"
-              >
-                <Minus className="h-3 w-3" />
-                <span>{stepVal}</span>
-              </button>
-
-              <button
-                type="button"
-                disabled={isDone}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  try { navigator.vibrate?.(15); } catch {}
-                  onSetValue?.(Math.min(targetVal, rawVal + stepVal));
-                }}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all active:scale-95 disabled:opacity-40 shadow-sm border-transparent"
-                style={{
-                  background: "color-mix(in srgb, var(--ink) 12%, transparent)",
-                  color: "var(--ink)",
-                }}
-              >
-                <Plus className="h-3 w-3" strokeWidth={2.5} />
-                <span>{stepVal}</span>
-              </button>
-            </div>
-
+          {isNumeric ? (
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                try { navigator.vibrate?.(20); } catch {}
+                // For numeric, tapping the left icon still just expands it (or maybe increments?)
+                // Let's have it expand for consistency, or increment if we want fast logging.
+                // Fast logging is better:
                 if (isDone) {
                   onSetValue?.(0);
                 } else {
-                  onSetValue?.(targetVal);
-                  setIsExpanded(false); // auto-collapse when filled
+                  onSetValue?.(Math.min(targetVal, rawVal + stepVal));
                 }
               }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all active:scale-95 shadow-sm border ${
+              className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border transition ${
                 isDone
-                  ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
-                  : "bg-ink text-on-ink border-transparent"
+                  ? "border-emerald-500 bg-emerald-500/20 text-emerald-400"
+                  : "border-[color:var(--hairline-strong)] text-ink hover:border-ink hover:bg-ink/5"
               }`}
             >
               {isDone ? (
-                <>
-                  <Check className="h-3 w-3 stroke-[2.5]" />
-                  <span>Done</span>
-                </>
+                <Check className="h-3.5 w-3.5 animate-scale-in" strokeWidth={3} />
               ) : (
-                <span>Fill Max</span>
+                <Droplets className="h-3 w-3" />
               )}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Options Menu */}
-      {menuOpen && (
-        <div className="absolute right-1 top-10 z-20 w-32 overflow-hidden rounded-xl border shadow-xl animate-fade-in p-1 backdrop-blur-2xl liquid-glass specular border-[color:var(--hairline-strong)]">
-          <button
-            onClick={(e) => { e.stopPropagation(); onEdit(); onMenuClose(); }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-ink hover:bg-canvas-soft rounded-lg"
-          >
-            <Settings className="h-3.5 w-3.5" /> Edit
-          </button>
-          {h.pinned ? (
-            <button
-              onClick={(e) => { e.stopPropagation(); onPin(); onMenuClose(); }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-ink hover:bg-canvas-soft rounded-lg"
-            >
-              <Pin className="h-3.5 w-3.5" /> Unpin
             </button>
           ) : (
             <button
-              onClick={(e) => { e.stopPropagation(); onPin(); onMenuClose(); }}
-              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-ink hover:bg-canvas-soft rounded-lg"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggle();
+              }}
+              className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border transition ${
+                h.done
+                  ? "border-ink bg-ink text-on-ink"
+                  : "border-[color:var(--hairline-strong)] hover:border-ink hover:bg-ink/5"
+              }`}
+              aria-label={h.done ? `Undo ${h.name}` : `Mark ${h.name} done`}
             >
-              <Pin className="h-3.5 w-3.5" fill="currentColor" /> Pin
+              {h.done && <Check className="h-3.5 w-3.5 animate-scale-in" strokeWidth={3} />}
             </button>
           )}
-          <button
-            onClick={(e) => { e.stopPropagation(); onRest(); onMenuClose(); }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-ink hover:bg-canvas-soft rounded-lg"
-          >
-            <Shield className="h-3.5 w-3.5" /> Rest Day
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onMove(); onMenuClose(); }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-ink hover:bg-canvas-soft rounded-lg"
-          >
-            <Sparkles className="h-3.5 w-3.5" /> Move
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(); onMenuClose(); }}
-            className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-red-500 hover:bg-canvas-soft rounded-lg"
-          >
-            <Trash2 className="h-3.5 w-3.5" /> Delete
-          </button>
+
+          <div className="min-w-0 flex-1">
+            <p
+              className={`truncate text-[13px] font-semibold leading-tight ${isDone && !isNumeric ? "line-through text-mute" : "text-ink"}`}
+            >
+              {h.name}
+            </p>
+            <div className="mt-1 flex items-center gap-1.5">
+              <span
+                className={`rounded-full px-1.5 py-px text-[9px] font-bold ${catClass(h.category)}`}
+              >
+                {h.category}
+              </span>
+              {h.streak > 0 && (
+                <span className="flex items-center gap-0.5 rounded-full bg-amber-500/15 border border-amber-500/25 px-1.5 py-0.5 text-[8px] font-bold text-amber-400">
+                  <Flame className="h-2 w-2 fill-amber-400" />
+                  {h.streak}d
+                </span>
+              )}
+              {isNumeric && (
+                <span className="text-[9px] font-medium text-mute tabular-nums ml-1">
+                  {rawVal}/{targetVal}
+                  {unitLabel}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-0.5">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onPin();
+              }}
+              className={`grid h-7 w-7 place-items-center rounded-lg transition ${
+                h.pinned
+                  ? "text-ink bg-ink/10"
+                  : "text-mute hover:text-ink hover:bg-[color:var(--canvas-soft)]"
+              }`}
+              aria-label="Pin to wallpaper"
+            >
+              <Pin className="h-3.5 w-3.5" fill={h.pinned ? "currentColor" : "none"} />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onMenuToggle();
+              }}
+              className="grid h-7 w-7 place-items-center rounded-lg text-mute hover:text-ink hover:bg-[color:var(--canvas-soft)]"
+              aria-label="More"
+            >
+              <MoreVertical className="h-4 w-4" />
+            </button>
+          </div>
         </div>
-      )}
-    </div>
-  );
-}, (prev, next) => {
-  return (
-    prev.habit === next.habit &&
-    prev.justDone === next.justDone &&
-    prev.menuOpen === next.menuOpen &&
-    prev.onSetValue === next.onSetValue
-  );
-});
+
+        {/* Expanded Area (For Numeric) */}
+        {isNumeric && (
+          <div
+            className={`overflow-hidden transition-all duration-300 ease-out px-3 ${isExpanded ? "max-h-32 opacity-100" : "max-h-0 opacity-0"}`}
+          >
+            {/* Progress Bar */}
+            <div className="relative w-full h-1.5 rounded-full bg-[color:var(--hairline-strong)] overflow-hidden my-2.5">
+              <div
+                className={`absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out ${
+                  isDone
+                    ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"
+                    : "bg-ink shadow-[0_0_6px_color-mix(in_srgb,var(--ink)_30%,transparent)]"
+                }`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+
+            {/* Stepper Controls */}
+            <div className="flex items-center justify-between gap-1.5 pt-1 pb-1">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={rawVal <= 0}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    try {
+                      navigator.vibrate?.(10);
+                    } catch {}
+                    onSetValue?.(Math.max(0, rawVal - stepVal));
+                  }}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none shadow-sm bg-[color:var(--canvas-soft)] border-[color:var(--hairline)] hover:bg-[color:var(--canvas-softer)] text-mute hover:text-ink"
+                >
+                  <Minus className="h-3 w-3" />
+                  <span>{stepVal}</span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={isDone}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    try {
+                      navigator.vibrate?.(15);
+                    } catch {}
+                    onSetValue?.(Math.min(targetVal, rawVal + stepVal));
+                  }}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-[11px] font-bold border transition-all active:scale-95 disabled:opacity-40 shadow-sm border-transparent"
+                  style={{
+                    background: "color-mix(in srgb, var(--ink) 12%, transparent)",
+                    color: "var(--ink)",
+                  }}
+                >
+                  <Plus className="h-3 w-3" strokeWidth={2.5} />
+                  <span>{stepVal}</span>
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  try {
+                    navigator.vibrate?.(20);
+                  } catch {}
+                  if (isDone) {
+                    onSetValue?.(0);
+                  } else {
+                    onSetValue?.(targetVal);
+                    setIsExpanded(false); // auto-collapse when filled
+                  }
+                }}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all active:scale-95 shadow-sm border ${
+                  isDone
+                    ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
+                    : "bg-ink text-on-ink border-transparent"
+                }`}
+              >
+                {isDone ? (
+                  <>
+                    <Check className="h-3 w-3 stroke-[2.5]" />
+                    <span>Done</span>
+                  </>
+                ) : (
+                  <span>Fill Max</span>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Options Menu */}
+        <DropdownMotion open={menuOpen} className="absolute right-1 top-10 z-20 w-32 overflow-hidden rounded-xl p-1 shadow-xl liquid-glass sheet-glass specular">
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+                onMenuClose();
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-ink hover:bg-canvas-soft rounded-lg"
+            >
+              <Settings className="h-3.5 w-3.5" /> Edit
+            </button>
+            {h.pinned ? (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPin();
+                  onMenuClose();
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-ink hover:bg-canvas-soft rounded-lg"
+              >
+                <Pin className="h-3.5 w-3.5" /> Unpin
+              </button>
+            ) : (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPin();
+                  onMenuClose();
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-ink hover:bg-canvas-soft rounded-lg"
+              >
+                <Pin className="h-3.5 w-3.5" fill="currentColor" /> Pin
+              </button>
+            )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onRest();
+                onMenuClose();
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-ink hover:bg-canvas-soft rounded-lg"
+            >
+              <Shield className="h-3.5 w-3.5" /> Rest Day
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onMove();
+                onMenuClose();
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-ink hover:bg-canvas-soft rounded-lg"
+            >
+              <Sparkles className="h-3.5 w-3.5" /> Move
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+                onMenuClose();
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-red-500 hover:bg-canvas-soft rounded-lg"
+            >
+              <Trash2 className="h-3.5 w-3.5" /> Delete
+            </button>
+        </DropdownMotion>
+      </div>
+    );
+  },
+  (prev, next) => {
+    return (
+      prev.habit === next.habit &&
+      prev.justDone === next.justDone &&
+      prev.menuOpen === next.menuOpen &&
+      prev.onSetValue === next.onSetValue
+    );
+  },
+);
 
 // ---------------- Profile Edit Sheet ----------------
 function ProfileEditSheet({
@@ -4654,15 +5805,17 @@ function ProfileEditSheet({
   const [initials, setInitials] = useState(profile.initials);
   const [initialsTouched, setInitialsTouched] = useState(false);
 
-  const derivedInitials = (name || "U")
-    .split(/\s+/)
-    .map((w) => w[0])
-    .filter(Boolean)
-    .slice(0, 2)
-    .join("")
-    .toUpperCase() || "U";
+  const derivedInitials =
+    (name || "U")
+      .split(/\s+/)
+      .map((w) => w[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "U";
 
-  const effectiveInitials = (initialsTouched ? initials : derivedInitials).slice(0, 2).toUpperCase() || "U";
+  const effectiveInitials =
+    (initialsTouched ? initials : derivedInitials).slice(0, 2).toUpperCase() || "U";
 
   return (
     <SheetShell onClose={onClose} title="Edit profile" subtitle="Update how you show up in the app">
@@ -4672,7 +5825,9 @@ function ProfileEditSheet({
             {effectiveInitials}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate font-display text-sm font-bold text-ink">{name || "Your name"}</p>
+            <p className="truncate font-display text-sm font-bold text-ink">
+              {name || "Your name"}
+            </p>
             <p className="truncate text-[11px] text-body">{tagline || "Your tagline"}</p>
           </div>
         </div>
@@ -4754,9 +5909,11 @@ function EditHabitSheet({
   const [category, setCategory] = useState(habit.category);
   const [q, setQ] = useState<Quadrant>(quadrant);
   const [time, setTime] = useState<Habit["time"] | undefined>(habit.time);
-  const [isNumeric, setIsNumeric] = useState(habit.target !== undefined);
+  const [isNumeric, setIsNumeric] = useState(habit.type === "numeric");
   const [target, setTarget] = useState<number>(habit.target ?? 1);
   const [unit, setUnit] = useState<string>(habit.unit ?? "");
+  const [frequency, setFrequency] = useState<Habit["frequency"]>(habit.frequency);
+  const [customDays, setCustomDays] = useState<number[]>(habit.customDays ?? []);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const CATS = ["Mind", "Health", "Growth", "Focus", "Fitness", "Admin"];
@@ -4787,8 +5944,9 @@ function EditHabitSheet({
                   <button
                     key={c}
                     onClick={() => setCategory(c)}
-                    className={`pill px-3 py-1.5 text-[11px] font-medium transition ${active ? "bg-ink text-on-ink" : "bg-canvas-soft text-ink"
-                      }`}
+                    className={`pill px-3 py-1.5 text-[11px] font-medium transition ${
+                      active ? "bg-ink text-on-ink" : "bg-canvas-soft text-ink"
+                    }`}
                   >
                     {c}
                   </button>
@@ -4805,8 +5963,9 @@ function EditHabitSheet({
                   <button
                     key={qq}
                     onClick={() => setQ(qq)}
-                    className={`pill px-3 py-2.5 text-left text-xs font-medium transition ${active ? "bg-ink text-on-ink" : "bg-canvas-soft text-ink"
-                      }`}
+                    className={`pill px-3 py-2.5 text-left text-xs font-medium transition ${
+                      active ? "bg-ink text-on-ink" : "bg-canvas-soft text-ink"
+                    }`}
                   >
                     {QUADRANTS[qq].title}
                   </button>
@@ -4823,14 +5982,52 @@ function EditHabitSheet({
                   <button
                     key={t.key}
                     onClick={() => setTime(t.key === "any" ? undefined : (t.key as Habit["time"]))}
-                    className={`pill px-3 py-1.5 text-[11px] font-medium transition ${active ? "bg-ink text-on-ink" : "bg-canvas-soft text-ink"
-                      }`}
+                    className={`pill px-3 py-1.5 text-[11px] font-medium transition ${
+                      active ? "bg-ink text-on-ink" : "bg-canvas-soft text-ink"
+                    }`}
                   >
                     {t.label}
                   </button>
                 );
               })}
             </div>
+          </Field>
+
+          <Field label="Frequency">
+            <div className="grid grid-cols-3 gap-2">
+              {(["daily", "weekdays", "custom"] as const).map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  onClick={() => setFrequency(option)}
+                  className={`pill px-3 py-2 text-xs font-medium capitalize ${frequency === option ? "bg-ink text-on-ink" : "bg-canvas-soft text-ink"}`}
+                >
+                  {option === "daily" ? "Daily" : option === "weekdays" ? "Weekdays" : "Custom"}
+                </button>
+              ))}
+            </div>
+            {frequency === "custom" && (
+              <div className="mt-2 grid grid-cols-7 gap-1.5">
+                {["M", "T", "W", "T", "F", "S", "S"].map((day, index) => {
+                  const active = customDays.includes(index);
+                  return (
+                    <button
+                      key={`${day}-${index}`}
+                      type="button"
+                      onClick={() =>
+                        setCustomDays((days) =>
+                          active ? days.filter((value) => value !== index) : [...days, index],
+                        )
+                      }
+                      className={`h-8 rounded-full text-[11px] font-bold ${active ? "bg-ink text-on-ink" : "bg-canvas-soft text-mute"}`}
+                      aria-pressed={active}
+                    >
+                      {day}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </Field>
 
           <Field label="Type">
@@ -4888,6 +6085,9 @@ function EditHabitSheet({
                   name: name.trim() || habit.name,
                   category,
                   time,
+                  type: isNumeric ? "numeric" : "binary",
+                  frequency,
+                  customDays: frequency === "custom" ? customDays : [],
                 };
                 if (isNumeric) {
                   patch.target = target;

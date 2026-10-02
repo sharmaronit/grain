@@ -25,6 +25,18 @@ import {
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { db } from "./firebase";
+import { runTrackedWrite } from "./sync-status";
+import {
+  addLocalGoal,
+  addLocalHabit,
+  deleteLocalGoal,
+  deleteLocalHabits,
+  readLocalData,
+  restoreLocalHabit,
+  setLocalCompletion,
+  updateLocalHabit,
+  updateLocalProfile,
+} from "./local-data";
 import type { CompletionEntry } from "./streaks";
 
 // ── Types ────────────────────────────────────────────────
@@ -94,19 +106,15 @@ export interface GoalDoc {
 export async function getUserProfile(
   userId: string,
 ): Promise<UserProfile | null> {
-  const snap = await getDoc(doc(db(), "users", userId));
-  if (!snap.exists()) return null;
-  return snap.data() as UserProfile;
+  const profile = readLocalData(userId).profile;
+  return Object.keys(profile).length > 0 ? profile as UserProfile : null;
 }
 
 export async function updateUserProfile(
   userId: string,
   data: Partial<UserProfile>,
 ): Promise<void> {
-  await updateDoc(doc(db(), "users", userId), {
-    ...data,
-    updatedAt: serverTimestamp(),
-  });
+  updateLocalProfile(userId, data);
 }
 
 // ── Habits ───────────────────────────────────────────────
@@ -136,12 +144,7 @@ function habitFromDoc(snap: QueryDocumentSnapshot<DocumentData>): HabitDoc {
 
 /** Get all habits for a user, ordered by `order` field. */
 export async function getHabits(userId: string): Promise<HabitDoc[]> {
-  const q = query(
-    collection(db(), "users", userId, "habits"),
-    orderBy("order", "asc"),
-  );
-  const snap = await getDocs(q);
-  return snap.docs.map(habitFromDoc);
+  return readLocalData(userId).habits.slice().sort((a, b) => a.order - b.order);
 }
 
 /** Add a new habit. Returns the auto-generated document ID. */
@@ -149,12 +152,7 @@ export async function addHabit(
   userId: string,
   habit: Omit<HabitDoc, "id" | "createdAt">,
 ): Promise<string> {
-  const ref = doc(collection(db(), "users", userId, "habits"));
-  setDoc(ref, {
-    ...habit,
-    createdAt: serverTimestamp(),
-  }).catch(console.error);
-  return ref.id;
+  return addLocalHabit(userId, habit);
 }
 
 /** Update specific fields on a habit document. */
@@ -163,13 +161,7 @@ export async function updateHabitDoc(
   habitId: string,
   patch: Partial<Omit<HabitDoc, "id" | "createdAt">>,
 ): Promise<void> {
-  const safePatch = { ...patch } as any;
-  for (const key in safePatch) {
-    if (safePatch[key] === undefined) {
-      safePatch[key] = deleteField();
-    }
-  }
-  await updateDoc(doc(db(), "users", userId, "habits", habitId), safePatch);
+  updateLocalHabit(userId, habitId, patch);
 }
 
 /** Delete a habit permanently. */
@@ -177,7 +169,7 @@ export async function deleteHabitDoc(
   userId: string,
   habitId: string,
 ): Promise<void> {
-  await deleteDoc(doc(db(), "users", userId, "habits", habitId));
+  deleteLocalHabits(userId, [habitId]);
 }
 
 /** Delete multiple habits permanently in an atomic batch. */
@@ -186,11 +178,7 @@ export async function deleteHabitDocs(
   habitIds: string[],
 ): Promise<void> {
   if (!userId || habitIds.length === 0) return;
-  const batch = writeBatch(db());
-  for (const habitId of habitIds) {
-    batch.delete(doc(db(), "users", userId, "habits", habitId));
-  }
-  await batch.commit();
+  deleteLocalHabits(userId, habitIds);
 }
 
 // ── Goals ────────────────────────────────────────────────
@@ -211,33 +199,14 @@ export async function addGoal(
   userId: string,
   goal: Omit<GoalDoc, "id" | "createdAt">,
 ): Promise<string> {
-  console.log("[addGoal] starting...", { userId, goal });
-  const ref = doc(collection(db(), "users", userId, "goals"));
-  try {
-    const data = {
-      ...goal,
-      createdAt: new Date(),
-    };
-    console.log("[addGoal] triggering setDoc with:", data);
-    // Fire and forget so we don't block the UI waiting for server acknowledgment
-    setDoc(ref, data).then(() => {
-      console.log("[addGoal] setDoc resolved asynchronously for:", ref.id);
-    }).catch((e) => {
-      console.error("[addGoal] Async setDoc failed:", e);
-    });
-    console.log("[addGoal] returning ref.id synchronously:", ref.id);
-    return ref.id;
-  } catch (e) {
-    console.error("[addGoal] Sync setDoc failed:", e);
-    throw e;
-  }
+  return addLocalGoal(userId, goal);
 }
 
 export async function deleteGoal(
   userId: string,
   goalId: string,
 ): Promise<void> {
-  await deleteDoc(doc(db(), "users", userId, "goals", goalId));
+  deleteLocalGoal(userId, goalId);
 }
 
 // ── Completions ──────────────────────────────────────────
@@ -247,15 +216,8 @@ export async function getCompletions(
   userId: string,
   dateKey: string,
 ): Promise<CompletionDoc | null> {
-  const snap = await getDoc(
-    doc(db(), "users", userId, "completions", dateKey),
-  );
-  if (!snap.exists()) return null;
-  const data = snap.data();
-  return {
-    date: dateKey,
-    entries: (data.entries as Record<string, CompletionEntry>) ?? {},
-  };
+  const entries = readLocalData(userId).completions[dateKey];
+  return entries ? { date: dateKey, entries } : null;
 }
 
 /** Upsert (merge) a single habit's completion entry for a given date. */
@@ -269,15 +231,7 @@ export async function setCompletionEntry(
     Object.entries(entry).filter(([_, v]) => v !== undefined)
   );
 
-  const ref = doc(db(), "users", userId, "completions", dateKey);
-  await setDoc(
-    ref,
-    {
-      date: dateKey,
-      entries: { [habitId]: cleanEntry },
-    },
-    { merge: true },
-  );
+  setLocalCompletion(userId, dateKey, habitId, cleanEntry);
 }
 
 /**
@@ -289,19 +243,9 @@ export async function getCompletionsRange(
   startKey: string,
   endKey: string,
 ): Promise<Record<string, Record<string, CompletionEntry>>> {
-  const q = query(
-    collection(db(), "users", userId, "completions"),
-    where("date", ">=", startKey),
-    where("date", "<=", endKey),
-    orderBy("date", "asc"),
+  return Object.fromEntries(
+    Object.entries(readLocalData(userId).completions).filter(([key]) => key >= startKey && key <= endKey),
   );
-  const snap = await getDocs(q);
-  const map: Record<string, Record<string, CompletionEntry>> = {};
-  for (const d of snap.docs) {
-    const data = d.data();
-    map[d.id] = (data.entries as Record<string, CompletionEntry>) ?? {};
-  }
-  return map;
 }
 
 /**
@@ -312,11 +256,7 @@ export async function restoreHabit(
   userId: string,
   habit: HabitDoc,
 ): Promise<void> {
-  const { id, createdAt, ...rest } = habit;
-  await setDoc(doc(db(), "users", userId, "habits", id), {
-    ...rest,
-    createdAt: createdAt,
-  });
+  restoreLocalHabit(userId, habit);
 }
 
 export interface FeedbackDoc {

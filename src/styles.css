@@ -3,8 +3,8 @@
 @import "tw-animate-css";
 
 @theme inline {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-display: "Space Grotesk", system-ui, sans-serif;
   --radius-md: 8px;
   --radius-lg: 12px;
   --radius-xl: 16px;
@@ -40,8 +40,8 @@
   --surface-pressed: #27272a;
   --ink: #ffffff;
   --on-ink: #000000;
-  --body: #a1a1aa;
-  --mute: #71717a;
+  --body: #b6b6c0;
+  --mute: #92929d;
   --hairline-mid: #3f3f46;
   --hairline: #27272a;
   --primary: #ffffff;
@@ -49,6 +49,14 @@
   --backdrop: #09090b;
   --accent: #ffffff;
   --accent-soft: rgba(255, 255, 255, 0.12);
+  --glass-surface: color-mix(in srgb, var(--canvas) 42%, transparent);
+  --glass-surface-strong: color-mix(in srgb, var(--canvas) 62%, transparent);
+  --glass-border: color-mix(in srgb, var(--ink) 24%, transparent);
+  --glass-highlight: color-mix(in srgb, var(--ink) 12%, transparent);
+  --glass-shadow: color-mix(in srgb, var(--canvas) 46%, transparent);
+  --glass-blur: 20px;
+  --control-height: 44px;
+  --screen-gutter: 16px;
 }
 
 /* AMOLED Black (Pure #000000 Pitch Dark - 120 FPS High Performance) */
@@ -59,8 +67,8 @@
   --surface-pressed: #222225;
   --ink: #ffffff;
   --on-ink: #000000;
-  --body: #a1a1aa;
-  --mute: #71717a;
+  --body: #b6b6c0;
+  --mute: #92929d;
   --hairline-mid: #2f2f35;
   --hairline: #1c1c20;
   --primary: #ffffff;
@@ -77,8 +85,8 @@
   --surface-pressed: #e4e4e7;
   --ink: #000000;
   --on-ink: #ffffff;
-  --body: #52525b;
-  --mute: #a1a1aa;
+  --body: #27272a;
+  --mute: #52525b;
   --hairline-mid: #d4d4d8;
   --hairline: #e4e4e7;
   --primary: #000000;
@@ -89,7 +97,6 @@
 }
 
 @layer base {
-
   html,
   body,
   #root {
@@ -112,19 +119,23 @@
 
   /* Smooth crossfade only for explicitly styled elements */
   [class*="card-"],
-  [class*="chip-"],
-  .liquid-glass {
+  [class*="chip-"] {
     contain: layout paint;
   }
 
   button,
   a,
   [role="button"] {
-    transition: transform 120ms ease, opacity 150ms ease;
+    transition:
+      transform 120ms ease,
+      opacity 150ms ease;
+  }
+
+  p {
+    line-height: 1.45;
   }
 
   @media (prefers-reduced-motion: reduce) {
-
     html,
     body,
     *,
@@ -136,17 +147,68 @@
   }
 }
 
+/* Auth surface: quiet liquid glass with a clear, focused form hierarchy. */
+.auth-shell {
+  background:
+    radial-gradient(circle at 12% 8%, color-mix(in srgb, var(--ink) 10%, transparent), transparent 34%),
+    var(--backdrop);
+}
+
+.auth-shell__surface {
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--canvas) 74%, transparent), transparent 48%),
+    color-mix(in srgb, var(--canvas) 92%, transparent);
+  isolation: isolate;
+}
+
+.auth-content {
+  width: min(100%, 440px);
+  margin-inline: auto;
+}
+
+.auth-brand > div:first-child {
+  border-color: color-mix(in srgb, var(--ink) 28%, transparent);
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 22%, transparent), 0 12px 30px color-mix(in srgb, var(--canvas) 45%, transparent);
+}
+
+.auth-input,
+.auth-glass-button {
+  border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  color: var(--ink);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 10%, transparent), 0 10px 26px color-mix(in srgb, var(--canvas) 28%, transparent);
+  backdrop-filter: blur(22px) saturate(135%);
+  -webkit-backdrop-filter: blur(22px) saturate(135%);
+}
+
+.auth-input::placeholder { color: color-mix(in srgb, var(--body) 68%, transparent); }
+.auth-input:focus { border-color: color-mix(in srgb, var(--ink) 38%, transparent); background: color-mix(in srgb, var(--ink) 11%, transparent); }
+
+.auth-primary-button {
+  background: var(--ink);
+  color: var(--on-ink);
+  box-shadow: 0 12px 26px color-mix(in srgb, var(--ink) 20%, transparent);
+}
+.auth-primary-button:hover { filter: brightness(1.08); }
+
+[data-theme="light"] .auth-shell__surface {
+  background: linear-gradient(145deg, rgba(255,255,255,.82), rgba(241,245,249,.76));
+}
+
 /* Crossfade the ambient liquid glass layer on theme flip.
    Keep them on their own compositor layer so animation stays on the GPU. */
 [data-theme] .liquid-blob {
-  transition: background 320ms ease, background-color 320ms ease,
-    filter 320ms ease, opacity 320ms ease;
+  transition:
+    background 320ms ease,
+    background-color 320ms ease,
+    filter 320ms ease,
+    opacity 320ms ease;
   will-change: transform;
   transform: translateZ(0);
   backface-visibility: hidden;
   contain: layout paint style;
 }
-
 
 @utility font-display {
   font-family: var(--font-display);
@@ -158,31 +220,27 @@
 }
 
 @utility card-uber {
-  background: color-mix(in srgb, var(--canvas) 60%, transparent);
-  backdrop-filter: blur(36px) saturate(150%);
-  -webkit-backdrop-filter: blur(36px) saturate(150%);
+  background: color-mix(in srgb, var(--canvas) 28%, transparent);
+  backdrop-filter: blur(18px) saturate(130%);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
   color: var(--ink);
   border-radius: var(--radius-xl);
-  border: 1px solid color-mix(in srgb, var(--accent) 15%, transparent) !important;
-  box-shadow: inset 0 1px 1px color-mix(in srgb, var(--accent) 25%, transparent), 0 8px 32px rgba(0, 0, 0, 0.4);
+  border: 0.5px solid color-mix(in srgb, var(--ink) 34%, transparent) !important;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 8%, transparent);
   position: relative;
   overflow: hidden;
-  contain: layout paint;
-  transform: translateZ(0);
 }
 
 @utility card-soft {
-  background: color-mix(in srgb, var(--canvas) 75%, transparent);
-  backdrop-filter: blur(24px) saturate(140%);
-  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  background: color-mix(in srgb, var(--canvas) 18%, transparent);
+  backdrop-filter: blur(16px) saturate(125%);
+  -webkit-backdrop-filter: blur(16px) saturate(125%);
   color: var(--ink);
   border-radius: var(--radius-xl);
-  border: 1px solid color-mix(in srgb, var(--accent) 8%, transparent) !important;
-  box-shadow: inset 0 1px 1px color-mix(in srgb, var(--accent) 15%, transparent), 0 4px 12px rgba(0, 0, 0, 0.2);
+  border: 0.5px solid color-mix(in srgb, var(--ink) 30%, transparent) !important;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 8%, transparent);
   position: relative;
   overflow: hidden;
-  contain: layout paint;
-  transform: translateZ(0);
 }
 
 @utility card-invert {
@@ -196,29 +254,13 @@
 
 @utility liquid-glass {
   position: relative;
-  background: color-mix(in srgb, var(--canvas) 50%, transparent);
-  backdrop-filter: blur(32px) saturate(150%);
-  -webkit-backdrop-filter: blur(32px) saturate(150%);
-  border: 1px solid color-mix(in srgb, var(--accent) 10%, transparent) !important;
-  box-shadow: inset 0 1px 1px color-mix(in srgb, var(--accent) 20%, transparent), 0 8px 32px rgba(0, 0, 0, 0.3);
+  background: color-mix(in srgb, var(--canvas) 36%, transparent);
+  backdrop-filter: blur(18px) saturate(125%);
+  -webkit-backdrop-filter: blur(18px) saturate(125%);
+  border: 0.5px solid color-mix(in srgb, var(--ink) 24%, transparent) !important;
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 10%, transparent);
   overflow: hidden;
-  contain: layout paint;
-  transform: translateZ(0);
 }
-
-/* Mobile & touch performance optimization: adjust blur radius for ultra-smooth 60fps scrolling */
-@media (pointer: coarse) {
-  .liquid-glass,
-  .card-uber {
-    backdrop-filter: blur(18px) saturate(135%);
-    -webkit-backdrop-filter: blur(18px) saturate(135%);
-  }
-  .card-soft {
-    backdrop-filter: blur(14px) saturate(130%);
-    -webkit-backdrop-filter: blur(14px) saturate(130%);
-  }
-}
-
 
 @utility specular {
   position: relative;
@@ -230,10 +272,12 @@
     content: "";
     position: absolute;
     inset: 0;
-    background: linear-gradient(115deg,
-        transparent 30%,
-        color-mix(in oklab, var(--ink) 18%, transparent) 48%,
-        transparent 66%);
+    background: linear-gradient(
+      115deg,
+      transparent 30%,
+      color-mix(in oklab, var(--ink) 18%, transparent) 48%,
+      transparent 66%
+    );
     transform: translateX(-120%);
     transition: transform 0.9s ease;
     pointer-events: none;
@@ -244,17 +288,25 @@
   }
 }
 
-
 @utility btn-primary-uber {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--primary) 100%, white 10%) 0%, var(--primary) 100%);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--primary) 100%, white 10%) 0%,
+    var(--primary) 100%
+  );
   color: var(--on-primary);
   border-radius: var(--radius-pill);
   font-weight: 500;
   position: relative;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--primary) 80%, black 20%);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2), 0 2px 4px rgba(0, 0, 0, 0.06);
-  transition: transform 0.12s ease, filter 0.2s ease, box-shadow 0.2s ease;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    0 2px 4px rgba(0, 0, 0, 0.06);
+  transition:
+    transform 0.12s ease,
+    filter 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 @utility btn-primary-uber {
@@ -298,7 +350,6 @@
   border: 1px solid var(--hairline);
 }
 
-
 @keyframes pop-badge {
   0% {
     transform: scale(1);
@@ -326,10 +377,9 @@
 }
 
 @keyframes sync-pulse {
-
   0%,
   100% {
-    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.0);
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
   }
 
   50% {
@@ -427,10 +477,12 @@
     content: "";
     position: absolute;
     inset: 0;
-    background: linear-gradient(115deg,
-        transparent 30%,
-        color-mix(in oklab, var(--ink) 12%, transparent) 50%,
-        transparent 70%);
+    background: linear-gradient(
+      115deg,
+      transparent 30%,
+      color-mix(in oklab, var(--ink) 12%, transparent) 50%,
+      transparent 70%
+    );
     animation: liquid-shimmer 6s ease-in-out infinite;
     pointer-events: none;
   }
@@ -482,10 +534,12 @@
   height: 12px;
   border-radius: 999px;
   pointer-events: none;
-  background: radial-gradient(circle,
-      color-mix(in oklab, var(--on-ink) 55%, transparent) 0%,
-      color-mix(in oklab, var(--on-ink) 20%, transparent) 45%,
-      transparent 70%);
+  background: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--on-ink) 55%, transparent) 0%,
+    color-mix(in oklab, var(--on-ink) 20%, transparent) 45%,
+    transparent 70%
+  );
   mix-blend-mode: overlay;
   transform: translate(-50%, -50%) scale(0);
   animation: lg-ripple 620ms cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
@@ -494,15 +548,16 @@
 
 /* On dark (inverted) surfaces the ripple should read as light */
 .card-invert .lg-ripple {
-  background: radial-gradient(circle,
-      rgba(255, 255, 255, 0.55) 0%,
-      rgba(255, 255, 255, 0.22) 45%,
-      transparent 70%);
+  background: radial-gradient(
+    circle,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(255, 255, 255, 0.22) 45%,
+    transparent 70%
+  );
   mix-blend-mode: screen;
 }
 
 @media (prefers-reduced-motion: reduce) {
-
   [class*="btn-"]:active,
   [class*="chip-"]:active,
   [data-lg-press]:active {
@@ -512,6 +567,92 @@
   .lg-ripple {
     animation-duration: 1ms;
   }
+
+  .grain-title-pill,
+  .grain-title-pill-copy,
+  .grain-title-pill-halo {
+    animation: none;
+    transition-duration: 1ms;
+  }
+}
+
+/* The top Grain pill doubles as lightweight feedback while changing dates.
+   Keep its surface calm, then move new copy in rather than snapping it. */
+.grain-title-pill {
+  overflow: hidden;
+  will-change: max-width, max-height, opacity, transform;
+  transition:
+    max-width 650ms cubic-bezier(0.22, 1, 0.36, 1),
+    max-height 520ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 320ms ease,
+    background-color 240ms ease,
+    border-color 240ms ease,
+    box-shadow 240ms ease,
+    color 180ms ease,
+    gap 520ms cubic-bezier(0.22, 1, 0.36, 1),
+    padding 520ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 650ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.grain-title-pill-copy {
+  animation: grain-pill-copy-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.grain-title-pill-halo {
+  animation: grain-pill-halo-in 380ms ease-out both;
+}
+
+/* Dropdowns scale from their trigger and remain mounted long enough to close gracefully. */
+.grain-dropdown-motion {
+  transform-origin: top right;
+  perspective: 700px;
+  will-change: opacity, transform, filter;
+}
+
+.grain-dropdown-motion--open {
+  animation: grain-dropdown-open 460ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.grain-dropdown-motion--closed {
+  animation: grain-dropdown-close 280ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+@keyframes grain-dropdown-open {
+  0% { opacity: 0; filter: blur(3px); transform: translateY(-13px) scale(0.86) rotateX(-10deg); }
+  62% { opacity: 1; filter: blur(0); transform: translateY(1px) scale(1.018) rotateX(1deg); }
+  100% { opacity: 1; filter: blur(0); transform: translateY(0) scale(1) rotateX(0); }
+}
+
+@keyframes grain-dropdown-close {
+  from { opacity: 1; filter: blur(0); transform: translateY(0) scale(1) rotateX(0); }
+  to { opacity: 0; filter: blur(2px); transform: translateY(-8px) scale(0.91) rotateX(-7deg); }
+}
+
+.grain-dropdown-motion--open > * {
+  animation: grain-dropdown-item-in 340ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.grain-dropdown-motion--open > :nth-child(1) { animation-delay: 55ms; }
+.grain-dropdown-motion--open > :nth-child(2) { animation-delay: 85ms; }
+.grain-dropdown-motion--open > :nth-child(3) { animation-delay: 115ms; }
+.grain-dropdown-motion--open > :nth-child(4) { animation-delay: 145ms; }
+.grain-dropdown-motion--open > :nth-child(5) { animation-delay: 175ms; }
+.grain-dropdown-motion--open > :nth-child(6) { animation-delay: 205ms; }
+.grain-dropdown-motion--open > :nth-child(7) { animation-delay: 235ms; }
+
+@keyframes grain-dropdown-item-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes grain-pill-copy-in {
+  from { opacity: 0; transform: translateY(3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes grain-pill-halo-in {
+  from { opacity: 0; transform: scale(0.72); }
+  to { opacity: 0.1; transform: scale(1); }
 }
 
 /* ============ Wallpaper theme scene transitions ============
@@ -523,14 +664,21 @@
    nodes per theme swap — descendants now opt in via
    `data-wp-tint` / `data-wp-cell`. */
 .wp-scene {
-  transition: background-color 260ms ease, color 260ms ease,
+  transition:
+    background-color 260ms ease,
+    color 260ms ease,
     border-color 260ms ease;
 }
 
 .wp-scene [data-wp-tint] {
-  transition: background-color 260ms ease, color 260ms ease,
-    border-color 260ms ease, fill 260ms ease, stroke 260ms ease,
-    -webkit-text-stroke-color 260ms ease, opacity 260ms ease;
+  transition:
+    background-color 260ms ease,
+    color 260ms ease,
+    border-color 260ms ease,
+    fill 260ms ease,
+    stroke 260ms ease,
+    -webkit-text-stroke-color 260ms ease,
+    opacity 260ms ease;
 }
 
 /* Heatmap cells crossfade in bulk; skip box-shadow/filter which
@@ -541,7 +689,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-
   .wp-scene,
   .wp-scene [data-wp-tint],
   .wp-scene [data-wp-cell] {
@@ -577,7 +724,6 @@
 
 /* ============ App-wide Smooth Animations & Profile Opening Effects ============ */
 @keyframes breathe {
-
   0%,
   100% {
     border-color: var(--hairline-mid);
@@ -784,10 +930,12 @@
 }
 .liquid-input {
   background: color-mix(in oklab, var(--ink) 5%, transparent) !important;
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border: 1px solid color-mix(in oklab, var(--ink) 15%, transparent);
-  box-shadow: inset 0 1px 1px color-mix(in oklab, var(--ink) 10%, transparent), 0 4px 16px rgba(0, 0, 0, 0.1);
+  box-shadow:
+    inset 0 1px 1px color-mix(in oklab, var(--ink) 10%, transparent),
+    0 4px 16px rgba(0, 0, 0, 0.1);
   transition: all 0.2s ease;
 }
 .liquid-input:hover {
@@ -795,7 +943,522 @@
   border-color: color-mix(in oklab, var(--ink) 30%, transparent);
 }
 
- @keyframes confetti-fall {
-  0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; }
-  100% { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+@keyframes confetti-fall {
+  0% {
+    transform: translateY(-10vh) rotate(0deg);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(110vh) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+.liquid-tabbar {
+  position: relative;
+  isolation: isolate;
+  border-radius: var(--radius-pill);
+  border: 0.5px solid color-mix(in srgb, var(--ink) 34%, transparent);
+  background: color-mix(in srgb, var(--canvas) 8%, transparent);
+  backdrop-filter: blur(20px) saturate(135%);
+  -webkit-backdrop-filter: blur(20px) saturate(135%);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+/* Reading surfaces stay denser than the floating cards. */
+.sheet-glass {
+  background: color-mix(in srgb, var(--canvas) 88%, transparent) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.liquid-control {
+  border: 0.5px solid var(--glass-border);
+  background: var(--glass-surface);
+  backdrop-filter: blur(var(--glass-blur)) saturate(125%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(125%);
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+
+/* Settings uses a restrained, token-driven glass layer in every app theme. */
+.settings-glass {
+  background: var(--glass-surface);
+  border: 0.5px solid var(--glass-border);
+  box-shadow:
+    inset 0 1px 0 var(--glass-highlight),
+    0 8px 22px var(--glass-shadow);
+  backdrop-filter: blur(var(--glass-blur)) saturate(125%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(125%);
+}
+
+.settings-control {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--canvas) 30%, transparent);
+  border: 0.5px solid color-mix(in srgb, var(--ink) 24%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 10%, transparent);
+  backdrop-filter: blur(18px) saturate(125%);
+  -webkit-backdrop-filter: blur(18px) saturate(125%);
+}
+
+[data-theme="amoled"] .settings-glass {
+  background: color-mix(in srgb, #080808 58%, transparent);
+  border-color: color-mix(in srgb, #ffffff 12%, transparent);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="light"] .settings-glass {
+  background: color-mix(in srgb, #ffffff 70%, transparent);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    0 10px 28px rgba(24, 24, 27, 0.08);
+}
+
+.liquid-deck-button {
+  border: 0.5px solid color-mix(in srgb, var(--ink) 34%, transparent);
+  background: color-mix(in srgb, var(--canvas) 8%, transparent);
+  backdrop-filter: blur(20px) saturate(135%);
+  -webkit-backdrop-filter: blur(20px) saturate(135%);
+}
+
+.liquid-tabbar-selection {
+  position: absolute;
+  z-index: 0;
+  top: 3px;
+  bottom: 3px;
+  border: 0.5px solid color-mix(in srgb, var(--ink) 22%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--ink) 20%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 12%, transparent);
+  transition:
+    left 580ms cubic-bezier(0.16, 1, 0.3, 1),
+    width 580ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 180ms ease;
+  pointer-events: none;
+  will-change: left, width, transform;
+}
+
+.liquid-tabbar-selection::before {
+  content: "";
+  position: absolute;
+  inset: 1px 14% auto;
+  height: 42%;
+  border-radius: inherit;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--ink) 10%, transparent), transparent);
+  filter: blur(6px);
+}
+
+.liquid-tabbar[data-pressing="true"] .liquid-tabbar-selection {
+  transform: scaleX(1.05) scaleY(0.97);
+}
+
+.liquid-tabbar-item,
+.liquid-tabbar-item-active {
+  position: relative;
+  z-index: 1;
+  min-height: 48px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.liquid-tabbar-item-active {
+  color: var(--ink);
+  text-shadow: 0 1px 8px color-mix(in srgb, var(--canvas) 52%, transparent);
+  transform: scale(1.05);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .liquid-tabbar-selection {
+    transition: none;
+  }
+}
+
+.deck-quadrant-tabs {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  min-height: 52px;
+  padding: 4px;
+  overflow: hidden;
+  border: 0.5px solid color-mix(in srgb, var(--ink) 28%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--canvas) 16%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 9%, transparent), 0 8px 24px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(22px) saturate(135%);
+  -webkit-backdrop-filter: blur(22px) saturate(135%);
+}
+
+/* Quiet depth behind the Deck cards. It adapts per theme without competing
+   with the habit content or introducing a full photographic background. */
+.deck-view {
+  background:
+    radial-gradient(circle at 18% 8%, color-mix(in srgb, var(--ink) 6%, transparent), transparent 42%),
+    var(--canvas);
+}
+
+[data-theme="light"] .deck-view {
+  background:
+    radial-gradient(circle at 18% 8%, rgba(148, 163, 184, 0.18), transparent 46%),
+    linear-gradient(180deg, #f8fafc 0%, #eef1f5 100%);
+}
+
+[data-theme="dark"] .deck-view {
+  background:
+    radial-gradient(circle at 18% 8%, rgba(255, 255, 255, 0.045), transparent 44%),
+    #09090b;
+}
+
+[data-theme="amoled"] .deck-view {
+  background: #000000;
+}
+
+.deck-quadrant-tabs::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(125deg, color-mix(in srgb, var(--ink) 8%, transparent), transparent 45%);
+  pointer-events: none;
+}
+
+.deck-quadrant-selection {
+  position: absolute;
+  z-index: 0;
+  top: 4px;
+  bottom: 4px;
+  left: 4px;
+  width: calc((100% - 8px) / 4);
+  border: 0.5px solid color-mix(in srgb, var(--ink) 26%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--canvas) 74%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 14%, transparent), 0 4px 12px rgba(0, 0, 0, 0.14);
+  transform: translateX(calc(var(--quadrant-index) * 100%));
+  transition: transform 520ms cubic-bezier(0.16, 1, 0.3, 1), width 320ms ease, border-radius 320ms ease;
+  will-change: transform;
+}
+
+.deck-quadrant-tab {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  color: color-mix(in srgb, var(--ink) 56%, transparent);
+  transition: color 240ms ease, transform 180ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.deck-quadrant-tab--active {
+  color: var(--ink);
+  text-shadow: 0 1px 8px color-mix(in srgb, var(--canvas) 45%, transparent);
+}
+
+.deck-quadrant-tab:active {
+  transform: scale(0.94);
+}
+
+.deck-quadrant-count {
+  display: inline-grid;
+  min-width: 16px;
+  height: 16px;
+  place-items: center;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  color: color-mix(in srgb, var(--ink) 74%, transparent);
+  font-size: 9px;
+  line-height: 1;
+  transition: background-color 240ms ease, color 240ms ease, transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.deck-quadrant-count--active {
+  background: color-mix(in srgb, var(--ink) 13%, transparent);
+  color: var(--ink);
+  transform: scale(1.08);
+}
+
+/* Compact Apple-like segmented control used for appearance options. */
+.theme-segmented-control {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  width: 190px;
+  min-height: 40px;
+  padding: 3px;
+  overflow: hidden;
+  border: 0.5px solid color-mix(in srgb, var(--ink) 24%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--canvas) 20%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 9%, transparent);
+  backdrop-filter: blur(18px) saturate(125%);
+  -webkit-backdrop-filter: blur(18px) saturate(125%);
+}
+
+.theme-segmented-selection {
+  position: absolute;
+  z-index: 0;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc((100% - 6px) / 3);
+  border: 0.5px solid color-mix(in srgb, var(--ink) 22%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--canvas) 74%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 12%, transparent), 0 2px 7px rgba(0, 0, 0, 0.12);
+  transform: translateX(calc(var(--theme-index) * 100%));
+  transition: transform 460ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.theme-segmented-option {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  border-radius: 999px;
+  color: color-mix(in srgb, var(--ink) 58%, transparent);
+  font-size: 11px;
+  font-weight: 600;
+  transition: color 220ms ease, transform 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.theme-segmented-option--active {
+  color: var(--ink);
+}
+
+.theme-segmented-option:active {
+  transform: scale(0.94);
+}
+
+.liquid-fab {
+  border: 0.5px solid color-mix(in srgb, var(--ink) 34%, transparent);
+  background: color-mix(in srgb, var(--canvas) 18%, transparent);
+  backdrop-filter: blur(18px) saturate(130%);
+  -webkit-backdrop-filter: blur(18px) saturate(130%);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+/* Share the deck button's responsive center line: 12px gutters on phones,
+   then the centred 360px navigation frame on wider screens. */
+.floating-deck-aligned {
+  right: calc(max(12px, (100vw - 360px) / 2) + 2px);
+}
+
+/* The Today hero has 24px side padding. Offset its inline completion action
+   to the same responsive right edge used by the deck and floating actions. */
+.deck-aligned-inline {
+  margin-right: calc(max(12px, (100vw - 360px) / 2) - 22px);
+}
+
+.habit-list-surface {
+  border: 0.5px solid color-mix(in srgb, var(--ink) 34%, transparent);
+  background: color-mix(in srgb, var(--canvas) 8%, transparent);
+  backdrop-filter: blur(20px) saturate(135%);
+  -webkit-backdrop-filter: blur(20px) saturate(135%);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
+/* Wallpaper editor: one shared glass language for controls, preview, and actions. */
+.wallpaper-glass-control,
+.wallpaper-glass-panel,
+.wallpaper-glass-action,
+.wallpaper-glass-hint {
+  border: 0.5px solid var(--glass-border);
+  background: var(--glass-surface);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 8px 24px var(--glass-shadow);
+  backdrop-filter: blur(var(--glass-blur)) saturate(145%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(145%);
+}
+
+.wallpaper-glass-control,
+.wallpaper-glass-action {
+  transition: background-color 200ms ease, border-color 200ms ease, box-shadow 200ms ease, transform 160ms ease;
+}
+
+.wallpaper-glass-control:hover,
+.wallpaper-glass-action:hover {
+  border-color: color-mix(in srgb, var(--ink) 42%, transparent);
+  background: color-mix(in srgb, var(--ink) 16%, transparent);
+}
+
+.wallpaper-glass-control--active,
+.wallpaper-glass-action--primary {
+  border-color: color-mix(in srgb, var(--ink) 55%, transparent);
+  background: color-mix(in srgb, var(--ink) 22%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 32%, transparent), 0 8px 26px var(--glass-shadow);
+}
+
+.wallpaper-glass-panel {
+  border-color: color-mix(in srgb, var(--ink) 32%, transparent);
+  background: var(--glass-surface-strong);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 16px 36px var(--glass-shadow);
+}
+
+.wallpaper-glass-hint {
+  border-radius: var(--radius-pill);
+  background: var(--glass-surface-strong);
+}
+
+.data-status-banner {
+  position: absolute;
+  z-index: 60;
+  top: 4rem;
+  left: var(--screen-gutter);
+  right: var(--screen-gutter);
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.625rem 0.75rem;
+  border: 0.5px solid color-mix(in srgb, #ef4444 55%, transparent);
+  border-radius: var(--radius-xl);
+  background: color-mix(in srgb, var(--canvas) 68%, transparent);
+  color: color-mix(in srgb, #ef4444 82%, var(--ink));
+  font-size: 0.75rem;
+  backdrop-filter: blur(var(--glass-blur)) saturate(130%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(130%);
+  box-shadow: 0 10px 28px var(--glass-shadow);
+}
+
+.data-status-banner__retry {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  gap: 0.35rem;
+  padding-inline: 0.7rem;
+  border: 0.5px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  background: var(--glass-surface);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.sync-status-pill {
+  position: fixed;
+  z-index: 55;
+  left: 50%;
+  bottom: calc(max(var(--sa-bottom, env(safe-area-inset-bottom, 0px)), 6px) + 84px);
+  display: inline-flex;
+  min-height: 32px;
+  transform: translateX(-50%);
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.75rem;
+  border: 0.5px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  background: var(--glass-surface-strong);
+  color: var(--ink);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 8px 22px var(--glass-shadow);
+  backdrop-filter: blur(var(--glass-blur)) saturate(135%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(135%);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.sync-status-pill--failed {
+  border-color: color-mix(in srgb, #ef4444 55%, transparent);
+  color: color-mix(in srgb, #ef4444 82%, var(--ink));
+}
+
+.virtualized-row {
+  content-visibility: auto;
+  contain-intrinsic-block-size: 68px;
+}
+
+.ambient-paused .liquid-blob,
+[data-app-visible="false"] *,
+[data-app-visible="false"] *::before,
+[data-app-visible="false"] *::after {
+  animation-play-state: paused !important;
+}
+
+.background-extension {
+  position: absolute;
+  z-index: 0;
+  inset: -32px;
+  overflow: hidden;
+  pointer-events: none;
+  mask-image: linear-gradient(to bottom, black 0%, black 76%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 0%, black 76%, transparent 100%);
+}
+
+.background-extension-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scale(1.13);
+  filter: blur(28px) saturate(145%) brightness(0.62);
+  opacity: 0.78;
+  animation: background-extension-in 700ms ease both;
+}
+
+.background-extension-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    color-mix(in srgb, var(--canvas) 18%, transparent) 0%,
+    color-mix(in srgb, var(--canvas) 54%, transparent) 58%,
+    color-mix(in srgb, var(--canvas) 92%, transparent) 100%
+  );
+}
+
+[data-theme="light"] .background-extension-image {
+  filter: none;
+  opacity: 1;
+  animation: none;
+}
+
+[data-theme="light"] .background-extension-scrim {
+  background: transparent;
+}
+
+[data-theme="light"] .background-extension {
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+
+/* Keep dark wallpapers free from the pale blurred photo wash. */
+[data-theme="dark"] .background-extension,
+[data-theme="amoled"] .background-extension {
+  display: none;
+}
+
+[data-theme="light"] .liquid-tabbar-item,
+[data-theme="light"] .liquid-tabbar-item-active,
+[data-theme="light"] .liquid-deck-button {
+  color: #ffffff !important;
+}
+
+/* Light photography already provides depth; dark glow makes controls look dirty. */
+[data-theme="light"] .grain-title-pill,
+[data-theme="light"] .liquid-tabbar,
+[data-theme="light"] .liquid-tabbar-selection,
+[data-theme="light"] .liquid-deck-button,
+[data-theme="light"] .liquid-fab,
+[data-theme="light"] .consistency-current-label,
+[data-theme="light"] .consistency-level-node {
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+[data-theme="light"] .liquid-tabbar-selection::before {
+  display: none;
+}
+
+@keyframes background-extension-in {
+  from {
+    opacity: 0;
+    transform: scale(1.18);
+  }
+  to {
+    opacity: 0.78;
+    transform: scale(1.13);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .background-extension-image {
+    animation: none;
+  }
 }

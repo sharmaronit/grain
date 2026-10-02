@@ -10,6 +10,9 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.util.Base64;
 import android.util.DisplayMetrics;
+import android.os.Build;
+import android.provider.Settings;
+import android.net.Uri;
 
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
@@ -207,6 +210,35 @@ public class WallpaperPlugin extends Plugin {
         call.resolve(ret);
     }
 
+    /** Returns whether Android will permit the precise midnight refresh alarm. */
+    @PluginMethod
+    public void isExactAlarmAllowed(PluginCall call) {
+        JSObject ret = new JSObject();
+        boolean supported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S;
+        boolean allowed = !supported || ((android.app.AlarmManager) getContext()
+                .getSystemService(Context.ALARM_SERVICE)).canScheduleExactAlarms();
+        ret.put("supported", supported);
+        ret.put("allowed", allowed);
+        call.resolve(ret);
+    }
+
+    /** Opens Android's system-controlled Exact Alarms permission page. */
+    @PluginMethod
+    public void requestExactAlarmPermission(PluginCall call) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                Intent intent = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM);
+                intent.setData(Uri.parse("package:" + getContext().getPackageName()));
+                getContext().startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            }
+            JSObject ret = new JSObject();
+            ret.put("opened", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("Unable to open Exact Alarms settings", e);
+        }
+    }
+
     // ── Helpers ──────────────────────────────────────────────────────────
 
     /**
@@ -306,4 +338,3 @@ public class WallpaperPlugin extends Plugin {
         }
     }
 }
-

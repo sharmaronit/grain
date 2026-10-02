@@ -132,7 +132,7 @@ export const TodayTab = memo(({
         }
       />
 
-      <section className="px-6 pb-12">
+      <section className="px-4 pb-12">
         {totalCount === 0 ? (
           <div className="flex flex-col items-start gap-4 py-16">
             <div

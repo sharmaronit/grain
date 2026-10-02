@@ -4,17 +4,19 @@
  */
 
 import { useEffect, useState } from "react";
-import { doc, onSnapshot, Timestamp } from "firebase/firestore";
-import { db } from "../lib/firebase";
 import { setCompletionEntry } from "../lib/firestore";
+import { readLocalData, subscribeLocalData } from "../lib/local-data";
 import type { CompletionEntry } from "../lib/streaks";
 import { formatDateKey } from "../lib/dates";
+import { usePageVisible } from "./usePageVisible";
 
 export interface UseCompletionsResult {
   /** Completion entries keyed by habit ID. */
   entries: Record<string, CompletionEntry>;
   /** Loading state for initial fetch. */
   loading: boolean;
+  error: Error | null;
+  retry: () => void;
   /** The date key this hook is tracking. */
   dateKey: string;
   /** Toggle a binary habit's done state. */
@@ -51,39 +53,32 @@ export function useCompletions(
   userId: string | null,
   date?: Date,
 ): UseCompletionsResult {
+  const pageVisible = usePageVisible();
   const dateKey = formatDateKey(date ?? new Date());
   const [entries, setEntries] = useState<Record<string, CompletionEntry>>({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
     if (!userId) {
       setEntries({});
       setLoading(false);
+      setError(null);
       return;
     }
+    if (!pageVisible) return;
+    setEntries({});
+    setLoading(true);
+    setError(null);
 
-    const ref = doc(db(), "users", userId, "completions", dateKey);
-    const unsub = onSnapshot(
-      ref,
-      (snap) => {
-        if (snap.exists()) {
-          const data = snap.data();
-          setEntries(
-            (data.entries as Record<string, CompletionEntry>) ?? {},
-          );
-        } else {
-          setEntries({});
-        }
-        setLoading(false);
-      },
-      (err) => {
-        console.error("[useCompletions] snapshot error:", err);
-        setLoading(false);
-      },
-    );
-
-    return unsub;
-  }, [userId, dateKey]);
+    const refresh = () => {
+      setEntries(readLocalData(userId).completions[dateKey] ?? {});
+      setLoading(false);
+    };
+    refresh();
+    return subscribeLocalData(userId, refresh);
+  }, [userId, dateKey, pageVisible, retryNonce]);
 
   const getEntry = (habitId: string): CompletionEntry =>
     entries[habitId] ?? { ...emptyEntry };
@@ -105,8 +100,10 @@ export function useCompletions(
       await setCompletionEntry(userId, dateKey, habitId, updated);
     } catch (err) {
       console.error("[useCompletions] toggleDone error:", err);
+      setError(err instanceof Error ? err : new Error("Completion could not be saved"));
       // Revert on error
       setEntries((prev) => ({ ...prev, [habitId]: current }));
+      throw err;
     }
   };
 
@@ -128,7 +125,9 @@ export function useCompletions(
       await setCompletionEntry(userId, dateKey, habitId, updated);
     } catch (err) {
       console.error("[useCompletions] setValue error:", err);
+      setError(err instanceof Error ? err : new Error("Progress could not be saved"));
       setEntries((prev) => ({ ...prev, [habitId]: current }));
+      throw err;
     }
   };
 
@@ -156,7 +155,9 @@ export function useCompletions(
       await setCompletionEntry(userId, dateKey, habitId, updated);
     } catch (err) {
       console.error("[useCompletions] adjustValue error:", err);
+      setError(err instanceof Error ? err : new Error("Progress could not be saved"));
       setEntries((prev) => ({ ...prev, [habitId]: current }));
+      throw err;
     }
   };
 
@@ -175,7 +176,9 @@ export function useCompletions(
       await setCompletionEntry(userId, dateKey, habitId, updated);
     } catch (err) {
       console.error("[useCompletions] setRestDay error:", err);
+      setError(err instanceof Error ? err : new Error("Rest day could not be saved"));
       setEntries((prev) => ({ ...prev, [habitId]: current }));
+      throw err;
     }
   };
 
@@ -194,7 +197,9 @@ export function useCompletions(
       await setCompletionEntry(userId, dateKey, habitId, updated);
     } catch (err) {
       console.error("[useCompletions] markSkipped error:", err);
+      setError(err instanceof Error ? err : new Error("Skip could not be saved"));
       setEntries((prev) => ({ ...prev, [habitId]: current }));
+      throw err;
     }
   };
 
@@ -212,7 +217,9 @@ export function useCompletions(
       await setCompletionEntry(userId, dateKey, habitId, updated);
     } catch (err) {
       console.error("[useCompletions] freezeStreak error:", err);
+      setError(err instanceof Error ? err : new Error("Streak freeze could not be saved"));
       setEntries((prev) => ({ ...prev, [habitId]: current }));
+      throw err;
     }
   };
 
@@ -227,13 +234,17 @@ export function useCompletions(
       await setCompletionEntry(userId, dateKey, habitId, updated);
     } catch (err) {
       console.error("[useCompletions] saveNote error:", err);
+      setError(err instanceof Error ? err : new Error("Note could not be saved"));
       setEntries((prev) => ({ ...prev, [habitId]: current }));
+      throw err;
     }
   };
 
   return {
     entries,
     loading,
+    error,
+    retry: () => setRetryNonce((value) => value + 1),
     dateKey,
     toggleDone,
     setValue,

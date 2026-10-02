@@ -5,42 +5,17 @@ import { HABIT_PACKS } from "../../lib/templates";
 
 type AuthStage = "login" | "onboarding" | "app";
 
-const authStore = {
-  get(key: string): string | null {
-    try {
-      return localStorage.getItem(key) ?? sessionStorage.getItem(key);
-    } catch {
-      return null;
-    }
-  },
-  set(key: string, value: string, remember: boolean) {
-    try {
-      const primary = remember ? localStorage : sessionStorage;
-      const other = remember ? sessionStorage : localStorage;
-      primary.setItem(key, value);
-      other.removeItem(key);
-    } catch { }
-  },
-  clear(key: string) {
-    try {
-      localStorage.removeItem(key);
-      sessionStorage.removeItem(key);
-    } catch { }
-  },
-};
-
-
-
 export function AuthGate({ children }: { children: (user: any) => React.ReactNode }) {
   const { user, loading } = useAuth();
 
-  // We'll enforce a minimum 1.5s splash screen time for the animation to finish playing smoothly.
+  // Keep the brand transition brief; authentication and migration must never
+  // turn the decorative splash into a blocking loading screen.
   const [minSplashTimePassed, setMinSplashTimePassed] = useState(false);
 
   React.useEffect(() => {
     const timer = setTimeout(() => {
       setMinSplashTimePassed(true);
-    }, 1500);
+    }, 450);
     return () => clearTimeout(timer);
   }, []);
 
@@ -51,27 +26,32 @@ export function AuthGate({ children }: { children: (user: any) => React.ReactNod
         splash.classList.add("fade-out");
         setTimeout(() => {
           splash.remove();
-        }, 500);
+        }, 220);
       }
     }
   }, [loading, minSplashTimePassed]);
 
-  if (loading || !minSplashTimePassed) {
-    // Return null while the HTML splash screen covers the window
+  if (loading) {
+    // Return null while Firebase restores the authenticated user.
     return null;
   }
 
   if (!user) {
+    // Keep the login screen behind the native splash until its entrance finishes.
+    if (!minSplashTimePassed) return null;
     return <LoginScreen />;
   }
 
+  // Mount the signed-in app as soon as auth is ready. The HTML splash remains
+  // above it until the minimum display time passes, allowing Firestore data and
+  // deferred UI chunks to load during that otherwise idle interval.
   return <>{children(user)}</>;
 }
 
 function PhoneShell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="fixed inset-0 flex h-[100dvh] w-full justify-center bg-canvas overflow-hidden">
-      <div className="relative flex h-full w-full flex-col overflow-hidden bg-canvas pt-safe pb-safe">
+    <div className="auth-shell fixed inset-0 flex h-[100dvh] w-full justify-center overflow-hidden">
+      <div className="auth-shell__surface relative flex h-full w-full flex-col overflow-hidden pt-safe pb-safe">
         {children}
       </div>
     </div>
@@ -178,7 +158,7 @@ function LoginScreen() {
       try { navigator.vibrate?.(14); } catch { }
       setLoading("signup");
       try {
-        await signUpEmail(email.trim(), password, name.trim());
+        await signUpEmail(email.trim(), password, name.trim(), remember);
       } catch (err) {
         setFormError(friendlyError(err));
         try { navigator.vibrate?.([20, 40, 20]); } catch { }
@@ -191,7 +171,7 @@ function LoginScreen() {
     try { navigator.vibrate?.(14); } catch { }
     setLoading("email");
     try {
-      await signInEmail(email.trim(), password);
+      await signInEmail(email.trim(), password, remember);
     } catch (err) {
       setFormError(friendlyError(err));
       try { navigator.vibrate?.([20, 40, 20]); } catch { }
@@ -216,7 +196,7 @@ function LoginScreen() {
   };
 
   const inputCls = (invalid: boolean) =>
-    `w-full rounded-2xl bg-white/5 backdrop-blur-[32px] border shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] px-4 py-3 text-[14px] text-white placeholder:text-white/50 focus:outline-none focus:bg-white/10 transition disabled:opacity-60 ${invalid ? "border-red-500/60 focus:border-red-500/80" : "border-white/10 focus:border-white/30"
+    `auth-input w-full rounded-2xl px-4 py-3 text-[14px] focus:outline-none transition disabled:opacity-60 ${invalid ? "border-red-500/60 focus:border-red-500/80" : ""}
     }`;
 
   const title =
@@ -237,8 +217,8 @@ function LoginScreen() {
         <div className="lg-blob absolute -right-16 bottom-24 h-64 w-64 rounded-full" style={{ animationDelay: "-6s" }} />
       </div>
 
-      <div className="relative flex h-full flex-col overflow-y-auto px-6 sm:px-7 pb-6 sm:pb-8 pt-8 sm:pt-14">
-        <div className="flex items-center gap-2">
+      <div className="auth-content relative flex h-full flex-col overflow-y-auto px-6 sm:px-7 pb-6 sm:pb-8 pt-8 sm:pt-14">
+        <div className="auth-brand flex items-center gap-2">
           <div className="grid h-8 w-8 sm:h-9 sm:w-9 place-items-center rounded-2xl bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.25)] overflow-hidden">
             <img src="/icon.png" alt="Grain Logo" className="h-full w-full object-cover mix-blend-screen opacity-90 drop-shadow-md scale-[1.5]" />
           </div>
@@ -259,7 +239,7 @@ function LoginScreen() {
               type="button"
               data-lg-press
               disabled={busy}
-              className="mt-5 sm:mt-6 flex w-full items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-[32px] shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] py-3 sm:py-3.5 text-[13px] sm:text-[14px] font-semibold text-white hover:bg-white/10 transition disabled:opacity-70"
+              className="auth-glass-button mt-5 sm:mt-6 flex w-full items-center justify-center gap-2 rounded-2xl py-3 sm:py-3.5 text-[13px] sm:text-[14px] font-semibold transition disabled:opacity-70"
             >
               <GoogleGlyph /> Continue with Google
             </button>
@@ -363,7 +343,7 @@ function LoginScreen() {
             type="submit"
             data-lg-press
             disabled={busy}
-            className="mt-1 flex w-full items-center justify-center gap-2 rounded-2xl bg-white/20 backdrop-blur-[40px] border border-white/30 shadow-[inset_0_1px_1px_rgba(255,255,255,0.3),0_8px_32px_rgba(0,0,0,0.25)] py-3 sm:py-3.5 text-[13px] sm:text-[14px] font-bold text-white hover:bg-white/30 transition disabled:opacity-70"
+            className="auth-primary-button mt-1 flex w-full items-center justify-center gap-2 rounded-2xl py-3 sm:py-3.5 text-[13px] sm:text-[14px] font-bold transition disabled:opacity-70"
           >
             {mode === "signup" ? (<>Create account <ArrowRight className="h-4 w-4" /></>) :
               mode === "forgot" ? (<>Send reset link <ArrowRight className="h-4 w-4" /></>) :
@@ -394,7 +374,7 @@ function LoginScreen() {
         </div>
 
         <p className="mt-auto pt-4 sm:pt-6 text-center text-[10px] leading-relaxed text-body">
-          By continuing you agree to the Terms and Privacy Policy.
+          By continuing you agree to the <a href="/terms.html" className="underline hover:text-ink">Terms</a> and <a href="/privacy.html" className="underline hover:text-ink">Privacy Policy</a>.
         </p>
       </div>
 

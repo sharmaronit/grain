@@ -90,9 +90,9 @@ export function SwipeModeView({
   }
 
   return (
-    <div className="absolute inset-0 z-50 flex flex-col bg-canvas animate-fade-in safe-pt safe-pb">
+    <div className="deck-view absolute inset-0 z-50 flex flex-col animate-fade-in safe-pt safe-pb">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 px-5">
+      <div className="flex items-center justify-between p-4 px-4">
         <button
           onClick={onClose}
           className="grid h-10 w-10 place-items-center rounded-full card-soft text-ink hover:bg-[color:var(--surface-pressed)] transition"
@@ -109,8 +109,12 @@ export function SwipeModeView({
       </div>
 
       {/* Quadrant Tabs */}
-      <div className="px-5 mb-4">
-        <div className="flex bg-[color:var(--canvas-soft)] p-1 rounded-full w-full shadow-inner border border-[color:var(--hairline)] overflow-x-auto hide-scrollbar">
+      <div className="px-4 mb-4">
+        <div
+          className="deck-quadrant-tabs"
+          style={{ "--quadrant-index": QUADRANT_ORDER.indexOf(activeQuadrant) } as React.CSSProperties}
+        >
+          <span className="deck-quadrant-selection" aria-hidden="true" />
           {QUADRANT_ORDER.map((q) => {
             const isActive = activeQuadrant === q;
             const count = habits[q].filter((h) => !h.isNumeric && !h.done && !h.skipped).length;
@@ -118,15 +122,15 @@ export function SwipeModeView({
               <button
                 key={q}
                 onClick={() => setActiveQuadrant(q)}
-                className={`flex-1 flex items-center justify-center gap-1.5 rounded-full py-2 px-3 text-xs font-bold transition-colors whitespace-nowrap ${
+                className={`deck-quadrant-tab flex items-center justify-center gap-1.5 rounded-full px-2 text-[11px] font-bold whitespace-nowrap ${
                   isActive
-                    ? "bg-ink text-on-ink shadow-sm"
-                    : "text-mute hover:text-ink"
+                    ? "deck-quadrant-tab--active"
+                    : "text-mute"
                 }`}
               >
                 {QUADRANT_LABELS[q]}
                 {count > 0 && (
-                  <span className={`px-1.5 py-0.5 rounded-full text-[9px] leading-none ${isActive ? "bg-white/20" : "bg-[color:var(--hairline-mid)] text-ink"}`}>
+                  <span className={`deck-quadrant-count ${isActive ? "deck-quadrant-count--active" : ""}`}>
                     {count}
                   </span>
                 )}

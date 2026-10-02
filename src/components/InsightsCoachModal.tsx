@@ -48,7 +48,7 @@ export function InsightsCoachModal({
     return tips;
   });
 
-  const refreshAdvice = () => {
+  const reorderAdvice = () => {
     setLoading(true);
     setTimeout(() => {
       setAdvice((prev) => prev ? [...prev].sort(() => Math.random() - 0.5) : prev);
@@ -79,8 +79,10 @@ export function InsightsCoachModal({
           </div>
           <button
             type="button"
-            onClick={refreshAdvice}
+            onClick={reorderAdvice}
             disabled={loading}
+            aria-label="Reorder suggestions"
+            title="Reorder suggestions"
             className="grid h-8 w-8 place-items-center rounded-full bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] text-ink hover:bg-[color:var(--surface-pressed)] disabled:opacity-50"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />

@@ -19,6 +19,7 @@ interface HabitCardProps {
   isSelected?: boolean;
   onSelectToggle?: (habitId: string) => void;
   onLongPress?: (habitId: string) => void;
+  showDivider?: boolean;
 }
 
 export const HabitCard = memo(function HabitCard({
@@ -31,6 +32,7 @@ export const HabitCard = memo(function HabitCard({
   isSelected = false,
   onSelectToggle,
   onLongPress,
+  showDivider = false,
 }: HabitCardProps) {
   const isDone = habit.done ?? false;
   const streak = habit.streak ?? 0;
@@ -100,25 +102,22 @@ export const HabitCard = memo(function HabitCard({
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
       onClick={handleClick}
-      className={`animate-fade-in-up liquid-glass specular flex items-center p-3.5 rounded-2xl group cursor-pointer transition-all duration-200 select-none ${
+      className={`virtualized-row relative flex min-h-[68px] items-center px-4 group cursor-pointer transition-colors duration-200 select-none ${showDivider ? "after:absolute after:bottom-0 after:left-[60px] after:right-4 after:h-px after:bg-[color:color-mix(in_srgb,var(--ink)_10%,transparent)]" : ""} ${
         isSelected
-          ? "ring-2 ring-ink bg-ink/15 border-ink shadow-[0_0_20px_color-mix(in_srgb,var(--ink)_25%,transparent)] scale-[1.01]"
+          ? "bg-[color:color-mix(in_srgb,var(--ink)_12%,transparent)]"
           : isSelectionMode
-          ? "border-[color:color-mix(in_srgb,var(--hairline)_70%,transparent)] hover:border-ink/40 hover:bg-ink/5"
-          : "hover:border-[color:color-mix(in_srgb,var(--accent)_25%,transparent)] hover:shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_30%,transparent),0_12px_28px_rgba(0,0,0,0.3)] active:scale-[0.99]"
+          ? "hover:bg-[color:color-mix(in_srgb,var(--ink)_7%,transparent)]"
+          : "hover:bg-[color:color-mix(in_srgb,var(--ink)_6%,transparent)] active:bg-[color:color-mix(in_srgb,var(--ink)_10%,transparent)]"
       }`}
-      style={{
-        animationDelay: `${Math.min(index * 30, 240)}ms`,
-        transform: "translateZ(0)",
-      }}
+      style={{ animationDelay: `${Math.min(index * 30, 240)}ms` }}
     >
-      <div className="flex items-center gap-3.5 min-w-0 flex-1">
+      <div className="flex items-center gap-3 min-w-0 flex-1">
         {isSelectionMode ? (
           <div
             className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border transition-all duration-200 ${
               isSelected
-                ? "bg-ink border-ink text-on-ink shadow-[0_0_12px_color-mix(in_srgb,var(--ink)_40%,transparent)] scale-105"
-                : "border-[color:color-mix(in_srgb,var(--ink)_35%,transparent)] bg-[color:color-mix(in_srgb,var(--canvas)_40%,transparent)] text-transparent"
+                ? "bg-ink border-ink text-on-ink"
+                : "border-[color:color-mix(in_srgb,var(--ink)_28%,transparent)] bg-[color:color-mix(in_srgb,var(--canvas)_18%,transparent)] text-transparent"
             }`}
           >
             <Check className="h-4 w-4" strokeWidth={3} />
@@ -132,8 +131,8 @@ export const HabitCard = memo(function HabitCard({
             }}
             className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border transition-all duration-200 ${
               isDone
-                ? "bg-ink border-ink text-on-ink shadow-[0_0_12px_color-mix(in_srgb,var(--ink)_40%,transparent)] animate-check-pop"
-                : "border-[color:color-mix(in_srgb,var(--ink)_25%,transparent)] bg-[color:color-mix(in_srgb,var(--canvas)_30%,transparent)] text-transparent hover:border-ink hover:scale-105 active:scale-95"
+                ? "bg-ink border-ink text-on-ink shadow-[0_2px_8px_color-mix(in_srgb,var(--canvas)_30%,transparent)] animate-check-pop"
+                : "border-[color:color-mix(in_srgb,var(--ink)_28%,transparent)] bg-[color:color-mix(in_srgb,var(--canvas)_18%,transparent)] text-transparent hover:border-[color:color-mix(in_srgb,var(--ink)_55%,transparent)] active:scale-95"
             }`}
           >
             <Check className="h-4 w-4" strokeWidth={3} />
@@ -141,13 +140,13 @@ export const HabitCard = memo(function HabitCard({
         )}
         <div className="min-w-0 flex-1">
           <p
-            className={`text-sm font-semibold truncate ${
-              isDone && !isSelectionMode ? "line-through opacity-40 text-body" : "text-ink"
+            className={`truncate text-[15px] font-semibold leading-tight ${
+              isDone && !isSelectionMode ? "line-through decoration-[1px] opacity-60 text-body" : "text-ink"
             }`}
           >
             {habit.name}
           </p>
-          <p className="text-[10px] font-medium text-mute mt-0.5">
+          <p className="mt-1 text-[11px] font-medium leading-none text-mute">
             {QUADRANTS[quadrant]?.title || quadrant} · {streak}d streak
           </p>
         </div>
@@ -166,6 +165,7 @@ export const HabitCard = memo(function HabitCard({
     prev.quadrant === next.quadrant &&
     prev.index === next.index &&
     prev.isSelectionMode === next.isSelectionMode &&
-    prev.isSelected === next.isSelected
+    prev.isSelected === next.isSelected &&
+    prev.showDivider === next.showDivider
   );
 });

@@ -184,13 +184,21 @@ public class GrainWallpaperService extends WallpaperService {
             }
 
             Calendar now = getMidnightCalendar();
-            long nowMs = now.getTimeInMillis();
             int todayDow = (now.get(Calendar.DAY_OF_WEEK) + 5) % 7; // Mon=0 .. Sun=6
-            long currentWeekMondayMs = nowMs - (todayDow * 86400000L);
+            Calendar currentWeekMonday = (Calendar) now.clone();
+            currentWeekMonday.add(Calendar.DAY_OF_YEAR, -todayDow);
 
             if (this.heatmapStartMs > 0) {
-                long syncedWeekMondayMs = this.heatmapStartMs + (51L * 7L * 86400000L);
-                long diffWeeks = (currentWeekMondayMs - syncedWeekMondayMs) / (7L * 86400000L);
+                Calendar syncedWeekMonday = getMidnightCalendar();
+                syncedWeekMonday.setTimeInMillis(this.heatmapStartMs);
+                // The payload contains the full grid. Using its actual column count avoids
+                // an incorrect jump when grid length changes, and Calendar avoids DST drift.
+                syncedWeekMonday.add(Calendar.WEEK_OF_YEAR, cols - 1);
+                int diffWeeks = 0;
+                while (syncedWeekMonday.before(currentWeekMonday)) {
+                    syncedWeekMonday.add(Calendar.WEEK_OF_YEAR, 1);
+                    diffWeeks++;
+                }
 
                 if (diffWeeks > 0) {
                     int shift = (int) Math.min(diffWeeks, cols);
@@ -199,6 +207,11 @@ public class GrainWallpaperService extends WallpaperService {
                         System.arraycopy(currentGrid[c + shift], 0, shifted[c], 0, 7);
                     }
                     currentGrid = shifted;
+                    // Keep the date origin aligned with the shifted cells. Without this,
+                    // the grid moves forward but month labels keep using the old payload date.
+                    Calendar adjustedStart = (Calendar) currentWeekMonday.clone();
+                    adjustedStart.add(Calendar.WEEK_OF_YEAR, -(cols - 1));
+                    copy.heatmapStartMs = adjustedStart.getTimeInMillis();
                     copy.completionRate = 0; // New week starts with 0% completion
 
                     // If more than 1 week passed or past Monday of new week with no completions
@@ -341,10 +354,12 @@ public class GrainWallpaperService extends WallpaperService {
                 try {
                     Bitmap photo = decodeSampledBitmapFromFile(photoPath, width, height);
                     if (photo != null) {
-                        // Center-crop to fill
+                        // Fit the complete photo inside the wallpaper bounds. Using max()
+                        // here center-cropped portrait/landscape photos and discarded the
+                        // left/right edges; min() preserves the user's complete image.
                         float scaleX = (float) width  / photo.getWidth();
                         float scaleY = (float) height / photo.getHeight();
-                        float baseScale  = Math.max(scaleX, scaleY);
+                        float baseScale  = Math.min(scaleX, scaleY);
                         float scale = baseScale * adjusted.photoScale;
                         int drawW    = Math.round(photo.getWidth()  * scale);
                         int drawH    = Math.round(photo.getHeight() * scale);
@@ -468,6 +483,9 @@ public class GrainWallpaperService extends WallpaperService {
             long weekStartMs = heatmapStartMs + (colIdx * 7L * 86400000L);
             Calendar weekCal = getMidnightCalendar();
             weekCal.setTimeInMillis(weekStartMs);
+            // Use Thursday, the midpoint of this Monday-start week. This labels a
+            // Sep 28–Oct 4 row as OCT, which is the month containing most of its days.
+            weekCal.add(Calendar.DAY_OF_YEAR, 3);
             int month = weekCal.get(Calendar.MONTH);
 
             float rowY = rowsStartY + r * (sq + gap);
@@ -705,10 +723,10 @@ public class GrainWallpaperService extends WallpaperService {
 
         float sq = 8f * dp * data.gridScale;
         float gap = 4f * dp * data.gridScale;
-        float padding = 24f * dp;
-        float maxAvail = w - padding * 2;
-        int maxCols = 26; // approx 320dp max width limit
-        int cols = (int) Math.min(maxCols, (maxAvail + gap) / (sq + gap));
+        // Goal days are a Monday–Sunday heatmap, not a long progress ribbon.
+        // A fixed seven-column grid makes short goals readable and keeps the
+        // wallpaper representation consistent with the in-app preview.
+        int cols = 7;
         
         // Stats spacing
         float titleH = 14f * dp;

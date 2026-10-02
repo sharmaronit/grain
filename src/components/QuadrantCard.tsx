@@ -13,6 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type { Quadrant, Habit } from "./types";
+import { DropdownMotion } from "./ui/DropdownMotion";
 
 const QUADRANTS: Record<Quadrant, { title: string; sub: string }> = {
   q1: { title: "Do first", sub: "Urgent · Important" },
@@ -22,7 +23,7 @@ const QUADRANTS: Record<Quadrant, { title: string; sub: string }> = {
 };
 
 const catClass = (_c: string) =>
-  "bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] text-body border border-white/10";
+  "liquid-control text-body";
 
 export function QuadrantCard({
   q,
@@ -72,7 +73,7 @@ export function QuadrantCard({
   const doneCount = visible.filter(({ h }) => h.done).length;
 
   return (
-    <div className="liquid-glass specular relative flex w-full flex-col overflow-hidden rounded-[24px] border border-[color:color-mix(in_srgb,var(--accent)_12%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_20%,transparent),0_8px_32px_rgba(0,0,0,0.3)] transition-all">
+    <div className="liquid-glass specular relative flex w-full flex-col overflow-hidden rounded-[24px] transition-all">
       {/* Header bar */}
       <button
         type="button"
@@ -160,7 +161,7 @@ function HabitRow({
   onAdjust: (dir: 1 | -1) => void;
   onOpenDetail: () => void;
 }) {
-  const isNumeric = h.target !== undefined && h.target !== null;
+  const isNumeric = h.type === "numeric";
   const pct = isNumeric
     ? Math.min(100, ((h.value ?? 0) / (h.target ?? 1)) * 100)
     : 0;
@@ -243,7 +244,7 @@ function HabitRow({
 
   return (
     <div
-      className={`group relative overflow-hidden rounded-xl bg-white/5 backdrop-blur-[40px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] text-white ${h.done ? "opacity-70" : ""
+      className={`group relative overflow-hidden rounded-xl liquid-control text-ink ${h.done ? "opacity-70" : ""
         } ${justDone ? "animate-sync-pulse" : ""}`}
     >
       {/* Swipe reveal backgrounds */}
@@ -313,7 +314,7 @@ function HabitRow({
             : "transform 260ms cubic-bezier(.2,.9,.3,1.2)",
           touchAction: "pan-y",
         }}
-        className="relative flex cursor-pointer items-center gap-2 bg-white/5 backdrop-blur-[40px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] text-white p-2 transition-[background] hover:bg-[color:var(--canvas-softer)]"
+        className="relative flex cursor-pointer items-center gap-2 bg-transparent text-ink p-2 transition-[background] hover:bg-[color:color-mix(in_srgb,var(--ink)_8%,transparent)]"
       >
         {isNumeric ? (
           <div className="grid h-5 w-5 shrink-0 place-items-center rounded-full border border-[color:var(--hairline-mid)] text-ink">
@@ -396,7 +397,7 @@ function HabitRow({
 
       {isNumeric && (
         <div
-          className="relative bg-white/5 backdrop-blur-[40px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] text-white px-2 pb-2"
+          className="relative bg-transparent text-ink px-2 pb-2"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="mb-1 flex items-center justify-between text-[9px] font-medium text-body">
@@ -411,7 +412,7 @@ function HabitRow({
               <button
                 type="button"
                 onClick={() => onAdjust(-1)}
-                className="grid h-5 w-5 place-items-center rounded-full bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] text-ink hover:bg-[color:var(--surface-pressed)]"
+                className="liquid-control grid h-5 w-5 place-items-center rounded-full text-ink hover:bg-[color:var(--surface-pressed)]"
                 aria-label="Decrease"
               >
                 <Minus className="h-2.5 w-2.5" strokeWidth={3} />
@@ -419,7 +420,7 @@ function HabitRow({
               <button
                 type="button"
                 onClick={() => onAdjust(1)}
-                className="grid h-5 w-5 place-items-center rounded-full bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.25)] text-white hover:opacity-90"
+                className="liquid-control grid h-5 w-5 place-items-center rounded-full text-ink hover:opacity-90"
                 aria-label="Increase"
               >
                 <Plus className="h-2.5 w-2.5" strokeWidth={3} />
@@ -435,8 +436,7 @@ function HabitRow({
         </div>
       )}
 
-      {menuOpen && (
-        <div className="absolute right-1 top-8 z-10 w-28 overflow-hidden rounded-lg border border-white/10 bg-white/5 backdrop-blur-[40px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] text-white shadow-xl animate-fade-in">
+      <DropdownMotion open={menuOpen} className="absolute right-1 top-8 z-10 w-28 overflow-hidden rounded-lg border border-white/10 bg-white/5 backdrop-blur-[40px] shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)] text-white shadow-xl">
           <button
             type="button"
             onClick={(e) => {
@@ -481,8 +481,7 @@ function HabitRow({
           >
             <Trash2 className="h-3 w-3" /> Delete
           </button>
-        </div>
-      )}
+      </DropdownMotion>
     </div>
   );
 }

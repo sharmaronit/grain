@@ -34,6 +34,13 @@ html, body {
   scroll-behavior: smooth;
 }
 
+.grain-background {
+  background-image: url('/back2.jpg');
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+}
+
 /* Animations */
 .reveal {
   opacity: 0;
@@ -80,8 +87,6 @@ html, body {
   cursor: pointer;
   text-decoration: none;
   transition: all 0.2s ease;
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
   box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 1px 1px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 
@@ -102,8 +107,6 @@ html, body {
   border: 1px solid color-mix(in srgb, var(--accent) 15%, transparent) !important;
   border-radius: 24px;
   padding: 32px;
-  backdrop-filter: blur(32px);
-  -webkit-backdrop-filter: blur(32px);
   box-shadow: inset 0 1px 1px color-mix(in srgb, var(--accent) 25%, transparent), 0 8px 32px rgba(0, 0, 0, 0.2);
 }
 
@@ -119,7 +122,5 @@ html, body {
 .liquid-glass-icon {
   background: color-mix(in srgb, var(--accent) 5%, transparent);
   border: 1px solid color-mix(in srgb, var(--accent) 15%, transparent) !important;
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
   box-shadow: inset 0 1px 1px color-mix(in srgb, var(--accent) 25%, transparent), 0 8px 32px rgba(0, 0, 0, 0.2);
 }

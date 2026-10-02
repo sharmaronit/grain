@@ -45,7 +45,9 @@ export function SheetShell({
         hapticFired.current = true;
         try {
           navigator.vibrate?.(18);
-        } catch {}
+        } catch {
+          // Haptics are optional.
+        }
       }
     } else {
       setDragY(deltaY * 0.2);
@@ -56,7 +58,9 @@ export function SheetShell({
     if (startY.current === null) return;
     try {
       (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-    } catch {}
+    } catch {
+      // Pointer capture may already have been released.
+    }
 
     if (dragY >= DISMISS_THRESHOLD) {
       onClose();
@@ -79,11 +83,9 @@ export function SheetShell({
         onClick={(e) => e.stopPropagation()}
         style={{
           transform: `translate3d(0, ${Math.max(0, dragY)}px, 0)`,
-          transition: isDragging
-            ? "none"
-            : "transform 250ms cubic-bezier(0.2, 0.9, 0.3, 1)",
+          transition: isDragging ? "none" : "transform 250ms cubic-bezier(0.2, 0.9, 0.3, 1)",
         }}
-        className="w-full max-h-[85vh] overflow-y-auto rounded-t-[24px] liquid-glass text-ink p-5 select-none animate-sheet-slide-up"
+        className="w-full max-h-[85vh] overflow-y-auto rounded-t-[24px] liquid-glass specular text-ink p-5 select-none animate-sheet-slide-up"
       >
         {/* Drag Handle & Header Drag Area */}
         <div
@@ -98,8 +100,8 @@ export function SheetShell({
               dragY >= DISMISS_THRESHOLD
                 ? "w-20 bg-rose-500"
                 : isDragging
-                ? "w-16 card-soft"
-                : "w-12 bg-[color:var(--surface-pressed)] group-hover:bg-[color:var(--hairline-mid)]"
+                  ? "w-16 card-soft"
+                  : "w-12 bg-[color:var(--surface-pressed)] group-hover:bg-[color:var(--hairline-mid)]"
             }`}
           />
           <div className="flex items-center justify-between">
@@ -125,6 +127,6 @@ export function SheetShell({
   if (typeof document !== "undefined") {
     return createPortal(content, document.body);
   }
-  
+
   return content;
 }

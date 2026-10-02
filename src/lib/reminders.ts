@@ -257,12 +257,6 @@ export async function scheduleHabitReminders(opts: HabitReminderOptions): Promis
       console.warn("Could not schedule native notifications:", e);
       return false;
     }
-  } else if ("Notification" in window && Notification.permission === "granted") {
-    new Notification("Grain · Reminders Active", {
-      body: `Daily reminders set for ${reminderTime}.`,
-      icon: "/icon.png",
-    });
-    return true;
   }
 
   return false;

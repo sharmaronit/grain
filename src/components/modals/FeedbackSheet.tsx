@@ -68,6 +68,7 @@ export function FeedbackSheet({
   const [name, setName] = useState(userName);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const activeCategoryConfig = CATEGORIES.find((c) => c.key === category) ?? CATEGORIES[0];
 
@@ -79,6 +80,7 @@ export function FeedbackSheet({
     }
 
     setSubmitting(true);
+    setSubmitError(null);
     try {
       navigator.vibrate?.(15);
     } catch {}
@@ -105,9 +107,7 @@ export function FeedbackSheet({
       } catch {}
     } catch (err) {
       console.error("Failed to submit feedback:", err);
-      // Even if offline/error, inform user gracefully
-      onToast("Feedback saved offline. Thank you!");
-      setSubmitted(true);
+      setSubmitError("We couldn't send your feedback. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -150,6 +150,7 @@ export function FeedbackSheet({
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-5 pt-2 pb-6">
+          {submitError && <p role="alert" className="text-xs text-red-500">{submitError}</p>}
           {/* Category Selector */}
           <div>
             <label className="text-[11px] font-bold uppercase tracking-widest text-mute block mb-2">

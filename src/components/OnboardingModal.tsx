@@ -1,14 +1,15 @@
 import React, { useState } from "react";
-import { Sparkles, Check, ArrowRight, ArrowLeft, Flame, Zap, Layers, Wallpaper, ShieldCheck, Compass, Target, Activity } from "lucide-react";
+import { Check, ArrowRight, ArrowLeft, Flame, Plus, Activity, ShieldCheck } from "lucide-react";
 import { HABIT_PACKS, type HabitTemplate } from "../lib/templates";
 import type { HabitDoc } from "../lib/firestore";
 
 interface OnboardingModalProps {
   onClose: () => void;
   onAddHabits: (habits: Array<Omit<HabitDoc, "id" | "createdAt">>) => Promise<void>;
+  storageKey: string;
 }
 
-export function OnboardingModal({ onClose, onAddHabits }: OnboardingModalProps) {
+export function OnboardingModal({ onClose, onAddHabits, storageKey }: OnboardingModalProps) {
   const [step, setStep] = useState<0 | 1 | 2>(0);
   const [selectedPackId, setSelectedPackId] = useState<string>("mindfulness");
   const [selectedHabits, setSelectedHabits] = useState<Set<string>>(() => {
@@ -17,6 +18,7 @@ export function OnboardingModal({ onClose, onAddHabits }: OnboardingModalProps) 
     return new Set(firstPack.habits.map((h) => h.name));
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const toggleHabit = (name: string) => {
     const next = new Set(selectedHabits);
@@ -39,6 +41,7 @@ export function OnboardingModal({ onClose, onAddHabits }: OnboardingModalProps) 
   };
 
   const handleFinish = async () => {
+    setError(null);
     try {
       setIsSubmitting(true);
       // Collect all selected habit definitions
@@ -73,12 +76,11 @@ export function OnboardingModal({ onClose, onAddHabits }: OnboardingModalProps) 
         await onAddHabits(docsToCreate);
       }
 
-      localStorage.setItem("grain_onboarded", "true");
+      localStorage.setItem(storageKey, "true");
       onClose();
     } catch (e) {
       console.error("Failed to complete onboarding:", e);
-      localStorage.setItem("grain_onboarded", "true");
-      onClose();
+      setError("We couldn't save your starter habits. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -111,7 +113,7 @@ export function OnboardingModal({ onClose, onAddHabits }: OnboardingModalProps) 
         />
       </div>
 
-      <div className="liquid-glass specular relative z-10 w-full max-w-md overflow-hidden rounded-[32px] border border-[color:color-mix(in_srgb,var(--hairline)_70%,transparent)] bg-[color:color-mix(in_srgb,var(--canvas)_88%,transparent)] p-6 shadow-2xl flex flex-col max-h-[90vh]">
+      <div className="liquid-glass sheet-glass specular relative z-10 w-full max-w-md overflow-hidden rounded-[32px] p-6 shadow-2xl flex flex-col max-h-[90vh]">
         
         {/* Step Indicator */}
         <div className="flex items-center justify-between mb-6">
@@ -156,21 +158,21 @@ export function OnboardingModal({ onClose, onAddHabits }: OnboardingModalProps) 
               <div className="grid grid-cols-2 gap-3 w-full text-left pt-2">
                 <div className="p-3.5 rounded-2xl bg-[color:color-mix(in_srgb,var(--canvas-soft)_50%,transparent)] border border-[color:color-mix(in_srgb,var(--hairline)_50%,transparent)] space-y-1">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-ink">
-                    <Zap className="h-3.5 w-3.5 text-ink" />
-                    <span>Streak Heatmaps</span>
+                    <Plus className="h-3.5 w-3.5 text-ink" />
+                    <span>Create a habit</span>
                   </div>
                   <p className="text-[10px] text-mute leading-normal">
-                    52-week calendar tracking that keeps you accountable.
+                    Start with one small action you can repeat today.
                   </p>
                 </div>
 
                 <div className="p-3.5 rounded-2xl bg-[color:color-mix(in_srgb,var(--canvas-soft)_50%,transparent)] border border-[color:color-mix(in_srgb,var(--hairline)_50%,transparent)] space-y-1">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-ink">
-                    <Wallpaper className="h-3.5 w-3.5 text-ink" />
-                    <span>Live Wallpaper</span>
+                    <Check className="h-3.5 w-3.5 text-ink" />
+                    <span>Complete today</span>
                   </div>
                   <p className="text-[10px] text-mute leading-normal">
-                    Sync your habit matrix directly to your lockscreen.
+                    Tap once to record progress and keep momentum visible.
                   </p>
                 </div>
               </div>
@@ -259,23 +261,24 @@ export function OnboardingModal({ onClose, onAddHabits }: OnboardingModalProps) 
                   Ready to Begin
                 </h3>
                 <p className="text-xs text-body leading-relaxed max-w-xs mx-auto">
-                  {selectedHabits.size} habits selected. Your dashboard is configured for fluid swipe navigation and daily tracking.
+                  {selectedHabits.size} habits selected. Start with today; the app will reveal deeper tools as your routine grows.
                 </p>
               </div>
 
               <div className="w-full p-4 rounded-2xl bg-[color:color-mix(in_srgb,var(--canvas-soft)_50%,transparent)] border border-[color:color-mix(in_srgb,var(--hairline)_50%,transparent)] text-left space-y-2">
                 <div className="flex items-center gap-2 text-xs font-bold text-ink">
-                  <Layers className="h-4 w-4 text-ink" />
-                  <span>Fluid Navigation</span>
+                  <Activity className="h-4 w-4 text-ink" />
+                  <span>See your consistency</span>
                 </div>
                 <p className="text-[11px] text-mute leading-relaxed">
-                  • <strong>Swipe horizontally</strong> anywhere on the screen to switch tabs.<br />
-                  • Tap <strong>Focus Mode</strong> to enter distraction-free card review.
+                  Complete habits from My Day, then open Consistency to see your pattern grow. Deck, goals, and wallpapers remain available when you are ready for more.
                 </p>
               </div>
             </div>
           )}
         </div>
+
+        {error && <p role="alert" className="mt-3 text-center text-xs text-red-400">{error}</p>}
 
         {/* Bottom Navigation Buttons */}
         <div className="flex items-center gap-3 pt-4 border-t border-[color:var(--hairline)] mt-4">
@@ -306,7 +309,7 @@ export function OnboardingModal({ onClose, onAddHabits }: OnboardingModalProps) 
               className="flex-1 flex items-center justify-center gap-2 h-12 rounded-2xl bg-ink text-on-ink font-display text-xs font-bold uppercase tracking-wider shadow-xl active:scale-95 transition hover:opacity-90 disabled:opacity-50"
             >
               <span>{isSubmitting ? "Setting Up..." : "Launch Dashboard"}</span>
-              <Sparkles className="h-4 w-4" />
+              <Check className="h-4 w-4" />
             </button>
           )}
         </div>

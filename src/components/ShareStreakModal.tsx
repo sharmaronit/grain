@@ -21,7 +21,8 @@ export function ShareStreakModal({
 }) {
   const [copied, setCopied] = React.useState(false);
 
-  const shareText = `I'm on a ${currentStreak}-day streak on Grain! Building 1% better habits daily. Check out Grain habit tracker.`;
+  const appUrl = typeof window !== "undefined" ? window.location.origin : "";
+  const shareText = `I'm on a ${currentStreak}-day streak on Grain! Building 1% better habits daily.${appUrl ? ` ${appUrl}` : ""}`;
 
   const copyShareText = async () => {
     try {

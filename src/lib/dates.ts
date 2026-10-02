@@ -72,6 +72,18 @@ export function heatmapStartDate(ref: Date = new Date()): Date {
 }
 
 /**
+ * Return the calendar date used to label a Monday-start week in the heatmap.
+ * Thursday is the week's midpoint, so a week such as Sep 28–Oct 4 is labelled
+ * October (the month containing most of that row) instead of looking stale.
+ */
+export function heatmapWeekLabelDate(weekStart: Date): Date {
+  const labelDate = new Date(weekStart);
+  labelDate.setHours(0, 0, 0, 0);
+  labelDate.setDate(labelDate.getDate() + 3);
+  return labelDate;
+}
+
+/**
  * Determine if a habit is scheduled for a given date based on its frequency.
  * @param frequency "daily" | "weekdays" | "custom"
  * @param customDays Array of ISO day-of-week indices (0=Mon … 6=Sun)

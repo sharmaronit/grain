@@ -29,7 +29,8 @@ export type CompletionsMap = Record<
  *   - streak was frozen (frozenStreak === true)
  *   - the habit was not scheduled for that day (frequency/customDays)
  *
- * The streak breaks on the first scheduled day with no qualifying entry.
+ * A missed scheduled day pauses the streak. It does not add a day, but the
+ * next qualifying check-in resumes from the existing total.
  */
 export function calculateStreak(
   habitId: string,
@@ -63,7 +64,8 @@ export function calculateStreak(
       continue;
     } else {
       // Scheduled day with no completion → streak broken
-      break;
+      cur.setDate(cur.getDate() - 1);
+      continue;
     }
 
     cur.setDate(cur.getDate() - 1);
@@ -73,7 +75,8 @@ export function calculateStreak(
 }
 
 /**
- * Find the longest streak ever for a habit.
+ * Find the highest accumulated streak for a habit. Missed scheduled days
+ * pause progress, matching calculateStreak, instead of resetting it.
  */
 export function calculateBestStreak(
   habitId: string,
@@ -89,7 +92,6 @@ export function calculateBestStreak(
   if (dateKeys.length === 0) return 0;
 
   let bestStreak = 0;
-  let currentStreak = 0;
 
   // Walk forward through all dates
   const startDate = new Date(dateKeys[0]);
@@ -107,10 +109,7 @@ export function calculateBestStreak(
 
     const entry = completionsMap[key]?.[habitId];
     if (entry && (entry.done || entry.restDay || entry.frozenStreak)) {
-      currentStreak++;
-      bestStreak = Math.max(bestStreak, currentStreak);
-    } else {
-      currentStreak = 0;
+      bestStreak++;
     }
 
     cur.setDate(cur.getDate() + 1);
@@ -129,10 +128,10 @@ export function freezesUsedThisWeek(
   refDate: Date = new Date(),
 ): number {
   let count = 0;
-  
+
   // Get all dates in the current calendar week (Mon-Sun)
   const weekDates = getWeekDates(refDate);
-  
+
   for (const cur of weekDates) {
     if (cur > refDate) continue; // Only count up to the reference date
     const key = formatDateKey(cur);
