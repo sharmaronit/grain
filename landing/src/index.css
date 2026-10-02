@@ -70,6 +70,41 @@ html, body {
   padding: 0 24px;
 }
 
+/* Landing page content shares one deliberate desktop alignment system. */
+.landing-section {
+  padding-block: clamp(104px, 12vw, 160px);
+}
+
+.landing-copy {
+  width: min(calc(100% - 48px), 760px);
+  margin-inline: auto;
+}
+
+.landing-hero-content {
+  width: min(calc(100% - 48px), 680px);
+}
+
+.landing-about {
+  max-width: 880px;
+}
+
+.landing-how {
+  width: min(calc(100% - 48px), 1040px);
+  margin-inline: auto;
+}
+
+@media (max-width: 767px) {
+  .landing-section {
+    padding-block: 96px;
+  }
+
+  .landing-copy,
+  .landing-hero-content,
+  .landing-how {
+    width: min(calc(100% - 40px), 100%);
+  }
+}
+
 /* Buttons */
 .btn-primary {
   display: inline-flex;

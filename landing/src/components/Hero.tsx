@@ -1,6 +1,7 @@
 import { ChevronDown } from "lucide-react";
 import { useScrollReveal } from "../hooks/useScrollReveal";
 import { useState, useEffect } from "react";
+import { LATEST_APK_URL } from "../lib/downloads";
 
 export function Hero() {
   const ref = useScrollReveal();
@@ -20,7 +21,7 @@ export function Hero() {
         opacity: Math.max(1 - scrollY / 600, 0)
       }}
     >
-      <div ref={ref} className="container reveal flex flex-col items-center text-center z-10">
+      <div ref={ref} className="landing-copy landing-hero-content reveal flex flex-col items-center text-center z-10">
         <h1 className="font-cursive liquid-text text-[90px] md:text-[160px] font-bold leading-none tracking-tighter mb-6 pb-2" style={{ textShadow: '0 4px 32px rgba(255,255,255,0.2)' }}>
           Grain
         </h1>
@@ -29,7 +30,7 @@ export function Hero() {
           Every single day.
         </p>
         
-        <a href="/grain-tracker-debug.apk" className="text-white/90 hover:text-white font-medium text-xl tracking-wide transition-colors underline decoration-2 underline-offset-4" download>
+        <a href={LATEST_APK_URL} className="text-white/90 hover:text-white font-medium text-xl tracking-wide transition-colors underline decoration-2 underline-offset-4" download>
           Download APK
         </a>
       </div>

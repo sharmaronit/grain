@@ -23,9 +23,9 @@ export function HowItWorks() {
   const ref = useScrollReveal(0.2);
 
   return (
-    <section className="relative z-10" style={{ padding: '160px 0' }}>
-      <div ref={ref} className="container reveal">
-        <div className="text-center mb-28">
+    <section className="landing-section relative z-10">
+      <div ref={ref} className="landing-how reveal">
+        <div className="landing-copy text-center mb-28">
           <h2 className="font-display text-4xl font-bold tracking-tight text-white drop-shadow-lg mb-6 leading-tight">How it works</h2>
           <p className="text-white/70 text-lg max-w-sm mx-auto drop-shadow-md font-medium leading-[1.8]">A simple, powerful loop to build unbreakable discipline.</p>
         </div>
