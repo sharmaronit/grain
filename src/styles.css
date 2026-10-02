@@ -1418,10 +1418,16 @@
   -webkit-mask-image: none;
 }
 
-/* Keep dark wallpapers free from the pale blurred photo wash. */
+/* Keep the default app wallpaper behind glass controls. Custom photos never
+   reach this layer; Dashboard supplies the app-safe default image separately. */
 [data-theme="dark"] .background-extension,
 [data-theme="amoled"] .background-extension {
-  display: none;
+  display: block;
+}
+
+[data-theme="amoled"] .background-extension-image {
+  opacity: 0.32;
+  filter: blur(34px) saturate(120%) brightness(0.3);
 }
 
 [data-theme="light"] .liquid-tabbar-item,

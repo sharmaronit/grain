@@ -12,6 +12,7 @@ import {
   lazy,
   Suspense,
 } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 import {
   Flame,
   Settings,
@@ -573,6 +574,12 @@ export function Dashboard({ user }: { user?: any }) {
   // Floating page title pill state & 2-second auto-fade timer
   const [showTitlePill, setShowTitlePill] = useState(true);
   const titlePillTimerRef = useRef<number | null>(null);
+  const [pillDragX, setPillDragX] = useState(0);
+  const [pillDragY, setPillDragY] = useState(0);
+  const pillDragStartRef = useRef<{ x: number; y: number } | null>(null);
+  const pillDraggingRef = useRef(false);
+  const pillSuppressClickRef = useRef(false);
+  const PILL_DISMISS_THRESHOLD = 72;
 
   useEffect(() => {
     setShowTitlePill(true);
@@ -995,6 +1002,40 @@ export function Dashboard({ user }: { user?: any }) {
     duration = 1600,
   ) => {
     globalToast(msg, "info", action, duration);
+  };
+
+  const handlePillPointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    pillDragStartRef.current = { x: event.clientX, y: event.clientY };
+    pillDraggingRef.current = true;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePillPointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (pillDragStartRef.current === null) return;
+    const deltaX = event.clientX - pillDragStartRef.current.x;
+    const deltaY = event.clientY - pillDragStartRef.current.y;
+    pillSuppressClickRef.current = Math.max(Math.abs(deltaX), Math.abs(deltaY)) > 8;
+    setPillDragX(deltaX);
+    setPillDragY(deltaY);
+  };
+
+  const handlePillPointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (pillDragStartRef.current === null) return;
+    const deltaX = event.clientX - pillDragStartRef.current.x;
+    const deltaY = event.clientY - pillDragStartRef.current.y;
+    try {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    } catch {}
+    if (Math.abs(deltaX) >= PILL_DISMISS_THRESHOLD || deltaY <= -PILL_DISMISS_THRESHOLD) {
+      try { navigator.vibrate?.(16); } catch {}
+      setShowTitlePill(false);
+      if (activeToast) removeToast(activeToast.id);
+      if (titlePillTimerRef.current) window.clearTimeout(titlePillTimerRef.current);
+    }
+    pillDragStartRef.current = null;
+    pillDraggingRef.current = false;
+    setPillDragX(0);
+    setPillDragY(0);
   };
 
   const toggleDone = async (q: Quadrant, i: number) => {
@@ -2116,9 +2157,7 @@ export function Dashboard({ user }: { user?: any }) {
   const appBackgroundImage =
     theme === "light"
       ? "/grain-light.jpg"
-      : wallpaperTheme === "custom" && wallpaperCustomPhoto
-        ? wallpaperCustomPhoto
-        : "/back2.jpg";
+      : "/back2.jpg";
   const backgroundExtensionImage = appBackgroundImage;
 
   return (
@@ -2212,7 +2251,15 @@ export function Dashboard({ user }: { user?: any }) {
 
             <button
               type="button"
+              onPointerDown={handlePillPointerDown}
+              onPointerMove={handlePillPointerMove}
+              onPointerUp={handlePillPointerUp}
+              onPointerCancel={handlePillPointerUp}
               onClick={() => {
+                if (pillDraggingRef.current || pillSuppressClickRef.current) {
+                  pillSuppressClickRef.current = false;
+                  return;
+                }
                 if (pillNotice) {
                   pillNotice.action?.onClick();
                   if (activeToast) removeToast(activeToast.id);
@@ -2241,6 +2288,11 @@ export function Dashboard({ user }: { user?: any }) {
                     : "pointer-events-none max-h-0 max-w-0 gap-0 border-transparent bg-transparent p-0 text-ink opacity-0 -translate-y-1 scale-75"
               }`}
               aria-label="App logo and section title"
+              style={{
+                transform: `translate3d(${pillDragX}px, ${pillDragY}px, 0) scale(${Math.max(0.72, 1 - Math.max(Math.abs(pillDragX), Math.abs(pillDragY)) / 520)})`,
+                transition: pillDragStartRef.current === null ? "transform 320ms cubic-bezier(0.22, 1, 0.36, 1)" : "none",
+                touchAction: "none",
+              }}
             >
               <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full overflow-hidden relative">
                 {showTitlePill || pillNotice ? (

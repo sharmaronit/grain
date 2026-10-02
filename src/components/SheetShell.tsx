@@ -72,6 +72,7 @@ export function SheetShell({
   };
 
   const backdropOpacity = Math.max(0.1, 1 - Math.min(0.75, dragY / 300));
+  const sheetScale = 1 - Math.min(0.025, dragY / 3600);
 
   const content = (
     <div
@@ -82,7 +83,7 @@ export function SheetShell({
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
-          transform: `translate3d(0, ${Math.max(0, dragY)}px, 0)`,
+          transform: `translate3d(0, ${Math.max(0, dragY)}px, 0) scale(${sheetScale})`,
           transition: isDragging ? "none" : "transform 250ms cubic-bezier(0.2, 0.9, 0.3, 1)",
         }}
         className="w-full max-h-[85vh] overflow-y-auto rounded-t-[24px] liquid-glass specular text-ink p-5 select-none animate-sheet-slide-up"
