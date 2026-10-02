@@ -23,6 +23,30 @@ const emptyData = (): GrainLocalData => ({
 });
 
 const keyFor = (userId: string) => `grain_local_data_${userId}`;
+const backupMetaKeyFor = (userId: string) => `grain_backup_meta_${userId}`;
+
+interface BackupMeta {
+  lastExportedAt?: string;
+  reminderDismissedAt?: string;
+}
+
+export interface LocalBackupStatus {
+  lastExportedAt: string | null;
+  dataUpdatedAt: string;
+  reminderDue: boolean;
+}
+
+function readBackupMeta(userId: string): BackupMeta {
+  try {
+    return JSON.parse(localStorage.getItem(backupMetaKeyFor(userId)) ?? "{}") as BackupMeta;
+  } catch {
+    return {};
+  }
+}
+
+function writeBackupMeta(userId: string, meta: BackupMeta): void {
+  localStorage.setItem(backupMetaKeyFor(userId), JSON.stringify(meta));
+}
 
 function hydrate(raw: GrainLocalData): GrainLocalData {
   return {
@@ -35,11 +59,19 @@ function hydrate(raw: GrainLocalData): GrainLocalData {
 }
 
 export function readLocalData(userId: string): GrainLocalData {
+  let value: string | null = null;
   try {
-    const value = localStorage.getItem(keyFor(userId));
+    value = localStorage.getItem(keyFor(userId));
     return value ? hydrate(JSON.parse(value) as GrainLocalData) : emptyData();
-  } catch {
-    return emptyData();
+  } catch (error) {
+    // Preserve the original bytes before surfacing the problem. Returning an
+    // empty store here would allow the next write to destroy recoverable data.
+    if (value) {
+      try {
+        localStorage.setItem(`grain_local_recovery_${userId}_${Date.now()}`, value);
+      } catch {}
+    }
+    throw new Error("Local data could not be read. Import your latest backup to recover it.", { cause: error });
   }
 }
 
@@ -129,12 +161,46 @@ export function exportLocalBackup(userId: string): GrainLocalData {
   return readLocalData(userId);
 }
 
+export function markLocalBackupExported(userId: string): string {
+  const exportedAt = new Date().toISOString();
+  writeBackupMeta(userId, { lastExportedAt: exportedAt });
+  return exportedAt;
+}
+
+export function dismissLocalBackupReminder(userId: string): void {
+  writeBackupMeta(userId, { ...readBackupMeta(userId), reminderDismissedAt: new Date().toISOString() });
+}
+
+export function getLocalBackupStatus(userId: string): LocalBackupStatus {
+  const data = readLocalData(userId);
+  const meta = readBackupMeta(userId);
+  const lastExportedAt = meta.lastExportedAt ?? null;
+  const hasData = data.habits.length > 0 || data.goals.length > 0 || Object.keys(data.completions).length > 0;
+  const exportedTime = lastExportedAt ? new Date(lastExportedAt).getTime() : 0;
+  const dismissedTime = meta.reminderDismissedAt ? new Date(meta.reminderDismissedAt).getTime() : 0;
+  const dataChangedSinceBackup = new Date(data.updatedAt).getTime() > exportedTime;
+  const fourteenDays = 14 * 24 * 60 * 60 * 1000;
+  const threeDays = 3 * 24 * 60 * 60 * 1000;
+  const backupIsOld = !exportedTime || Date.now() - exportedTime >= fourteenDays;
+  const snoozeExpired = !dismissedTime || Date.now() - dismissedTime >= threeDays;
+
+  return {
+    lastExportedAt,
+    dataUpdatedAt: data.updatedAt,
+    reminderDue: hasData && dataChangedSinceBackup && backupIsOld && snoozeExpired,
+  };
+}
+
 export function importLocalBackup(userId: string, value: unknown): void {
   if (!value || typeof value !== "object") throw new Error("Invalid backup file");
   const candidate = value as Partial<GrainLocalData>;
   if (!Array.isArray(candidate.habits) || !Array.isArray(candidate.goals) || typeof candidate.completions !== "object") {
     throw new Error("This is not a valid Grain backup");
   }
+  try {
+    const current = localStorage.getItem(keyFor(userId));
+    if (current) localStorage.setItem(`grain_local_recovery_${userId}_${Date.now()}`, current);
+  } catch {}
   writeLocalData(userId, hydrate({ ...emptyData(), ...candidate } as GrainLocalData));
 }
 

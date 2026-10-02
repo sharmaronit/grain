@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Check, ArrowRight, ArrowLeft, Flame, Plus, Activity, ShieldCheck } from "lucide-react";
+import { useState } from "react";
+import { ArrowLeft, ArrowRight, Check, Flame } from "lucide-react";
 import { HABIT_PACKS, type HabitTemplate } from "../lib/templates";
 import type { HabitDoc } from "../lib/firestore";
 
@@ -10,307 +10,116 @@ interface OnboardingModalProps {
 }
 
 export function OnboardingModal({ onClose, onAddHabits, storageKey }: OnboardingModalProps) {
-  const [step, setStep] = useState<0 | 1 | 2>(0);
-  const [selectedPackId, setSelectedPackId] = useState<string>("mindfulness");
-  const [selectedHabits, setSelectedHabits] = useState<Set<string>>(() => {
-    // Default select all habits from the first pack
-    const firstPack = HABIT_PACKS[0];
-    return new Set(firstPack.habits.map((h) => h.name));
-  });
+  const firstPack = HABIT_PACKS[0];
+  const [step, setStep] = useState<0 | 1>(0);
+  const [selectedPackId, setSelectedPackId] = useState(firstPack.id);
+  const [selectedHabit, setSelectedHabit] = useState<HabitTemplate>(firstPack.habits[0]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const toggleHabit = (name: string) => {
-    const next = new Set(selectedHabits);
-    if (next.has(name)) {
-      next.delete(name);
-    } else {
-      next.add(name);
-    }
-    setSelectedHabits(next);
-  };
-
-  const selectEntirePack = (packId: string) => {
+  const selectPack = (packId: string) => {
+    const pack = HABIT_PACKS.find((item) => item.id === packId);
+    if (!pack) return;
     setSelectedPackId(packId);
-    const pack = HABIT_PACKS.find((p) => p.id === packId);
-    if (pack) {
-      const next = new Set(selectedHabits);
-      pack.habits.forEach((h) => next.add(h.name));
-      setSelectedHabits(next);
-    }
+    setSelectedHabit(pack.habits[0]);
   };
 
   const handleFinish = async () => {
     setError(null);
+    setIsSubmitting(true);
     try {
-      setIsSubmitting(true);
-      // Collect all selected habit definitions
-      const allTemplates: HabitTemplate[] = [];
-      HABIT_PACKS.forEach((pack) => {
-        pack.habits.forEach((h) => {
-          if (selectedHabits.has(h.name) && !allTemplates.some((t) => t.name === h.name)) {
-            allTemplates.push(h);
-          }
-        });
-      });
-
-      const docsToCreate: Array<Omit<HabitDoc, "id" | "createdAt">> = allTemplates.map((t, idx) => ({
-        name: t.name,
-        category: t.category,
-        quadrant: t.quadrant,
-        time: t.time,
-        type: t.type,
-        target: t.target ?? null,
-        unit: t.unit ?? null,
-        step: t.type === "numeric" ? 1 : null,
-        pinned: idx === 0,
-        frequency: t.frequency,
+      await onAddHabits([{
+        name: selectedHabit.name,
+        category: selectedHabit.category,
+        quadrant: selectedHabit.quadrant,
+        time: selectedHabit.time,
+        type: selectedHabit.type,
+        target: selectedHabit.target ?? null,
+        unit: selectedHabit.unit ?? null,
+        step: selectedHabit.type === "numeric" ? 1 : null,
+        pinned: true,
+        frequency: selectedHabit.frequency,
         customDays: [],
         icon: 0,
         shade: 0,
         bestStreak: 0,
-        order: idx,
-      }));
-
-      if (docsToCreate.length > 0) {
-        await onAddHabits(docsToCreate);
-      }
-
+        order: 0,
+      }]);
       localStorage.setItem(storageKey, "true");
       onClose();
-    } catch (e) {
-      console.error("Failed to complete onboarding:", e);
-      setError("We couldn't save your starter habits. Please try again.");
+    } catch (reason) {
+      console.error("Failed to complete onboarding:", reason);
+      setError("Your first habit was not saved. Tap Try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-2xl animate-fade-in overflow-hidden">
-      {/* Background Animated Blur Gradient */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden z-0">
-        <div
-          className="liquid-blob absolute -left-20 -top-20 h-80 w-80 rounded-full"
-          style={{ background: "color-mix(in oklab, var(--ink) 25%, transparent)" }}
-          aria-hidden
-        />
-        <div
-          className="liquid-blob absolute top-1/3 -right-20 h-96 w-96 rounded-full"
-          style={{
-            background: "color-mix(in oklab, var(--ink) 18%, transparent)",
-            animationDelay: "-4s",
-          }}
-          aria-hidden
-        />
-        <div
-          className="liquid-blob absolute -bottom-20 left-1/4 h-80 w-80 rounded-full"
-          style={{
-            background: "color-mix(in oklab, var(--ink) 20%, transparent)",
-            animationDelay: "-8s",
-          }}
-          aria-hidden
-        />
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-black/60 p-4 backdrop-blur-2xl animate-fade-in">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
+        <div className="liquid-blob absolute -left-20 -top-20 h-80 w-80 rounded-full bg-[color:color-mix(in_srgb,var(--ink)_20%,transparent)]" />
+        <div className="liquid-blob absolute -bottom-24 -right-20 h-96 w-96 rounded-full bg-[color:color-mix(in_srgb,var(--ink)_14%,transparent)]" style={{ animationDelay: "-5s" }} />
       </div>
 
-      <div className="liquid-glass sheet-glass specular relative z-10 w-full max-w-md overflow-hidden rounded-[32px] p-6 shadow-2xl flex flex-col max-h-[90vh]">
-        
-        {/* Step Indicator */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-ink text-[11px] font-black text-on-ink">
-              {step + 1}
-            </span>
-            <span className="text-[11px] font-bold uppercase tracking-widest text-mute">
-              {step === 0 ? "Introduction" : step === 1 ? "Starter Habits" : "Navigation"}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-1.5">
-            {[0, 1, 2].map((i) => (
-              <div
-                key={i}
-                className={`h-1.5 rounded-full transition-all duration-300 ${
-                  step === i ? "w-6 bg-ink" : "w-2 bg-ink/20"
-                }`}
-              />
-            ))}
+      <div className="liquid-glass sheet-glass specular relative z-10 flex max-h-[88vh] w-full max-w-md flex-col overflow-hidden rounded-[32px] p-6 shadow-2xl">
+        <div className="mb-6 flex items-center justify-between">
+          <span className="text-[11px] font-bold uppercase tracking-[0.18em] text-mute">First success</span>
+          <div className="flex gap-1.5" aria-label={`Step ${step + 1} of 2`}>
+            {[0, 1].map((item) => <span key={item} className={`h-1.5 rounded-full transition-all ${step === item ? "w-7 bg-ink" : "w-2 bg-ink/20"}`} />)}
           </div>
         </div>
 
-        {/* Slide Content */}
-        <div className="flex-1 overflow-y-auto scrollbar-none pr-0.5">
-          {step === 0 && (
-            <div className="flex flex-col items-center text-center py-4 space-y-5 animate-fade-in-up">
-              <div className="grid h-20 w-20 place-items-center rounded-3xl bg-[color:color-mix(in_srgb,var(--canvas-soft)_60%,transparent)] border border-[color:color-mix(in_srgb,var(--hairline)_60%,transparent)] shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_32px_rgba(0,0,0,0.3)] text-ink">
-                <Flame className="h-10 w-10" />
+        <div className="flex-1 overflow-y-auto scrollbar-none">
+          {step === 0 ? (
+            <div className="flex flex-col items-center py-5 text-center animate-fade-in-up">
+              <div className="grid h-20 w-20 place-items-center rounded-[28px] border border-[color:var(--glass-border)] bg-[color:var(--glass-surface-strong)] text-ink shadow-xl">
+                <Flame className="h-9 w-9" />
               </div>
-
-              <div className="space-y-2">
-                <h2 className="font-display text-2xl font-black text-ink tracking-tight">
-                  Welcome to Grain
-                </h2>
-                <p className="text-xs text-body leading-relaxed max-w-xs mx-auto">
-                  A minimal consistency engine designed to track your daily compounding habits without noise or distraction.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 w-full text-left pt-2">
-                <div className="p-3.5 rounded-2xl bg-[color:color-mix(in_srgb,var(--canvas-soft)_50%,transparent)] border border-[color:color-mix(in_srgb,var(--hairline)_50%,transparent)] space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-ink">
-                    <Plus className="h-3.5 w-3.5 text-ink" />
-                    <span>Create a habit</span>
+              <h2 className="mt-6 font-display text-2xl font-black tracking-tight text-ink">Start with one habit</h2>
+              <p className="mt-2 max-w-xs text-xs leading-relaxed text-body">Choose one small action, complete it today, and watch your first consistency mark appear. More tools unlock after that first check-in.</p>
+              <div className="mt-6 grid w-full grid-cols-3 gap-2 text-center">
+                {["Choose one", "Complete it", "Build the pattern"].map((label, index) => (
+                  <div key={label} className="rounded-2xl border border-[color:var(--hairline)] bg-[color:color-mix(in_srgb,var(--canvas-soft)_55%,transparent)] px-2 py-3">
+                    <span className="mx-auto grid h-6 w-6 place-items-center rounded-full bg-ink text-[10px] font-bold text-on-ink">{index + 1}</span>
+                    <p className="mt-2 text-[10px] font-semibold text-ink">{label}</p>
                   </div>
-                  <p className="text-[10px] text-mute leading-normal">
-                    Start with one small action you can repeat today.
-                  </p>
-                </div>
-
-                <div className="p-3.5 rounded-2xl bg-[color:color-mix(in_srgb,var(--canvas-soft)_50%,transparent)] border border-[color:color-mix(in_srgb,var(--hairline)_50%,transparent)] space-y-1">
-                  <div className="flex items-center gap-1.5 text-xs font-bold text-ink">
-                    <Check className="h-3.5 w-3.5 text-ink" />
-                    <span>Complete today</span>
-                  </div>
-                  <p className="text-[10px] text-mute leading-normal">
-                    Tap once to record progress and keep momentum visible.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {step === 1 && (
-            <div className="space-y-4 animate-fade-in-up">
-              <div className="space-y-1 text-center">
-                <h3 className="font-display text-lg font-bold text-ink">
-                  Select Starter Habits
-                </h3>
-                <p className="text-[11px] text-mute">
-                  Pick curated routines to bootstrap your dashboard. Customize anytime.
-                </p>
-              </div>
-
-              {/* Pack Selector Tabs */}
-              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-                {HABIT_PACKS.map((pack) => (
-                  <button
-                    key={pack.id}
-                    type="button"
-                    onClick={() => selectEntirePack(pack.id)}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-                      selectedPackId === pack.id
-                        ? "bg-ink text-on-ink shadow-md scale-[1.02]"
-                        : "bg-[color:color-mix(in_srgb,var(--canvas-soft)_60%,transparent)] border border-[color:color-mix(in_srgb,var(--hairline)_40%,transparent)] text-mute hover:text-ink"
-                    }`}
-                  >
-                    <span>{pack.name.split(" ")[0]}</span>
-                  </button>
                 ))}
               </div>
-
-              {/* Habit Checklist for selected pack */}
-              <div className="space-y-2">
-                {HABIT_PACKS.find((p) => p.id === selectedPackId)?.habits.map((h) => {
-                  const isChecked = selectedHabits.has(h.name);
+            </div>
+          ) : (
+            <div className="animate-fade-in-up">
+              <div className="text-center">
+                <h2 className="font-display text-xl font-bold text-ink">Choose your first habit</h2>
+                <p className="mt-1 text-[11px] text-mute">Keep it easy enough to finish today.</p>
+              </div>
+              <div className="mt-5 flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+                {HABIT_PACKS.map((pack) => (
+                  <button key={pack.id} type="button" onClick={() => selectPack(pack.id)} className={`shrink-0 rounded-full px-3.5 py-2 text-[11px] font-bold transition ${selectedPackId === pack.id ? "bg-ink text-on-ink" : "border border-[color:var(--hairline)] bg-[color:var(--canvas-soft)] text-body"}`}>{pack.name.split(" ")[0]}</button>
+                ))}
+              </div>
+              <div className="mt-2 space-y-2">
+                {HABIT_PACKS.find((pack) => pack.id === selectedPackId)?.habits.map((habit) => {
+                  const selected = selectedHabit.name === habit.name;
                   return (
-                    <div
-                      key={h.name}
-                      onClick={() => toggleHabit(h.name)}
-                      className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all cursor-pointer ${
-                        isChecked
-                          ? "bg-[color:color-mix(in_srgb,var(--canvas-softer)_70%,transparent)] border-[color:color-mix(in_srgb,var(--hairline)_80%,transparent)] shadow-sm"
-                          : "bg-[color:color-mix(in_srgb,var(--canvas-soft)_30%,transparent)] border-[color:color-mix(in_srgb,var(--hairline)_30%,transparent)] opacity-60 hover:opacity-100"
-                      }`}
-                    >
-                      <div className="min-w-0 pr-3">
-                        <div className="flex items-center gap-2">
-                          <p className="text-xs font-bold text-ink truncate">{h.name}</p>
-                          <span className="text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[color:color-mix(in_srgb,var(--ink)_10%,transparent)] text-mute">
-                            {h.time ?? "anytime"}
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-mute mt-0.5">
-                          {h.category} · {h.type === "numeric" ? `Target: ${h.target} ${h.unit}` : "Check-in"}
-                        </p>
-                      </div>
-
-                      <div
-                        className={`grid h-6 w-6 shrink-0 place-items-center rounded-lg border transition-all ${
-                          isChecked
-                            ? "bg-ink text-on-ink border-transparent"
-                            : "border-[color:var(--hairline)] bg-transparent"
-                        }`}
-                      >
-                        {isChecked && <Check className="h-3.5 w-3.5 stroke-[3]" />}
-                      </div>
-                    </div>
+                    <button key={habit.name} type="button" onClick={() => setSelectedHabit(habit)} className={`flex w-full items-center gap-3 rounded-2xl border p-3.5 text-left transition active:scale-[0.99] ${selected ? "border-[color:var(--glass-border)] bg-[color:var(--glass-surface-strong)]" : "border-[color:var(--hairline)] bg-[color:color-mix(in_srgb,var(--canvas-soft)_45%,transparent)]"}`}>
+                      <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border ${selected ? "border-transparent bg-ink text-on-ink" : "border-[color:var(--hairline-mid)]"}`}>{selected && <Check className="h-3.5 w-3.5" />}</span>
+                      <span className="min-w-0 flex-1"><span className="block truncate text-xs font-bold text-ink">{habit.name}</span><span className="mt-0.5 block text-[10px] text-mute">{habit.category} · {habit.type === "numeric" ? `${habit.target} ${habit.unit}` : "Daily check-in"}</span></span>
+                    </button>
                   );
                 })}
               </div>
             </div>
           )}
-
-          {step === 2 && (
-            <div className="flex flex-col items-center text-center py-4 space-y-5 animate-fade-in-up">
-              <div className="grid h-16 w-16 place-items-center rounded-3xl bg-[color:color-mix(in_srgb,var(--canvas-soft)_60%,transparent)] border border-[color:color-mix(in_srgb,var(--hairline)_60%,transparent)] text-ink shadow-xl">
-                <ShieldCheck className="h-8 w-8" />
-              </div>
-
-              <div className="space-y-2">
-                <h3 className="font-display text-xl font-bold text-ink">
-                  Ready to Begin
-                </h3>
-                <p className="text-xs text-body leading-relaxed max-w-xs mx-auto">
-                  {selectedHabits.size} habits selected. Start with today; the app will reveal deeper tools as your routine grows.
-                </p>
-              </div>
-
-              <div className="w-full p-4 rounded-2xl bg-[color:color-mix(in_srgb,var(--canvas-soft)_50%,transparent)] border border-[color:color-mix(in_srgb,var(--hairline)_50%,transparent)] text-left space-y-2">
-                <div className="flex items-center gap-2 text-xs font-bold text-ink">
-                  <Activity className="h-4 w-4 text-ink" />
-                  <span>See your consistency</span>
-                </div>
-                <p className="text-[11px] text-mute leading-relaxed">
-                  Complete habits from My Day, then open Consistency to see your pattern grow. Deck, goals, and wallpapers remain available when you are ready for more.
-                </p>
-              </div>
-            </div>
-          )}
         </div>
 
-        {error && <p role="alert" className="mt-3 text-center text-xs text-red-400">{error}</p>}
-
-        {/* Bottom Navigation Buttons */}
-        <div className="flex items-center gap-3 pt-4 border-t border-[color:var(--hairline)] mt-4">
-          {step > 0 && (
-            <button
-              type="button"
-              onClick={() => setStep((s) => (s - 1) as 0 | 1 | 2)}
-              className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[color:var(--canvas-soft)] border border-[color:var(--hairline)] text-ink hover:bg-[color:var(--surface-pressed)] active:scale-95 transition"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </button>
-          )}
-
-          {step < 2 ? (
-            <button
-              type="button"
-              onClick={() => setStep((s) => (s + 1) as 0 | 1 | 2)}
-              className="flex-1 flex items-center justify-center gap-2 h-12 rounded-2xl bg-ink text-on-ink font-display text-xs font-bold uppercase tracking-wider shadow-lg active:scale-95 transition hover:opacity-90"
-            >
-              <span>Continue</span>
-              <ArrowRight className="h-4 w-4" />
-            </button>
+        {error && <div role="alert" className="mt-3 rounded-xl border border-red-500/25 bg-red-500/8 px-3 py-2 text-center text-[11px] text-red-500">{error}</div>}
+        <div className="mt-5 flex gap-3 border-t border-[color:var(--hairline)] pt-4">
+          {step === 1 && <button type="button" onClick={() => setStep(0)} className="grid h-12 w-12 place-items-center rounded-2xl border border-[color:var(--hairline)] bg-[color:var(--canvas-soft)] text-ink" aria-label="Back"><ArrowLeft className="h-5 w-5" /></button>}
+          {step === 0 ? (
+            <button type="button" onClick={() => setStep(1)} className="flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-ink text-xs font-bold uppercase tracking-wider text-on-ink"><span>Choose a habit</span><ArrowRight className="h-4 w-4" /></button>
           ) : (
-            <button
-              type="button"
-              disabled={isSubmitting}
-              onClick={handleFinish}
-              className="flex-1 flex items-center justify-center gap-2 h-12 rounded-2xl bg-ink text-on-ink font-display text-xs font-bold uppercase tracking-wider shadow-xl active:scale-95 transition hover:opacity-90 disabled:opacity-50"
-            >
-              <span>{isSubmitting ? "Setting Up..." : "Launch Dashboard"}</span>
-              <Check className="h-4 w-4" />
-            </button>
+            <button type="button" disabled={isSubmitting} onClick={handleFinish} className="flex h-12 flex-1 items-center justify-center gap-2 rounded-2xl bg-ink text-xs font-bold uppercase tracking-wider text-on-ink disabled:opacity-50"><span>{isSubmitting ? "Saving…" : error ? "Try again" : "Add first habit"}</span><Check className="h-4 w-4" /></button>
           )}
         </div>
       </div>

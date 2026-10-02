@@ -15,7 +15,7 @@ export function AuthGate({ children }: { children: (user: any) => React.ReactNod
   React.useEffect(() => {
     const timer = setTimeout(() => {
       setMinSplashTimePassed(true);
-    }, 450);
+    }, 700);
     return () => clearTimeout(timer);
   }, []);
 
@@ -26,7 +26,7 @@ export function AuthGate({ children }: { children: (user: any) => React.ReactNod
         splash.classList.add("fade-out");
         setTimeout(() => {
           splash.remove();
-        }, 220);
+        }, 420);
       }
     }
   }, [loading, minSplashTimePassed]);

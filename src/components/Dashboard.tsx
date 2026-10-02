@@ -132,11 +132,15 @@ import type { AppTab, Theme, WallpaperState, Habit } from "../components/types";
 import { useToast } from "./ui/Toast";
 import { WheelPicker } from "./ui/WheelPicker";
 import { DataStatusBanner } from "./ui/DataStatusBanner";
+import { BackupReminderBanner } from "./ui/BackupReminderBanner";
 import { WallpaperEditorControls } from "./wallpaper/WallpaperEditorControls";
 import {
   clearLocalCompletionDate,
   exportLocalBackup,
+  getLocalBackupStatus,
   importLocalBackup,
+  markLocalBackupExported,
+  dismissLocalBackupReminder,
   migrateCloudDataToLocalOnce,
   updateLocalPrefs,
 } from "../lib/local-data";
@@ -430,6 +434,16 @@ export function Dashboard({ user }: { user?: any }) {
   } = useHeatmap(userId, rawHabits, selectedHabit);
 
   const dataError = habitsError || completionsError || heatmapError || goalsError;
+  const [backupStatus, setBackupStatus] = useState(() => userId ? getLocalBackupStatus(userId) : null);
+  const hasFirstCompletion = useMemo(
+    () => Object.values(completionsMap).some((day) => Object.values(day).some((entry) => entry.done)),
+    [completionsMap],
+  );
+
+  useEffect(() => {
+    setBackupStatus(userId ? getLocalBackupStatus(userId) : null);
+  }, [userId, rawHabits.length, goals.length, heatmapStats.totalCompletions]);
+
   const retryData = useCallback(() => {
     retryHabits();
     retryCompletions();
@@ -1107,7 +1121,12 @@ export function Dashboard({ user }: { user?: any }) {
       setNewUnit("");
       showToast(`Saved "${name}" on this device`);
     } catch {
-      toastError("Habit was not saved. Check your connection and try again.");
+      globalToast(
+        "Habit was not saved on this device.",
+        "error",
+        { label: "Try again", onClick: () => void createHabit() },
+        6000,
+      );
     } finally {
       setIsCreatingHabit(false);
     }
@@ -1517,11 +1536,20 @@ export function Dashboard({ user }: { user?: any }) {
       setWallpaperState("applied");
       setWallpaperSnapshot(heatmap.map((c) => c.slice()));
     } catch (e: any) {
-      toastError(e.message || "An error occurred");
       if (e?.message?.includes("static")) {
-        showToast("Static wallpaper failed. Try Live Wallpaper instead.");
+        globalToast(
+          "Static wallpaper could not be applied.",
+          "error",
+          { label: "Try live", onClick: () => void applyWallpaper(false) },
+          7000,
+        );
       } else {
-        showToast("Could not generate wallpaper image");
+        globalToast(
+          e?.message || "Could not generate the wallpaper image.",
+          "error",
+          { label: "Try again", onClick: () => void applyWallpaper(forceStatic, screenTarget) },
+          7000,
+        );
       }
     } finally {
       window.setTimeout(() => setWallpaperState("idle"), 2500);
@@ -1645,9 +1673,11 @@ export function Dashboard({ user }: { user?: any }) {
       a.download = `grain-backup-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
+      markLocalBackupExported(userId);
+      setBackupStatus(getLocalBackupStatus(userId));
       showToast(`Backup downloaded · ${flatHabits.length} habits`);
     } catch {
-      showToast("Export failed");
+      globalToast("Backup could not be downloaded.", "error", { label: "Try again", onClick: exportBackup }, 6000);
     }
   };
 
@@ -1661,7 +1691,12 @@ export function Dashboard({ user }: { user?: any }) {
       showToast("Backup restored · Reloading local data");
       window.setTimeout(() => window.location.reload(), 500);
     } catch (error) {
-      toastError(error instanceof Error ? error.message : "Backup could not be imported");
+      globalToast(
+        error instanceof Error ? error.message : "Backup could not be imported",
+        "error",
+        { label: "Choose file", onClick: () => backupInputRef.current?.click() },
+        7000,
+      );
     }
   };
 
@@ -2281,8 +2316,21 @@ export function Dashboard({ user }: { user?: any }) {
 
           {dataError && (
             <DataStatusBanner
-              message={dataError.message || "Some data could not sync. Your saved items are still shown."}
+              message={dataError.message || "Some local data could not be loaded. Your saved items remain on this device."}
               onRetry={retryData}
+              recoveryAction={{ label: "Import backup", onClick: () => backupInputRef.current?.click() }}
+            />
+          )}
+
+          {backupStatus?.reminderDue && !onboardingOpen && (
+            <BackupReminderBanner
+              onBackup={exportBackup}
+              onLater={() => {
+                if (!userId) return;
+                dismissLocalBackupReminder(userId);
+                setBackupStatus(getLocalBackupStatus(userId));
+                showToast("Backup reminder snoozed for 3 days");
+              }}
             />
           )}
 
@@ -2917,7 +2965,7 @@ export function Dashboard({ user }: { user?: any }) {
               activeTab={activeTab}
               onSwitchTab={switchTab}
               onOpenDeck={openDeck}
-              advancedFeaturesUnlocked={habitsLoading || rawHabits.length > 0}
+              advancedFeaturesUnlocked={habitsLoading || hasFirstCompletion}
             />
           )}
 
@@ -3522,6 +3570,11 @@ export function Dashboard({ user }: { user?: any }) {
                   <input ref={backupInputRef} type="file" accept="application/json,.json" className="hidden" onChange={importBackup} />
                   <div className="mx-5 mb-2 rounded-2xl border border-amber-500/25 bg-amber-500/8 px-3.5 py-3 text-[11px] leading-relaxed text-body">
                     <strong className="text-ink">Local data only.</strong> Your account remains online, but habits and progress stay on this device. Download a backup before uninstalling or changing phones.
+                    <span className="mt-1.5 block text-mute">
+                      {backupStatus?.lastExportedAt
+                        ? `Last backup: ${new Date(backupStatus.lastExportedAt).toLocaleDateString()}`
+                        : "No backup created yet."}
+                    </span>
                   </div>
                   <button
                     data-lg-press
@@ -5008,7 +5061,11 @@ export function Dashboard({ user }: { user?: any }) {
                   for (const h of newHabits) {
                     await addHabit(h);
                   }
-                  showToast(`Added ${newHabits.length} starter habits!`);
+                  showToast(
+                    "Your first habit is ready · complete it to unlock more tools",
+                    { label: "Got it", onClick: () => undefined },
+                    6000,
+                  );
                 }}
               />
             )}

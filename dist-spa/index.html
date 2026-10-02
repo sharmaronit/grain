@@ -7,14 +7,22 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" media="print" onload="this.media='all'" />
-    <script type="module" crossorigin src="/assets/index-GaLlXaU3.js"></script>
+    <script>
+      try {
+        const savedTheme = localStorage.getItem("grain_app_theme");
+        if (savedTheme === "light" || savedTheme === "dark" || savedTheme === "amoled") {
+          document.documentElement.dataset.theme = savedTheme;
+          document.documentElement.classList.toggle("dark", savedTheme !== "light");
+        }
+      } catch (_) {}
+    </script>
+    <script type="module" crossorigin src="/assets/index-B5yLNkDG.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/rolldown-runtime-QTnfLwEv.js">
     <link rel="modulepreload" crossorigin href="/assets/react-CVaUQXZF.js">
     <link rel="modulepreload" crossorigin href="/assets/createLucideIcon-6-YxuYGF.js">
     <link rel="modulepreload" crossorigin href="/assets/arrow-right-CfAsTJji.js">
     <link rel="modulepreload" crossorigin href="/assets/check-IjtX_-NW.js">
     <link rel="modulepreload" crossorigin href="/assets/flame-CHuSZEqH.js">
-    <link rel="modulepreload" crossorigin href="/assets/plus-Cs0URS-S.js">
     <link rel="modulepreload" crossorigin href="/assets/firebase-firestore-Cszh0pOl.js">
     <link rel="modulepreload" crossorigin href="/assets/firebase-firestore-Cmsx80Hu.js">
     <link rel="modulepreload" crossorigin href="/assets/firebase-firestore-BWv2FXkR.js">
@@ -25,68 +33,160 @@
     <link rel="modulepreload" crossorigin href="/assets/firebase-firestore-7zVl2RTE.js">
     <link rel="modulepreload" crossorigin href="/assets/firebase-core-BzPhq-uy.js">
     <link rel="modulepreload" crossorigin href="/assets/capacitor-IrhEo5D2.js">
-    <link rel="stylesheet" crossorigin href="/assets/index-DNjlPKjG.css">
+    <link rel="stylesheet" crossorigin href="/assets/index-0hedUM7g.css">
   </head>
-  <body class="bg-black text-white antialiased">
+  <body class="antialiased">
     <style>
-      @keyframes grain-splash-icon {
-        0% { transform: scale(0.6) rotate(-10deg); opacity: 0; filter: blur(10px); }
-        40% { transform: scale(1.1) rotate(5deg); opacity: 1; filter: blur(0px); }
-        60% { transform: scale(0.95) rotate(-2deg); opacity: 1; filter: blur(0px); }
-        100% { transform: scale(1) rotate(0deg); opacity: 1; filter: blur(0px); }
+      @keyframes grain-loader-enter {
+        0% { opacity: 0; transform: translateY(14px) scale(0.9); }
+        100% { opacity: 1; transform: translateY(0) scale(1); }
       }
-      @keyframes grain-fade-in-up {
-        from { opacity: 0; transform: translateY(12px); }
-        to { opacity: 1; transform: translateY(0); }
+      @keyframes grain-kernel-breathe {
+        0%, 100% { opacity: 0.28; transform: scale(0.78); }
+        38%, 62% { opacity: 1; transform: scale(1); }
+      }
+      @keyframes grain-stem-draw {
+        0% { stroke-dashoffset: 112; opacity: 0.2; }
+        44%, 100% { stroke-dashoffset: 0; opacity: 1; }
+      }
+      @keyframes grain-loader-sway {
+        0%, 100% { transform: rotate(-1.8deg); }
+        50% { transform: rotate(1.8deg); }
+      }
+      @keyframes grain-loader-ring {
+        0% { opacity: 0; transform: scale(0.72); }
+        35% { opacity: 0.55; }
+        100% { opacity: 0; transform: scale(1.18); }
+      }
+      @keyframes grain-loader-track {
+        0% { transform: translateX(-115%); }
+        55%, 100% { transform: translateX(260%); }
       }
       #splash-screen {
         position: fixed; inset: 0; z-index: 99999;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
-        background-color: #09090b; 
-        transition: opacity 0.22s ease-out, transform 0.22s ease-out, filter 0.22s ease-out;
+        color: #f4f4f5;
+        background: #09090b;
+        transition: opacity 0.42s cubic-bezier(0.22, 1, 0.36, 1), transform 0.42s cubic-bezier(0.22, 1, 0.36, 1), filter 0.42s ease;
       }
       #splash-screen.fade-out {
-        opacity: 0; transform: scale(1.02); filter: blur(4px); pointer-events: none;
+        opacity: 0; transform: scale(1.025); filter: blur(7px); pointer-events: none;
       }
-      .splash-glow {
-        position: absolute; width: 256px; height: 256px;
-        background: rgba(255,255,255,0.05); border-radius: 50%;
-        filter: blur(60px);
+      .grain-loader {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        animation: grain-loader-enter 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
       }
-      .splash-icon-container {
-        width: 96px; height: 96px; border-radius: 24px;
-        background: rgba(255,255,255,0.05); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
-        border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
-        display: flex; align-items: center; justify-content: center; overflow: hidden;
-        animation: grain-splash-icon 1.2s cubic-bezier(0.25, 1, 0.3, 1) forwards;
-        position: relative; z-index: 1;
+      .grain-loader__mark {
+        position: relative;
+        display: grid;
+        width: 104px;
+        height: 104px;
+        place-items: center;
       }
-      .splash-icon-container img {
-        width: 150%; height: 150%; object-fit: cover; mix-blend-mode: screen; opacity: 0.9;
+      .grain-loader__mark::before,
+      .grain-loader__mark::after {
+        content: "";
+        position: absolute;
+        inset: 4px;
+        border: 1px solid color-mix(in srgb, currentColor 14%, transparent);
+        border-radius: 50%;
       }
-      .splash-text {
+      .grain-loader__mark::after {
+        animation: grain-loader-ring 2.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+      }
+      .grain-loader__svg {
+        width: 58px;
+        height: 74px;
+        overflow: visible;
+        animation: grain-loader-sway 2.4s ease-in-out infinite;
+        transform-origin: 50% 100%;
+      }
+      .grain-loader__stem {
+        stroke-dasharray: 112;
+        animation: grain-stem-draw 1.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+      }
+      .grain-loader__kernel {
+        transform-box: fill-box;
+        transform-origin: center;
+        animation: grain-kernel-breathe 1.55s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+      }
+      .grain-loader__kernel:nth-of-type(2), .grain-loader__kernel:nth-of-type(3) { animation-delay: 0.12s; }
+      .grain-loader__kernel:nth-of-type(4), .grain-loader__kernel:nth-of-type(5) { animation-delay: 0.24s; }
+      .grain-loader__kernel:nth-of-type(6), .grain-loader__kernel:nth-of-type(7) { animation-delay: 0.36s; }
+      .grain-loader__kernel:nth-of-type(8) { animation-delay: 0.48s; }
+      .grain-loader__name {
+        margin-top: 14px;
+        font-family: "Space Grotesk", "Inter", system-ui, sans-serif;
+        font-size: 23px;
+        font-weight: 650;
+        letter-spacing: -0.025em;
+      }
+      .grain-loader__status {
+        margin-top: 6px;
         font-family: "Inter", system-ui, sans-serif;
-        font-size: 24px; font-weight: 700; color: #fff; letter-spacing: -0.01em; margin-top: 16px;
-        animation: grain-fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-        animation-delay: 0.4s;
-        position: relative; z-index: 1;
+        color: color-mix(in srgb, currentColor 58%, transparent);
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
       }
-      
+      .grain-loader__track {
+        width: 82px;
+        height: 2px;
+        margin-top: 18px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: color-mix(in srgb, currentColor 12%, transparent);
+      }
+      .grain-loader__track::after {
+        content: "";
+        display: block;
+        width: 34%;
+        height: 100%;
+        border-radius: inherit;
+        background: currentColor;
+        animation: grain-loader-track 1.35s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+      }
+      html[data-theme="light"] #splash-screen {
+        color: #18181b;
+        background: #fafafa;
+      }
       @media (prefers-color-scheme: light) {
-        #splash-screen { background-color: #ffffff; }
-        .splash-glow { background: rgba(0,0,0,0.05); }
-        .splash-icon-container { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.1); }
-        .splash-icon-container img { mix-blend-mode: multiply; filter: invert(1); }
-        .splash-text { color: #000; }
+        html:not([data-theme]) #splash-screen { color: #18181b; background: #fafafa; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .grain-loader,
+        .grain-loader__svg,
+        .grain-loader__stem,
+        .grain-loader__kernel,
+        .grain-loader__mark::after,
+        .grain-loader__track::after { animation: none !important; }
+        .grain-loader__stem { stroke-dashoffset: 0; }
+        .grain-loader__kernel { opacity: 1; transform: none; }
       }
     </style>
-    
-    <div id="splash-screen">
-      <div class="splash-glow"></div>
-      <div class="splash-icon-container">
-        <img src="/icon.png" alt="Grain" />
+
+    <div id="splash-screen" role="status" aria-label="Loading Grain">
+      <div class="grain-loader">
+        <div class="grain-loader__mark" aria-hidden="true">
+          <svg class="grain-loader__svg" viewBox="0 0 58 74" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path class="grain-loader__stem" d="M29 70C29 52 29 32 29 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            <ellipse class="grain-loader__kernel" cx="21" cy="19" rx="5" ry="9" transform="rotate(-39 21 19)" fill="currentColor" />
+            <ellipse class="grain-loader__kernel" cx="37" cy="24" rx="5" ry="9" transform="rotate(39 37 24)" fill="currentColor" />
+            <ellipse class="grain-loader__kernel" cx="20" cy="33" rx="5" ry="9" transform="rotate(-43 20 33)" fill="currentColor" />
+            <ellipse class="grain-loader__kernel" cx="38" cy="38" rx="5" ry="9" transform="rotate(43 38 38)" fill="currentColor" />
+            <ellipse class="grain-loader__kernel" cx="20" cy="47" rx="5" ry="9" transform="rotate(-47 20 47)" fill="currentColor" />
+            <ellipse class="grain-loader__kernel" cx="38" cy="52" rx="5" ry="9" transform="rotate(47 38 52)" fill="currentColor" />
+            <ellipse class="grain-loader__kernel" cx="29" cy="9" rx="4.5" ry="8" fill="currentColor" />
+          </svg>
+        </div>
+        <div class="grain-loader__name">Grain</div>
+        <div class="grain-loader__status">Preparing your day</div>
+        <div class="grain-loader__track" aria-hidden="true"></div>
       </div>
-      <div class="splash-text">Grain</div>
     </div>
 
     <div id="root"></div>
