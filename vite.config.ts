@@ -11,7 +11,7 @@ export default defineConfig({
     tsconfigPaths(),
   ],
   build: {
-    outDir: "dist-spa",
+    outDir: "dist/app",
     emptyOutDir: true,
     rolldownOptions: {
       output: {
