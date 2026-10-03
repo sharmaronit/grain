@@ -178,8 +178,8 @@
   background: color-mix(in srgb, var(--ink) 7%, transparent);
   color: var(--ink);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 10%, transparent), 0 10px 26px color-mix(in srgb, var(--canvas) 28%, transparent);
-  backdrop-filter: blur(22px) saturate(135%);
   -webkit-backdrop-filter: blur(22px) saturate(135%);
+  backdrop-filter: blur(22px) saturate(135%);
 }
 
 .auth-input::placeholder { color: color-mix(in srgb, var(--body) 68%, transparent); }
@@ -221,8 +221,8 @@
 
 @utility card-uber {
   background: color-mix(in srgb, var(--canvas) 28%, transparent);
-  backdrop-filter: blur(18px) saturate(130%);
   -webkit-backdrop-filter: blur(18px) saturate(130%);
+  backdrop-filter: blur(18px) saturate(130%);
   color: var(--ink);
   border-radius: var(--radius-xl);
   border: 0.5px solid color-mix(in srgb, var(--ink) 34%, transparent) !important;
@@ -233,8 +233,8 @@
 
 @utility card-soft {
   background: color-mix(in srgb, var(--canvas) 18%, transparent);
-  backdrop-filter: blur(16px) saturate(125%);
   -webkit-backdrop-filter: blur(16px) saturate(125%);
+  backdrop-filter: blur(16px) saturate(125%);
   color: var(--ink);
   border-radius: var(--radius-xl);
   border: 0.5px solid color-mix(in srgb, var(--ink) 30%, transparent) !important;
@@ -255,8 +255,8 @@
 @utility liquid-glass {
   position: relative;
   background: color-mix(in srgb, var(--canvas) 36%, transparent);
-  backdrop-filter: blur(18px) saturate(125%);
   -webkit-backdrop-filter: blur(18px) saturate(125%);
+  backdrop-filter: blur(18px) saturate(125%);
   border: 0.5px solid color-mix(in srgb, var(--ink) 24%, transparent) !important;
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 10%, transparent);
   overflow: hidden;
@@ -930,8 +930,8 @@
 }
 .liquid-input {
   background: color-mix(in oklab, var(--ink) 5%, transparent) !important;
-  backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
   border: 1px solid color-mix(in oklab, var(--ink) 15%, transparent);
   box-shadow:
     inset 0 1px 1px color-mix(in oklab, var(--ink) 10%, transparent),
@@ -954,29 +954,31 @@
   }
 }
 
+/* Keep the Safari prefix before the standard property. Production optimization
+   otherwise retains only the prefix, which Chromium/WebView does not accept. */
 .liquid-tabbar {
   position: relative;
   isolation: isolate;
   border-radius: var(--radius-pill);
   border: 0.5px solid color-mix(in srgb, var(--ink) 34%, transparent);
-  background: color-mix(in srgb, var(--canvas) 8%, transparent);
-  backdrop-filter: blur(20px) saturate(135%);
+  background: color-mix(in srgb, var(--canvas) 28%, transparent);
   -webkit-backdrop-filter: blur(20px) saturate(135%);
+  backdrop-filter: blur(20px) saturate(135%);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 8%, transparent);
 }
 
 /* Reading surfaces stay denser than the floating cards. */
 .sheet-glass {
   background: color-mix(in srgb, var(--canvas) 88%, transparent) !important;
-  backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
 }
 
 .liquid-control {
   border: 0.5px solid var(--glass-border);
   background: var(--glass-surface);
-  backdrop-filter: blur(var(--glass-blur)) saturate(125%);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(125%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(125%);
   box-shadow: inset 0 1px 0 var(--glass-highlight);
 }
 
@@ -987,8 +989,8 @@
   box-shadow:
     inset 0 1px 0 var(--glass-highlight),
     0 8px 22px var(--glass-shadow);
-  backdrop-filter: blur(var(--glass-blur)) saturate(125%);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(125%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(125%);
 }
 
 .settings-control {
@@ -999,8 +1001,8 @@
   background: color-mix(in srgb, var(--canvas) 30%, transparent);
   border: 0.5px solid color-mix(in srgb, var(--ink) 24%, transparent);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 10%, transparent);
-  backdrop-filter: blur(18px) saturate(125%);
   -webkit-backdrop-filter: blur(18px) saturate(125%);
+  backdrop-filter: blur(18px) saturate(125%);
 }
 
 [data-theme="amoled"] .settings-glass {
@@ -1018,9 +1020,9 @@
 
 .liquid-deck-button {
   border: 0.5px solid color-mix(in srgb, var(--ink) 34%, transparent);
-  background: color-mix(in srgb, var(--canvas) 8%, transparent);
-  backdrop-filter: blur(20px) saturate(135%);
+  background: color-mix(in srgb, var(--canvas) 28%, transparent);
   -webkit-backdrop-filter: blur(20px) saturate(135%);
+  backdrop-filter: blur(20px) saturate(135%);
 }
 
 .liquid-tabbar-selection {
@@ -1086,8 +1088,8 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--canvas) 16%, transparent);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 9%, transparent), 0 8px 24px rgba(0, 0, 0, 0.12);
-  backdrop-filter: blur(22px) saturate(135%);
   -webkit-backdrop-filter: blur(22px) saturate(135%);
+  backdrop-filter: blur(22px) saturate(135%);
 }
 
 /* Quiet depth behind the Deck cards. It adapts per theme without competing
@@ -1191,8 +1193,8 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--canvas) 20%, transparent);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 9%, transparent);
-  backdrop-filter: blur(18px) saturate(125%);
   -webkit-backdrop-filter: blur(18px) saturate(125%);
+  backdrop-filter: blur(18px) saturate(125%);
 }
 
 .theme-segmented-selection {
@@ -1233,8 +1235,8 @@
 .liquid-fab {
   border: 0.5px solid color-mix(in srgb, var(--ink) 34%, transparent);
   background: color-mix(in srgb, var(--canvas) 18%, transparent);
-  backdrop-filter: blur(18px) saturate(130%);
   -webkit-backdrop-filter: blur(18px) saturate(130%);
+  backdrop-filter: blur(18px) saturate(130%);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 8%, transparent);
 }
 
@@ -1253,8 +1255,8 @@
 .habit-list-surface {
   border: 0.5px solid color-mix(in srgb, var(--ink) 34%, transparent);
   background: color-mix(in srgb, var(--canvas) 8%, transparent);
-  backdrop-filter: blur(20px) saturate(135%);
   -webkit-backdrop-filter: blur(20px) saturate(135%);
+  backdrop-filter: blur(20px) saturate(135%);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 8%, transparent);
 }
 
@@ -1266,8 +1268,8 @@
   border: 0.5px solid var(--glass-border);
   background: var(--glass-surface);
   box-shadow: inset 0 1px 0 var(--glass-highlight), 0 8px 24px var(--glass-shadow);
-  backdrop-filter: blur(var(--glass-blur)) saturate(145%);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(145%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(145%);
 }
 
 .wallpaper-glass-control,
@@ -1314,8 +1316,8 @@
   background: color-mix(in srgb, var(--canvas) 68%, transparent);
   color: color-mix(in srgb, #ef4444 82%, var(--ink));
   font-size: 0.75rem;
-  backdrop-filter: blur(var(--glass-blur)) saturate(130%);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(130%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(130%);
   box-shadow: 0 10px 28px var(--glass-shadow);
 }
 
@@ -1348,8 +1350,8 @@
   background: var(--glass-surface-strong);
   color: var(--ink);
   box-shadow: inset 0 1px 0 var(--glass-highlight), 0 8px 22px var(--glass-shadow);
-  backdrop-filter: blur(var(--glass-blur)) saturate(135%);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(135%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(135%);
   font-size: 0.6875rem;
   font-weight: 700;
   white-space: nowrap;

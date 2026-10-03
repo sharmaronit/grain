@@ -8,7 +8,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build",
+    "build": "vite build && node landing/scripts/check-glass-css.mjs dist-spa/assets",
     "preview": "vite preview",
     "test": "vitest run",
     "lint": "eslint .",
