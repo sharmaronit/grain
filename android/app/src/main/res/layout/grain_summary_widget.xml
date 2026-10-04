@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/summary_root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="16dp" android:background="@drawable/widget_surface_dark">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <TextView android:id="@+id/summary_title" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+            android:text="Grain" android:textColor="#F4F4F5" android:textSize="14sp" android:fontFamily="sans-serif-medium" />
+        <TextView android:id="@+id/summary_brand" android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:text="GRAIN" android:textSize="8sp" android:letterSpacing="0.16" android:textColor="#A1A1AA" android:layout_marginStart="8dp" />
+    </LinearLayout>
+    <ImageView android:id="@+id/summary_graphic" android:layout_width="match_parent" android:layout_height="0dp"
+        android:layout_weight="1" android:layout_marginTop="8dp" android:layout_marginBottom="8dp" android:scaleType="fitCenter" />
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical">
+        <TextView android:id="@+id/summary_caption" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content"
+            android:text="Open Grain to get started" android:textColor="#A1A1AA" android:textSize="11sp" />
+        <TextView android:id="@+id/summary_edit" android:layout_width="40dp" android:layout_height="36dp"
+            android:text="Edit" android:contentDescription="Edit widget design" android:textColor="#A1A1AA" android:textSize="11sp" android:gravity="center" />
+    </LinearLayout>
+</LinearLayout>

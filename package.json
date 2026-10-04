@@ -8,7 +8,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "vite build",
+    "build": "vite build && node landing/scripts/check-glass-css.mjs dist/app/assets",
+    "build:android": "powershell -NoProfile -File scripts/build-android.ps1",
     "preview": "vite preview",
     "test": "vitest run",
     "lint": "eslint .",

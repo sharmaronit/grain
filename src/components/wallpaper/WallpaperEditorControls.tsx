@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { Check, ChevronDown, Move } from "lucide-react";
+import { CollapseMotion } from "../ui/CollapseMotion";
 
 interface WallpaperEditorControlsProps {
   editingPhoto: boolean;
@@ -48,11 +49,11 @@ export function WallpaperEditorControls({
             </div>
             <button type="button" onClick={onToggleExpanded} className="mb-1 flex h-7 w-full items-center justify-center gap-1 rounded-full text-[10px] font-bold uppercase tracking-[0.16em] text-white/65 hover:bg-white/10" aria-expanded={expanded}>
               <span>{expanded ? "Hide customization" : "Choose theme and layout"}</span>
-              <ChevronDown size={14} className={`transition-transform duration-300 ${expanded ? "rotate-180" : ""}`} />
+              <ChevronDown size={14} className={`grain-disclosure-chevron ${expanded ? "rotate-180" : ""}`} />
             </button>
-            <div className={`overflow-hidden transition-[max-height,opacity] duration-300 ease-out ${expanded ? "max-h-[420px] opacity-100" : "max-h-0 opacity-0"}`}>
-              {settings}
-            </div>
+            <CollapseMotion open={expanded}>
+              <div className="max-h-[min(420px,45dvh)] overflow-y-auto overscroll-contain">{settings}</div>
+            </CollapseMotion>
           </div>
 
           <div className={`grid w-full max-w-[420px] ${customPhoto ? "grid-cols-3" : "grid-cols-2"} gap-2 pointer-events-auto`}>

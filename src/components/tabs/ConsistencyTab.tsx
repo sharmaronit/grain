@@ -41,6 +41,7 @@ interface ConsistencyTabProps {
   doneCount: number;
   totalCount: number;
   totalStreak: number;
+  bestStreak: number;
   rate: number;
   weeklyInsights: InsightsResult;
   showToast: (msg: string) => void;
@@ -55,6 +56,7 @@ export const ConsistencyTab = memo(function ConsistencyTab({
   doneCount,
   totalCount,
   totalStreak,
+  bestStreak,
   rate,
   weeklyInsights,
 }: ConsistencyTabProps) {
@@ -143,7 +145,7 @@ export const ConsistencyTab = memo(function ConsistencyTab({
         {/* Minimalist Stats Grid */}
         <div className="grid grid-cols-3 gap-3 mb-12">
           <Stat label="Today" value={`${doneCount}/${totalCount}`} pulseKey={doneCount} />
-          <Stat label="Best" value={totalStreak > 0 ? `${totalStreak}d` : "—"} />
+          <Stat label="Best" value={bestStreak > 0 ? `${bestStreak}d` : "—"} />
           <Stat label="Rate" value={`${rate}%`} pulseKey={rate} />
         </div>
 

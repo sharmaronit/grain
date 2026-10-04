@@ -73,7 +73,12 @@ export function useCompletions(
     setError(null);
 
     const refresh = () => {
+      try {
       setEntries(readLocalData(userId).completions[dateKey] ?? {});
+      setError(null);
+      } catch (error) {
+        setError(error instanceof Error ? error : new Error("Progress could not be read"));
+      }
       setLoading(false);
     };
     refresh();
@@ -81,7 +86,7 @@ export function useCompletions(
   }, [userId, dateKey, pageVisible, retryNonce]);
 
   const getEntry = (habitId: string): CompletionEntry =>
-    entries[habitId] ?? { ...emptyEntry };
+    (userId ? readLocalData(userId).completions[dateKey]?.[habitId] : entries[habitId]) ?? { ...emptyEntry };
 
   const toggleDone = async (habitId: string) => {
     if (!userId) return;
@@ -90,6 +95,9 @@ export function useCompletions(
     const updated: CompletionEntry = {
       ...current,
       done: nowDone,
+      restDay: false,
+      frozenStreak: false,
+      skipped: false,
       completedAt: nowDone ? new Date() : null,
     };
 
@@ -116,7 +124,10 @@ export function useCompletions(
       ...current,
       done,
       value: newVal,
-      completedAt: done && !current.done ? new Date() : current.completedAt,
+      restDay: false,
+      frozenStreak: false,
+      skipped: false,
+      completedAt: done ? (current.completedAt ?? new Date()) : null,
     };
 
     setEntries((prev) => ({ ...prev, [habitId]: updated }));
@@ -146,7 +157,10 @@ export function useCompletions(
       ...current,
       value: newVal,
       done,
-      completedAt: done && !current.done ? new Date() : current.completedAt,
+      restDay: false,
+      frozenStreak: false,
+      skipped: false,
+      completedAt: done ? (current.completedAt ?? new Date()) : null,
     };
 
     setEntries((prev) => ({ ...prev, [habitId]: updated }));

@@ -29,6 +29,7 @@ export function useGoals(userId: string | null): UseGoalsResult {
     setError(null);
 
     const refresh = () => {
+      try {
         const fetchedGoals = readLocalData(userId).goals.slice();
         fetchedGoals.sort((a, b) => {
           const timeA = a.createdAt?.getTime() || 0;
@@ -36,6 +37,10 @@ export function useGoals(userId: string | null): UseGoalsResult {
           return timeB - timeA;
         });
         setGoals(fetchedGoals);
+        setError(null);
+      } catch (error) {
+        setError(error instanceof Error ? error : new Error("Goals could not be read"));
+      }
         setLoading(false);
     };
     refresh();

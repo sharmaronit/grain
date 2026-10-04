@@ -7,6 +7,7 @@ interface ToastMessage {
   id: string;
   message: string;
   type: ToastType;
+  durationMs: number;
   action?: { label: string; onClick: () => void };
 }
 
@@ -30,9 +31,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const addToast = useCallback((message: string, type: ToastType = "info", action?: ToastMessage["action"], duration = 3000) => {
     const id = Math.random().toString(36).substring(2, 9);
-    setToasts((prev) => [...prev, { id, message, type, action }]);
+    setToasts((prev) => [...prev, { id, message, type, action, durationMs: duration }]);
 
-    // Auto dismiss after 3 seconds
+    // Auto dismiss after the requested duration.
     setTimeout(() => {
       removeToast(id);
     }, duration);

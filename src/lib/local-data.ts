@@ -1,5 +1,7 @@
 import type { GoalDoc, HabitDoc, UserProfile } from "./firestore";
 import type { CompletionEntry } from "./streaks";
+import { validateBackup } from "./backup-validation";
+import { reduceExternalActions, type ExternalHabitAction } from "./external-actions";
 
 export interface GrainLocalData {
   version: 1;
@@ -107,6 +109,21 @@ export function addLocalHabit(userId: string, habit: Omit<HabitDoc, "id" | "crea
   return id;
 }
 
+/** Save all starter habits and the completion flag in one storage write. */
+export function completeLocalOnboarding(userId: string, habits: Array<Omit<HabitDoc, "id" | "createdAt">>): void {
+  if (habits.length === 0) throw new Error("Choose at least one starter habit.");
+  const data = readLocalData(userId);
+  if (data.prefs.onboardingCompleted === true) return;
+  const firstOrder = Math.max(-1, ...data.habits.map(habit => Number.isFinite(habit.order) ? habit.order : -1)) + 1;
+  const createdAt = new Date();
+  const additions = habits.map((habit, index) => ({ ...habit, id: crypto.randomUUID(), createdAt, order: firstOrder + index }));
+  writeLocalData(userId, {
+    ...data,
+    habits: [...data.habits, ...additions],
+    prefs: { ...data.prefs, onboardingCompleted: true },
+  });
+}
+
 export function updateLocalHabit(userId: string, habitId: string, patch: Partial<HabitDoc>): void {
   updateLocalData(userId, (data) => ({ ...data, habits: data.habits.map((habit) => habit.id === habitId ? { ...habit, ...patch } : habit) }));
 }
@@ -139,6 +156,10 @@ export function setLocalCompletion(userId: string, dateKey: string, habitId: str
     ...data,
     completions: { ...data.completions, [dateKey]: { ...(data.completions[dateKey] ?? {}), [habitId]: entry as CompletionEntry } },
   }));
+}
+
+export function applyExternalHabitActions(userId: string, actions: ExternalHabitAction[]): void {
+  if (actions.length) updateLocalData(userId, data => reduceExternalActions(data, userId, actions));
 }
 
 export function clearLocalCompletionDate(userId: string, dateKey: string): void {
@@ -192,6 +213,7 @@ export function getLocalBackupStatus(userId: string): LocalBackupStatus {
 }
 
 export function importLocalBackup(userId: string, value: unknown): void {
+  validateBackup(value);
   if (!value || typeof value !== "object") throw new Error("Invalid backup file");
   const candidate = value as Partial<GrainLocalData>;
   if (!Array.isArray(candidate.habits) || !Array.isArray(candidate.goals) || typeof candidate.completions !== "object") {

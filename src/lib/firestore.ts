@@ -82,6 +82,7 @@ export interface UserProfile {
   remindersOn: boolean;
   reminderTime?: string;
   morningKickoff?: boolean;
+  dailySummary?: boolean;
   previewWeeks: number;
   activeGoalId?: string;
 }

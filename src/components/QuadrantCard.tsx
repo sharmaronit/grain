@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import type { Quadrant, Habit } from "./types";
 import { DropdownMotion } from "./ui/DropdownMotion";
+import { CollapseMotion } from "./ui/CollapseMotion";
 
 const QUADRANTS: Record<Quadrant, { title: string; sub: string }> = {
   q1: { title: "Do first", sub: "Urgent · Important" },
@@ -101,7 +102,7 @@ export function QuadrantCard({
       </button>
 
       {/* Content Area */}
-      {!collapsed && (
+      <CollapseMotion open={!collapsed}>
         <div className="px-3 pb-3 pt-0 space-y-1.5">
           {visible.map(({ h, i }) => (
             <HabitRow
@@ -127,7 +128,7 @@ export function QuadrantCard({
             </div>
           )}
         </div>
-      )}
+      </CollapseMotion>
     </div>
   );
 }

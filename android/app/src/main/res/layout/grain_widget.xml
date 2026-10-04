@@ -1,40 +1,44 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:gravity="center"
     android:padding="16dp"
-    android:background="#121212">
+    android:background="@drawable/widget_surface_dark">
 
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="4dp">
     <TextView
         android:id="@+id/widget_title"
-        android:layout_width="wrap_content"
+        android:layout_width="0dp"
+        android:layout_weight="1"
         android:layout_height="wrap_content"
-        android:text="Today"
-        android:textColor="#AAAAAA"
+        android:text="Today · Grain"
+        android:textColor="#F4F4F5"
         android:textSize="14sp"
-        android:fontFamily="sans-serif-medium"
-        android:layout_marginBottom="4dp" />
+        android:fontFamily="sans-serif-medium" />
+    <TextView android:id="@+id/widget_brand" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:text="GRAIN" android:textSize="8sp" android:letterSpacing="0.16" android:textColor="#A1A1AA" android:layout_marginStart="8dp" />
+    </LinearLayout>
 
     <TextView
         android:id="@+id/widget_progress"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="0/0"
-        android:textColor="#FFFFFF"
-        android:textSize="32sp"
-        android:textStyle="bold"
-        android:fontFamily="sans-serif-black" />
-
-    <TextView
-        android:id="@+id/widget_streak"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="0 Day Streak"
-        android:textColor="#10B981"
+        android:text="0 / 0 complete"
+        android:textColor="#A1A1AA"
         android:textSize="12sp"
-        android:fontFamily="sans-serif-medium"
-        android:layout_marginTop="8dp" />
+        android:layout_marginBottom="8dp" />
+
+    <FrameLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+        <ListView android:id="@+id/widget_list" android:layout_width="match_parent" android:layout_height="match_parent" android:divider="@android:color/transparent" android:dividerHeight="4dp" />
+        <LinearLayout android:id="@+id/widget_compact" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center_vertical" android:orientation="vertical" android:visibility="gone" />
+        <TextView android:id="@+id/widget_empty" android:layout_width="match_parent" android:layout_height="match_parent" android:gravity="center_vertical" android:text="Open Grain to get started" android:textColor="#A1A1AA" android:textSize="14sp" />
+    </FrameLayout>
+    <LinearLayout android:layout_width="match_parent" android:layout_height="36dp" android:orientation="horizontal" android:gravity="center_vertical">
+        <TextView android:id="@+id/widget_undo" android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:gravity="center_vertical" android:text="Undo" android:contentDescription="Undo last action" android:textSize="11sp" android:textColor="#F4F4F5" android:visibility="gone" />
+        <TextView android:id="@+id/widget_configure" android:layout_width="wrap_content" android:layout_height="match_parent" android:minWidth="48dp" android:gravity="center" android:text="Edit" android:textSize="12sp" android:textColor="#A1A1AA" />
+        <TextView android:id="@+id/widget_add" android:layout_width="40dp" android:layout_height="match_parent" android:gravity="center" android:text="+" android:contentDescription="Add habit" android:textSize="24sp" android:textColor="#F4F4F5" />
+    </LinearLayout>
 
 </LinearLayout>

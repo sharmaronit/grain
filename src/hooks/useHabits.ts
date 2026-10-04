@@ -66,9 +66,14 @@ export function useHabits(userId: string | null): UseHabitsResult {
     setError(null);
 
     const refresh = () => {
+      try {
       const list = readLocalData(userId).habits.slice().sort((a, b) => a.order - b.order);
       setHabits(list);
       hasLoadedRef.current = true;
+      setError(null);
+      } catch (error) {
+        setError(error instanceof Error ? error : new Error("Habits could not be read"));
+      }
       setLoading(false);
     };
     refresh();

@@ -1,5 +1,5 @@
 import React from "react";
-import { Check, Flame } from "lucide-react";
+import { Check, Flame, Plus } from "lucide-react";
 import type { Quadrant, Habit } from "./types";
 
 export interface TodayHeroProps {
@@ -83,10 +83,19 @@ export function TodayHero({
             </p>
             <button
               type="button"
+              aria-label={
+                nextHabit.habit.type === "numeric"
+                  ? `Add ${nextHabit.habit.step ?? 0.25} ${nextHabit.habit.unit || "unit"} to ${nextHabit.habit.name}`
+                  : `Complete ${nextHabit.habit.name}`
+              }
               onClick={() => onCompleteNext(nextHabit.q, nextHabit.i)}
               className="liquid-control deck-aligned-inline grid h-14 w-14 shrink-0 place-items-center rounded-full text-ink transition hover:scale-105 active:scale-95"
             >
-              <Check className="h-6 w-6" strokeWidth={3} />
+              {nextHabit.habit.type === "numeric" ? (
+                <Plus className="h-6 w-6" strokeWidth={3} />
+              ) : (
+                <Check className="h-6 w-6" strokeWidth={3} />
+              )}
             </button>
           </div>
         </div>

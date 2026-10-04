@@ -172,25 +172,17 @@
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 22%, transparent), 0 12px 30px color-mix(in srgb, var(--canvas) 45%, transparent);
 }
 
-.auth-input,
-.auth-glass-button {
+.auth-input {
   border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
   background: color-mix(in srgb, var(--ink) 7%, transparent);
   color: var(--ink);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 10%, transparent), 0 10px 26px color-mix(in srgb, var(--canvas) 28%, transparent);
-  backdrop-filter: blur(22px) saturate(135%);
   -webkit-backdrop-filter: blur(22px) saturate(135%);
+  backdrop-filter: blur(22px) saturate(135%);
 }
 
 .auth-input::placeholder { color: color-mix(in srgb, var(--body) 68%, transparent); }
 .auth-input:focus { border-color: color-mix(in srgb, var(--ink) 38%, transparent); background: color-mix(in srgb, var(--ink) 11%, transparent); }
-
-.auth-primary-button {
-  background: var(--ink);
-  color: var(--on-ink);
-  box-shadow: 0 12px 26px color-mix(in srgb, var(--ink) 20%, transparent);
-}
-.auth-primary-button:hover { filter: brightness(1.08); }
 
 [data-theme="light"] .auth-shell__surface {
   background: linear-gradient(145deg, rgba(255,255,255,.82), rgba(241,245,249,.76));
@@ -221,8 +213,8 @@
 
 @utility card-uber {
   background: color-mix(in srgb, var(--canvas) 28%, transparent);
-  backdrop-filter: blur(18px) saturate(130%);
   -webkit-backdrop-filter: blur(18px) saturate(130%);
+  backdrop-filter: blur(18px) saturate(130%);
   color: var(--ink);
   border-radius: var(--radius-xl);
   border: 0.5px solid color-mix(in srgb, var(--ink) 34%, transparent) !important;
@@ -233,8 +225,8 @@
 
 @utility card-soft {
   background: color-mix(in srgb, var(--canvas) 18%, transparent);
-  backdrop-filter: blur(16px) saturate(125%);
   -webkit-backdrop-filter: blur(16px) saturate(125%);
+  backdrop-filter: blur(16px) saturate(125%);
   color: var(--ink);
   border-radius: var(--radius-xl);
   border: 0.5px solid color-mix(in srgb, var(--ink) 30%, transparent) !important;
@@ -255,8 +247,8 @@
 @utility liquid-glass {
   position: relative;
   background: color-mix(in srgb, var(--canvas) 36%, transparent);
-  backdrop-filter: blur(18px) saturate(125%);
   -webkit-backdrop-filter: blur(18px) saturate(125%);
+  backdrop-filter: blur(18px) saturate(125%);
   border: 0.5px solid color-mix(in srgb, var(--ink) 24%, transparent) !important;
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 10%, transparent);
   overflow: hidden;
@@ -288,56 +280,70 @@
   }
 }
 
-@utility btn-primary-uber {
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--primary) 100%, white 10%) 0%,
-    var(--primary) 100%
-  );
-  color: var(--on-primary);
-  border-radius: var(--radius-pill);
-  font-weight: 500;
+@utility btn-glass {
   position: relative;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--primary) 80%, black 20%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    0 2px 4px rgba(0, 0, 0, 0.06);
-  transition:
-    transform 0.12s ease,
-    filter 0.2s ease,
-    box-shadow 0.2s ease;
-}
-
-@utility btn-primary-uber {
-  &:hover {
-    filter: brightness(1.05);
-  }
-
-  &:active {
-    transform: scale(0.97);
-  }
-}
-
-@utility btn-subtle-uber {
-  background: var(--canvas-soft);
+  min-height: var(--control-height);
+  border-radius: var(--radius-xl);
+  border: 1px solid color-mix(in srgb, var(--ink) 24%, transparent);
+  background:
+    linear-gradient(165deg, color-mix(in srgb, var(--ink) 16%, transparent), color-mix(in srgb, var(--ink) 4%, transparent) 58%),
+    color-mix(in srgb, var(--canvas) 54%, transparent);
   color: var(--ink);
+  font-weight: 600;
+  -webkit-backdrop-filter: blur(24px) saturate(140%);
+  backdrop-filter: blur(24px) saturate(140%);
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--ink) 24%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--ink) 6%, transparent),
+    0 6px 18px color-mix(in srgb, var(--canvas) 28%, transparent);
+  transition:
+    transform 140ms ease,
+    background-color 220ms ease,
+    border-color 220ms ease,
+    box-shadow 220ms ease,
+    opacity 180ms ease;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(110deg, transparent 25%, color-mix(in srgb, var(--ink) 12%, transparent) 50%, transparent 75%);
+    transform: translateX(-130%);
+    transition: transform 650ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  @media (hover: hover) {
+    &:enabled:hover {
+      border-color: color-mix(in srgb, var(--ink) 38%, transparent);
+      background-color: color-mix(in srgb, var(--canvas-soft) 78%, transparent);
+    }
+
+    &:enabled:hover::before {
+      transform: translateX(130%);
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid color-mix(in srgb, var(--ink) 60%, transparent);
+    outline-offset: 3px;
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+  }
+}
+
+@utility btn-primary-uber {
+  @apply btn-glass;
   border-radius: var(--radius-pill);
-  font-weight: 500;
-  position: relative;
-  overflow: hidden;
-  border: 1px solid var(--hairline);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 @utility btn-subtle-uber {
-  &:hover {
-    background: var(--canvas-softer);
-  }
-
-  &:active {
-    transform: scale(0.97);
-  }
+  @apply btn-glass;
+  border-radius: var(--radius-pill);
 }
 
 @utility chip-uber {
@@ -516,7 +522,7 @@
     background 200ms ease;
 }
 
-[class*="btn-"]:active,
+[class*="btn-"]:not(:disabled):active,
 [class*="chip-"]:active,
 [data-lg-press]:active {
   transform: scale(0.96) translateZ(0);
@@ -568,38 +574,36 @@
     animation-duration: 1ms;
   }
 
-  .grain-title-pill,
-  .grain-title-pill-copy,
-  .grain-title-pill-halo {
-    animation: none;
-    transition-duration: 1ms;
-  }
 }
 
-/* The top Grain pill doubles as lightweight feedback while changing dates.
-   Keep its surface calm, then move new copy in rather than snapping it. */
-.grain-title-pill {
-  overflow: hidden;
-  will-change: max-width, max-height, opacity, transform;
-  transition:
-    max-width 650ms cubic-bezier(0.22, 1, 0.36, 1),
-    max-height 520ms cubic-bezier(0.22, 1, 0.36, 1),
-    opacity 320ms ease,
-    background-color 240ms ease,
-    border-color 240ms ease,
-    box-shadow 240ms ease,
-    color 180ms ease,
-    gap 520ms cubic-bezier(0.22, 1, 0.36, 1),
-    padding 520ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 650ms cubic-bezier(0.22, 1, 0.36, 1);
+@keyframes grain-text-fade {
+  0% { opacity: 0; transform: translateY(-5px); }
+  12%, 82% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-3px); }
 }
-
-.grain-title-pill-copy {
-  animation: grain-pill-copy-in 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+.grain-text-notice {
+  animation-name: grain-text-fade;
+  animation-timing-function: ease-in-out;
+  animation-fill-mode: forwards;
+  text-shadow: 0 1px 8px color-mix(in srgb, var(--canvas) 75%, transparent);
 }
-
-.grain-title-pill-halo {
-  animation: grain-pill-halo-in 380ms ease-out both;
+.grain-hue-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--wp-fg);
+  background: var(--wp-bg);
+}
+.grain-hue-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--wp-fg);
+  background: var(--wp-bg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .grain-text-notice { animation: none; }
 }
 
 /* Dropdowns scale from their trigger and remain mounted long enough to close gracefully. */
@@ -617,11 +621,92 @@
   animation: grain-dropdown-close 280ms cubic-bezier(0.4, 0, 1, 1) both;
 }
 
+.grain-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  transition: grid-template-rows 380ms cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 240ms ease, visibility 380ms;
+}
+
+.grain-collapse--open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  visibility: visible;
+}
+
+.grain-collapse-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.grain-disclosure-chevron {
+  transition: transform 380ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .grain-collapse, .grain-disclosure-chevron { transition: none; }
+  .grain-dropdown-motion, .grain-dropdown-motion > * { animation: none !important; }
+}
+
 @keyframes grain-dropdown-open {
   0% { opacity: 0; filter: blur(3px); transform: translateY(-13px) scale(0.86) rotateX(-10deg); }
   62% { opacity: 1; filter: blur(0); transform: translateY(1px) scale(1.018) rotateX(1deg); }
   100% { opacity: 1; filter: blur(0); transform: translateY(0) scale(1) rotateX(0); }
 }
+
+.widget-preview-stage {
+  background: radial-gradient(ellipse at 15% 15%, color-mix(in srgb, var(--ink) 7%, transparent), transparent 70%), var(--canvas-soft);
+}
+.widget-preview {
+  --widget-ink: #f4f4f5;
+  --widget-muted: #a1a1aa;
+  --widget-accent: #34d399;
+  --widget-track: #27272a;
+  color: var(--widget-ink);
+  background: #18181b;
+  border: 1px solid #35353c;
+  border-radius: 24px;
+  padding: 16px;
+  max-width: 360px;
+  margin: 0 auto;
+}
+[data-theme="light"] .widget-preview {
+  --widget-ink: #151517;
+  --widget-muted: #66666e;
+  --widget-accent: #047857;
+  --widget-track: #dde3e0;
+  background: #f5f5f7;
+  border-color: #d4d4d8;
+}
+[data-theme="amoled"] .widget-preview { background: #000; border-color: #303034; }
+.widget-preview--progress { max-width: 260px; }
+.widget-preview[data-widget-design="paper"] {
+  --widget-ink: #302c26; --widget-muted: #756c5b; --widget-accent: #947344; --widget-track: #e5ddcd;
+  background: #f5f0e6; border-color: #dfd4c0;
+}
+.widget-preview[data-widget-design="oled"] {
+  --widget-ink: #f4f4f5; --widget-muted: #a1a1aa; --widget-accent: #c4b5fd; --widget-track: #232127;
+  background: #000; border-color: #303034;
+}
+.widget-preview[data-widget-design="botanical"] {
+  --widget-ink: #213d2b; --widget-muted: #5d725a; --widget-accent: #39734b; --widget-track: #d4dfca;
+  background: #eef4e7; border-color: #c8d8bc;
+}
+.widget-preview[data-widget-design="dots"] {
+  --widget-ink: #e9f2ef; --widget-muted: #a5b7ae; --widget-accent: #a8edbc; --widget-track: #283b33;
+  background: #111b16; border-color: #35483d;
+}
+.widget-preview-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 14px; font-weight: 600; }
+.widget-preview-brand { font-size: 8px; letter-spacing: 0.16em; color: var(--widget-muted); }
+.widget-preview-muted { color: var(--widget-muted); }
+.widget-preview-check { background: var(--widget-track); }
+.widget-preview-cell { position: relative; height: 44px; border-radius: 9px; overflow: hidden; background: var(--widget-track); }
+.widget-preview-cell > span { position: absolute; inset: 0; background: var(--widget-accent); }
+.widget-preview-enter { animation: widget-preview-enter 280ms ease-out both; }
+@keyframes widget-preview-enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .widget-preview-enter { animation: none; } }
 
 @keyframes grain-dropdown-close {
   from { opacity: 1; filter: blur(0); transform: translateY(0) scale(1) rotateX(0); }
@@ -643,16 +728,6 @@
 @keyframes grain-dropdown-item-in {
   from { opacity: 0; transform: translateY(-6px); }
   to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes grain-pill-copy-in {
-  from { opacity: 0; transform: translateY(3px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes grain-pill-halo-in {
-  from { opacity: 0; transform: scale(0.72); }
-  to { opacity: 0.1; transform: scale(1); }
 }
 
 /* ============ Wallpaper theme scene transitions ============
@@ -757,6 +832,48 @@
 }
 
 /* Bottom Sheet Spring Slide Up */
+.grain-sheet-layer {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.grain-sheet-backdrop {
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--canvas) 60%, transparent);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  will-change: opacity;
+}
+
+.grain-sheet-surface {
+  width: 100%;
+  max-height: 85vh;
+  max-height: 85dvh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 24px 24px 0 0;
+  padding: 20px;
+  padding-bottom: calc(20px + var(--sa-bottom, env(safe-area-inset-bottom, 0px)));
+  overflow: hidden;
+  will-change: transform;
+}
+
+.grain-sheet-header {
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.grain-sheet-content {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 @keyframes sheet-slide-up {
   0% {
     transform: translate3d(0, 100%, 0);
@@ -930,8 +1047,8 @@
 }
 .liquid-input {
   background: color-mix(in oklab, var(--ink) 5%, transparent) !important;
-  backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
   border: 1px solid color-mix(in oklab, var(--ink) 15%, transparent);
   box-shadow:
     inset 0 1px 1px color-mix(in oklab, var(--ink) 10%, transparent),
@@ -943,40 +1060,59 @@
   border-color: color-mix(in oklab, var(--ink) 30%, transparent);
 }
 
-@keyframes confetti-fall {
-  0% {
-    transform: translateY(-10vh) rotate(0deg);
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(110vh) rotate(720deg);
-    opacity: 0;
+/* The sheet supplies the glass blur. Keep chip geometry and filter layers
+   constant when selection changes; animate only these small paint surfaces. */
+.habit-category-option {
+  border: 1px solid color-mix(in srgb, var(--ink) 15%, transparent);
+  background-color: color-mix(in srgb, var(--ink) 5%, transparent);
+  color: var(--ink);
+  box-shadow: inset 0 1px 1px color-mix(in srgb, var(--ink) 10%, transparent);
+  transition: background-color 160ms ease, color 120ms ease, border-color 160ms ease;
+}
+
+.habit-category-option[aria-pressed="true"] {
+  background-color: var(--ink);
+  border-color: var(--ink);
+  color: var(--on-ink);
+}
+
+@media (hover: hover) {
+  .habit-category-option[aria-pressed="false"]:hover {
+    background-color: color-mix(in srgb, var(--ink) 10%, transparent);
+    border-color: color-mix(in srgb, var(--ink) 30%, transparent);
   }
 }
 
+.habit-category-option:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--ink) 60%, transparent);
+  outline-offset: 2px;
+}
+
+/* Keep the Safari prefix before the standard property. Production optimization
+   otherwise retains only the prefix, which Chromium/WebView does not accept. */
 .liquid-tabbar {
   position: relative;
   isolation: isolate;
   border-radius: var(--radius-pill);
   border: 0.5px solid color-mix(in srgb, var(--ink) 34%, transparent);
-  background: color-mix(in srgb, var(--canvas) 8%, transparent);
-  backdrop-filter: blur(20px) saturate(135%);
+  background: color-mix(in srgb, var(--canvas) 28%, transparent);
   -webkit-backdrop-filter: blur(20px) saturate(135%);
+  backdrop-filter: blur(20px) saturate(135%);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 8%, transparent);
 }
 
 /* Reading surfaces stay denser than the floating cards. */
 .sheet-glass {
   background: color-mix(in srgb, var(--canvas) 88%, transparent) !important;
-  backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
 }
 
 .liquid-control {
   border: 0.5px solid var(--glass-border);
   background: var(--glass-surface);
-  backdrop-filter: blur(var(--glass-blur)) saturate(125%);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(125%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(125%);
   box-shadow: inset 0 1px 0 var(--glass-highlight);
 }
 
@@ -987,8 +1123,8 @@
   box-shadow:
     inset 0 1px 0 var(--glass-highlight),
     0 8px 22px var(--glass-shadow);
-  backdrop-filter: blur(var(--glass-blur)) saturate(125%);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(125%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(125%);
 }
 
 .settings-control {
@@ -999,8 +1135,8 @@
   background: color-mix(in srgb, var(--canvas) 30%, transparent);
   border: 0.5px solid color-mix(in srgb, var(--ink) 24%, transparent);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 10%, transparent);
-  backdrop-filter: blur(18px) saturate(125%);
   -webkit-backdrop-filter: blur(18px) saturate(125%);
+  backdrop-filter: blur(18px) saturate(125%);
 }
 
 [data-theme="amoled"] .settings-glass {
@@ -1018,9 +1154,9 @@
 
 .liquid-deck-button {
   border: 0.5px solid color-mix(in srgb, var(--ink) 34%, transparent);
-  background: color-mix(in srgb, var(--canvas) 8%, transparent);
-  backdrop-filter: blur(20px) saturate(135%);
+  background: color-mix(in srgb, var(--canvas) 28%, transparent);
   -webkit-backdrop-filter: blur(20px) saturate(135%);
+  backdrop-filter: blur(20px) saturate(135%);
 }
 
 .liquid-tabbar-selection {
@@ -1078,7 +1214,7 @@
   position: relative;
   isolation: isolate;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   min-height: 52px;
   padding: 4px;
   overflow: hidden;
@@ -1086,8 +1222,8 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--canvas) 16%, transparent);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 9%, transparent), 0 8px 24px rgba(0, 0, 0, 0.12);
-  backdrop-filter: blur(22px) saturate(135%);
   -webkit-backdrop-filter: blur(22px) saturate(135%);
+  backdrop-filter: blur(22px) saturate(135%);
 }
 
 /* Quiet depth behind the Deck cards. It adapts per theme without competing
@@ -1096,6 +1232,26 @@
   background:
     radial-gradient(circle at 18% 8%, color-mix(in srgb, var(--ink) 6%, transparent), transparent 42%),
     var(--canvas);
+}
+.grain-state {
+  border: 0.5px solid color-mix(in srgb, var(--ink) 13%, transparent);
+  background: linear-gradient(140deg, color-mix(in srgb, var(--ink) 4%, transparent), transparent 55%), color-mix(in srgb, var(--canvas) 82%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 7%, transparent);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+.grain-state-icon {
+  border: 0.5px solid color-mix(in srgb, var(--ink) 18%, transparent);
+  background: color-mix(in srgb, var(--ink) 4%, var(--canvas));
+  box-shadow: 0 0 0 8px color-mix(in srgb, var(--ink) 2%, transparent);
+}
+.grain-state-action {
+  border: 0.5px solid color-mix(in srgb, var(--ink) 24%, transparent);
+  background: linear-gradient(145deg, color-mix(in srgb, var(--ink) 9%, transparent), transparent), color-mix(in srgb, var(--canvas) 85%, transparent);
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 10%, transparent);
+}
+.grain-state-action:hover {
+  background: color-mix(in srgb, var(--ink) 10%, var(--canvas));
 }
 
 [data-theme="light"] .deck-view {
@@ -1129,7 +1285,7 @@
   top: 4px;
   bottom: 4px;
   left: 4px;
-  width: calc((100% - 8px) / 4);
+  width: calc((100% - 8px) / 5);
   border: 0.5px solid color-mix(in srgb, var(--ink) 26%, transparent);
   border-radius: 999px;
   background: color-mix(in srgb, var(--canvas) 74%, transparent);
@@ -1191,8 +1347,8 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--canvas) 20%, transparent);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 9%, transparent);
-  backdrop-filter: blur(18px) saturate(125%);
   -webkit-backdrop-filter: blur(18px) saturate(125%);
+  backdrop-filter: blur(18px) saturate(125%);
 }
 
 .theme-segmented-selection {
@@ -1233,8 +1389,8 @@
 .liquid-fab {
   border: 0.5px solid color-mix(in srgb, var(--ink) 34%, transparent);
   background: color-mix(in srgb, var(--canvas) 18%, transparent);
-  backdrop-filter: blur(18px) saturate(130%);
   -webkit-backdrop-filter: blur(18px) saturate(130%);
+  backdrop-filter: blur(18px) saturate(130%);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 8%, transparent);
 }
 
@@ -1253,8 +1409,8 @@
 .habit-list-surface {
   border: 0.5px solid color-mix(in srgb, var(--ink) 34%, transparent);
   background: color-mix(in srgb, var(--canvas) 8%, transparent);
-  backdrop-filter: blur(20px) saturate(135%);
   -webkit-backdrop-filter: blur(20px) saturate(135%);
+  backdrop-filter: blur(20px) saturate(135%);
   box-shadow: inset 0 1px 0 color-mix(in srgb, var(--ink) 8%, transparent);
 }
 
@@ -1266,8 +1422,8 @@
   border: 0.5px solid var(--glass-border);
   background: var(--glass-surface);
   box-shadow: inset 0 1px 0 var(--glass-highlight), 0 8px 24px var(--glass-shadow);
-  backdrop-filter: blur(var(--glass-blur)) saturate(145%);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(145%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(145%);
 }
 
 .wallpaper-glass-control,
@@ -1300,11 +1456,9 @@
 }
 
 .data-status-banner {
-  position: absolute;
+  position: relative;
   z-index: 60;
-  top: 4rem;
-  left: var(--screen-gutter);
-  right: var(--screen-gutter);
+  margin-inline: var(--screen-gutter);
   display: flex;
   align-items: center;
   gap: 0.625rem;
@@ -1314,8 +1468,8 @@
   background: color-mix(in srgb, var(--canvas) 68%, transparent);
   color: color-mix(in srgb, #ef4444 82%, var(--ink));
   font-size: 0.75rem;
-  backdrop-filter: blur(var(--glass-blur)) saturate(130%);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(130%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(130%);
   box-shadow: 0 10px 28px var(--glass-shadow);
 }
 
@@ -1348,8 +1502,8 @@
   background: var(--glass-surface-strong);
   color: var(--ink);
   box-shadow: inset 0 1px 0 var(--glass-highlight), 0 8px 22px var(--glass-shadow);
-  backdrop-filter: blur(var(--glass-blur)) saturate(135%);
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(135%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(135%);
   font-size: 0.6875rem;
   font-weight: 700;
   white-space: nowrap;
@@ -1418,10 +1572,16 @@
   -webkit-mask-image: none;
 }
 
-/* Keep dark wallpapers free from the pale blurred photo wash. */
+/* Keep the default app wallpaper behind glass controls. Custom photos never
+   reach this layer; Dashboard supplies the app-safe default image separately. */
 [data-theme="dark"] .background-extension,
 [data-theme="amoled"] .background-extension {
-  display: none;
+  display: block;
+}
+
+[data-theme="amoled"] .background-extension-image {
+  opacity: 0.32;
+  filter: blur(34px) saturate(120%) brightness(0.3);
 }
 
 [data-theme="light"] .liquid-tabbar-item,
@@ -1431,7 +1591,6 @@
 }
 
 /* Light photography already provides depth; dark glow makes controls look dirty. */
-[data-theme="light"] .grain-title-pill,
 [data-theme="light"] .liquid-tabbar,
 [data-theme="light"] .liquid-tabbar-selection,
 [data-theme="light"] .liquid-deck-button,

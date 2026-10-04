@@ -1,0 +1,10 @@
+<resources>
+    <string name="widget_heatmap_name">Grain · Weekly heatmap</string>
+    <string name="widget_progress_name">Grain · Daily progress</string>
+    <string name="widget_heatmap_description">Your habit completion over the last seven days.</string>
+    <string name="widget_progress_description">A ring showing your completed habits today.</string>
+    <string name="widget_checklist_name">Grain · Today</string>
+    <string name="widget_compact_name">Grain · One habit</string>
+    <string name="widget_checklist_description">A checklist of your pending habits. Complete them without opening Grain.</string>
+    <string name="widget_compact_description">Your next habit, or one you choose. One tap to make progress.</string>
+</resources>

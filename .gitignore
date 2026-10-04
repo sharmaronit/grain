@@ -10,6 +10,11 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+/dist-spa/
+
+# Keep a single canonical Android release artifact.
+*.apk
+!/releases/android/grain.apk
 .output
 .vinxi
 .tanstack/**

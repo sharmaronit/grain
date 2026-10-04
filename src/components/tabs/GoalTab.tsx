@@ -5,6 +5,7 @@ import { AddGoalSheet } from "../modals/AddGoalSheet";
 import { useStore } from "../../store/useStore";
 import { parseDateKey, todayKey } from "../../lib/dates";
 import { DynamicIcon } from "../ui/DynamicIcon";
+import { GrainState } from "../ui/GrainState";
 
 interface GoalTabProps {
   goals: GoalDoc[];
@@ -163,6 +164,7 @@ export const GoalTab = memo(function GoalTab({ goals, onDelete, onSetActiveGoal 
               <div className="flex shrink-0 items-center gap-2">
                 <button
                   onClick={() => handleSetActiveGoal(isActive ? null : g.id)}
+                  aria-label={`${isActive ? "Deactivate" : "Activate"} ${g.name}`}
                   className={`grid w-10 h-10 place-items-center rounded-full border border-[color:color-mix(in_srgb,var(--accent)_15%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_18%,transparent),0_8px_24px_rgba(0,0,0,0.2)] transition ${
                     isActive
                       ? "bg-ink text-on-ink shadow-lg scale-105"
@@ -176,6 +178,7 @@ export const GoalTab = memo(function GoalTab({ goals, onDelete, onSetActiveGoal 
                   />
                 </button>
                 <button
+                  aria-label={`Delete ${g.name}`}
                   onClick={() => {
                     if (
                       window.confirm(
@@ -195,13 +198,7 @@ export const GoalTab = memo(function GoalTab({ goals, onDelete, onSetActiveGoal 
         })}
 
         {goals.length === 0 && (
-          <div className="text-center py-10 opacity-60">
-            <Target className="w-10 h-10 mx-auto mb-3 text-mute" />
-            <p className="text-[13px] font-medium text-ink">No goals yet.</p>
-            <p className="text-[11px] font-semibold text-mute mt-1 max-w-[200px] mx-auto">
-              Set a long term goal to see it visualized on your wallpaper.
-            </p>
-          </div>
+          <GrainState icon={Target} eyebrow="Goals" title="Give your days direction." description="Choose something worth showing up for. Build towards it one day at a time." action={{ label: "Create goal", onClick: () => setIsAdding(true) }} />
         )}
       </div>
       </div>

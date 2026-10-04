@@ -60,6 +60,7 @@
 
         <receiver
             android:name=".GrainWidget"
+            android:label="@string/widget_checklist_name"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -68,10 +69,38 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/grain_widget_info" />
         </receiver>
+        <receiver android:name=".GrainCompactWidget" android:label="@string/widget_compact_name" android:exported="true">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/grain_compact_widget_info" />
+        </receiver>
+        <receiver android:name=".GrainHeatmapWidget" android:label="@string/widget_heatmap_name" android:exported="true">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/grain_heatmap_widget_info" />
+        </receiver>
+        <receiver android:name=".GrainProgressWidget" android:label="@string/widget_progress_name" android:exported="true">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/grain_progress_widget_info" />
+        </receiver>
+        <activity android:name=".HabitWidgetConfigureActivity" android:exported="true" android:theme="@style/AppTheme.NoActionBar">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" /></intent-filter>
+        </activity>
+        <receiver android:name=".HabitActionReceiver" android:exported="false" />
+        <receiver android:name=".WidgetPinnedReceiver" android:exported="false" />
+        <receiver android:name=".HabitTimeReceiver" android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.DATE_CHANGED" />
+            </intent-filter>
+        </receiver>
+        <service android:name=".HabitWidgetService" android:exported="false" android:permission="android.permission.BIND_REMOTEVIEWS" />
     </application>
 
     <!-- Allow the app to see and launch the system Live Wallpaper Picker on Android 11+ -->
     <queries>
+        <intent>
+            <action android:name="android.service.wallpaper.WallpaperService" />
+        </intent>
         <intent>
             <action android:name="android.service.wallpaper.WallpaperService" />
         </intent>

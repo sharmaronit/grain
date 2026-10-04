@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 import { parseDateKey } from "../lib/dates";
+import { registerOverlayDismissal } from "../lib/overlay-dismissal";
 
 interface CustomDatePickerProps {
   label: string;
@@ -34,6 +35,15 @@ export function CustomDatePicker({ label, value, onChange }: CustomDatePickerPro
   const [currentYear, setCurrentYear] = useState(initialDate.getFullYear());
 
   const containerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!isOpen) return;
+    const close = () => setIsOpen(false);
+    return registerOverlayDismissal({
+      owner: () => close,
+      priority: 10_000,
+      close: (afterClose) => { close(); afterClose?.(); },
+    });
+  }, [isOpen]);
 
   // Close when clicking outside
   useEffect(() => {
@@ -131,6 +141,7 @@ export function CustomDatePicker({ label, value, onChange }: CustomDatePickerPro
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
+        aria-label={`Select ${label.toLowerCase()}`}
         className="liquid-glass w-full flex items-center justify-between rounded-2xl px-4 py-3 text-[13px] font-medium text-ink outline-none transition hover:brightness-110"
       >
         <span>{displayDateStr}</span>
@@ -152,6 +163,7 @@ export function CustomDatePicker({ label, value, onChange }: CustomDatePickerPro
                 <button
                   type="button"
                   onClick={handlePrevMonth}
+                  aria-label="Previous month"
                   className="grid w-8 h-8 place-items-center rounded-full text-mute hover:text-ink hover:liquid-input transition"
                 >
                   <ChevronLeft className="w-5 h-5" />
@@ -159,6 +171,7 @@ export function CustomDatePicker({ label, value, onChange }: CustomDatePickerPro
                 <button
                   type="button"
                   onClick={handleNextMonth}
+                  aria-label="Next month"
                   className="grid w-8 h-8 place-items-center rounded-full text-mute hover:text-ink hover:liquid-input transition"
                 >
                   <ChevronRight className="w-5 h-5" />
@@ -185,6 +198,7 @@ export function CustomDatePicker({ label, value, onChange }: CustomDatePickerPro
               type="button"
               className="w-full mt-4 py-3 rounded-xl liquid-input text-ink font-bold text-[13px] hover:bg-[color:var(--surface-pressed)] transition"
               onClick={() => setIsOpen(false)}
+              aria-label="Cancel date selection"
             >
               Cancel
             </button>

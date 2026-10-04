@@ -21,6 +21,8 @@ public class BootReceiver extends BroadcastReceiver {
                 || "com.htc.intent.action.QUICKBOOT_POWERON".equals(action)) {
 
             try {
+                GrainWidget.forceUpdate(context);
+                HabitReminders.reschedule(context);
                 SharedPreferences prefs = context.getSharedPreferences(GrainWallpaperService.PREFS_NAME, Context.MODE_PRIVATE);
                 boolean isStatic = prefs.getBoolean("GRAIN_IS_STATIC_FALLBACK", false);
 

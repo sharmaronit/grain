@@ -3,6 +3,8 @@ import { Sparkles, Plus, Check, Shield, Droplets, Pin, MoreVertical, Minus, Sett
 import { useStore } from "../../store/useStore";
 import type { Habit, Quadrant } from "../types";
 import { DropdownMotion } from "../ui/DropdownMotion";
+import { CollapseMotion } from "../ui/CollapseMotion";
+import { GrainState } from "../ui/GrainState";
 
 const QUADRANTS: Record<Quadrant, { title: string }> = {
   q1: { title: "Do first" },
@@ -43,21 +45,7 @@ export const MatrixTab = memo(function MatrixTab({
     <div className="animate-tab-fade pt-16">
       <section className="px-4">
         {totalCount === 0 ? (
-          <div className="liquid-glass specular flex flex-col items-center justify-center gap-3 px-5 py-10 text-center rounded-3xl">
-            <div>
-              <p className="font-display text-base font-bold text-ink">No habits yet</p>
-              <p className="mt-1 max-w-[240px] text-[12px] text-body">
-                Add your first habit to start a streak. It'll show up here in the matrix.
-              </p>
-            </div>
-            <button
-              onClick={() => setModalOpen(true)}
-              className="pill mt-1 flex items-center gap-1.5 bg-ink px-4 py-2 text-[12px] font-semibold text-on-ink shadow-lg active:scale-95 transition"
-              data-lg-press
-            >
-              <Plus className="h-3.5 w-3.5" strokeWidth={3} /> Create your first habit
-            </button>
-          </div>
+          <GrainState icon={Plus} eyebrow="Habits" title="Make room for what matters." description="Add a habit, then choose where it belongs in your day." action={{ label: "Create habit", onClick: () => setModalOpen(true) }} />
         ) : (
           <div className="flex flex-col gap-3.5">
             {QUADRANT_ORDER.map((q) => (
@@ -397,9 +385,9 @@ function HabitRow({
         </div>
       </div>
 
-      {isNumeric && numericOpen && (
+      <CollapseMotion open={isNumeric && numericOpen}>
         <div
-          className="bg-transparent text-ink px-2 pb-2 animate-fade-in-up"
+          className="bg-transparent text-ink px-2 pb-2"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="mb-1 flex items-center justify-between text-[9px] font-medium text-body">
@@ -432,7 +420,7 @@ function HabitRow({
             />
           </div>
         </div>
-      )}
+      </CollapseMotion>
 
       <DropdownMotion open={menuOpen} className="absolute right-1 top-full z-30 mt-1 w-28 overflow-hidden rounded-lg border border-white/10 bg-[#1A1A1A]/50 text-white backdrop-blur-[40px] shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.3)]">
           <button

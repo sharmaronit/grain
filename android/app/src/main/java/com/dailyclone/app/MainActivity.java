@@ -1,6 +1,7 @@
 package com.dailyclone.app;
 
 import android.os.Bundle;
+import android.content.Intent;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import com.getcapacitor.BridgeActivity;
@@ -12,6 +13,8 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(FirebaseAuthenticationPlugin.class);
         registerPlugin(WallpaperPlugin.class);
+        registerPlugin(HabitActionsPlugin.class);
+        registerPlugin(GrainFilesPlugin.class);
         super.onCreate(savedInstanceState);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);
@@ -57,6 +60,14 @@ public class MainActivity extends BridgeActivity {
                 params.preferredDisplayModeId = maxModeId;
                 window.setAttributes(params);
             }
+        }
+    }
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (intent.getBooleanExtra(HabitActionsPlugin.EXTRA_CREATE_HABIT, false)) {
+            HabitActionsPlugin.createHabitRequested();
         }
     }
 }

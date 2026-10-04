@@ -1,50 +1,46 @@
 # Grain
 
-> Copyright © 2026 Ronit Sharma. All rights reserved. This is a proprietary project; see [LICENSE](LICENSE) before viewing, using, or distributing the code.
+A habit and goal tracker for building everyday discipline.
 
-A minimalist, high-performance habit tracker and consistency dashboard. Built as a fully independent, offline-first application with Firebase syncing and native Capacitor integration.
+Website: [trygrain.vercel.app](https://trygrain.vercel.app/)
 
-**Website & Landing Page:** [https://trygrain.vercel.app/](https://trygrain.vercel.app/)
+## Repository
 
-## Ownership and usage
+| Folder | Purpose |
+| --- | --- |
+| `src/` | React Android app source |
+| `android/` | Capacitor Android project |
+| `landing/` | Website source and runtime assets |
+| `public/` | App runtime assets |
+| `assets/` | Native app resources and reference images |
+| `config/` | Local reference configuration files |
+| `docs/` | Development, features, design, and release documentation |
+| `scripts/` | Android build automation |
+| `tests/` | App tests |
+| `releases/android/grain.apk` | The single current APK |
+| `archive/` | Previous website implementation and capture tools |
 
-Grain, its source code, UI designs, assets, logo, and compiled applications are owned by Ronit Sharma. The repository is published for controlled review and development access only. Copying, redistribution, commercial use, or creating derivative products requires written permission.
+Generated web builds go into `dist/app/` and `landing/dist/`. They are ignored by Git.
 
-Do not commit credentials, signing keys, release tokens, or private user data. Keep the GitHub repository private if the source should not be visible, and enable branch protection and required pull requests for `main` in GitHub repository settings.
+## Commands
 
-## 🚀 Tech Stack
-- **Frontend:** React 19, TypeScript, Vite, TailwindCSS
-- **State & Data:** Zustand, TanStack Query, Firebase Firestore (Offline-first)
-- **Native Wrapper:** Capacitor (Android/iOS)
-- **UI Architecture:** Radix UI primitives, custom animated liquid glass themes
+```powershell
+npm install
+npm run dev
+npm run build
+npm test
+npm run build:android
+```
 
-## 🛠️ Installation & Setup
+Website commands run from `landing/`: `npm run dev`, `npm run build`, and `npm run lint`.
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/[Your-Username]/Grain.git
-   cd Grain
-   ```
+## Documentation
 
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+- [Development and Android setup](docs/development.md)
+- [Website setup](docs/landing.md)
+- [Features](docs/features.md)
+- [Liquid glass design and production CSS](docs/design/liquid-glass.md)
+- [APK and GitHub release workflow](docs/releases.md)
+- [Archived files](docs/archive.md)
 
-3. **Configure Environment Variables:**
-   Copy the example environment file and add your Firebase credentials:
-   ```bash
-   cp .env.example .env
-   ```
-
-4. **Start Development Server:**
-   ```bash
-   npm run dev
-   ```
-
-5. **Build for Android:**
-   ```bash
-   npm run build
-   npx cap sync android
-   cd android && ./gradlew assembleDebug
-   ```
+Copyright © 2026 Ronit Sharma. See [LICENSE](LICENSE).

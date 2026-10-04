@@ -1,6 +1,17 @@
 import { HabitCard } from "./HabitCard";
+import { SheetShell } from "./SheetShell";
+import { SettingsToggle as Toggle } from "./settings/SettingsToggle";
+import { FeedbackToast } from "./ui/FeedbackToast";
+import { HabitActions } from "../lib/habit-actions-bridge";
+import { wallpaperSevenDays } from "../lib/wallpaper-seven-days";
+import { AccentPalette } from "./wallpaper/AccentPalette";
+import { GrainState } from "./ui/GrainState";
+import { HabitCategoryDraftPicker, HabitCategoryPicker } from "./ui/HabitCategoryPicker";
+import { dismissTopOverlay, registerOverlayDismissal, requestOverlayClose } from "../lib/overlay-dismissal";
+import { useSheetDismiss } from "../hooks/useSheetMotion";
 import { BottomNavigation } from "./BottomNavigation";
 import { DropdownMotion } from "./ui/DropdownMotion";
+import { CollapseMotion } from "./ui/CollapseMotion";
 import {
   useCallback,
   useEffect,
@@ -57,10 +68,11 @@ import {
   ImagePlus,
   Move,
   Infinity,
-  Wheat,
 } from "lucide-react";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
+import { downloadBackup, exportImage, shareNativeImage } from "../lib/backup-download";
+import { summarizeConsistency } from "../lib/consistency-summary";
 import { StatusBar, Style } from "@capacitor/status-bar";
 
 // ── Firebase auth & data hooks ───────────────────────────
@@ -99,7 +111,6 @@ import {
   shortDay,
   todayKey,
   heatmapStartDate,
-  heatmapWeekLabelDate,
   isoDow,
   isScheduledDay,
 } from "../lib/dates";
@@ -111,16 +122,16 @@ import { computeWeeklyInsights } from "../lib/insights";
 import { computeMilestones } from "../lib/badges";
 import { InsightsCard } from "../components/InsightsCard";
 import { TodayHero } from "../components/TodayHero";
-import { WidgetBridge } from "../lib/widget-bridge";
+import { useExternalHabits } from "../hooks/useExternalHabits";
+import { WidgetSettings } from "./settings/WidgetSettings";
 import { useWallpaperSync } from "../hooks/useWallpaperSync";
 import { useGoals } from "../hooks/useGoals";
 import { deleteGoal } from "../lib/firestore";
 import { Target } from "lucide-react";
 import { useStore } from "../store/useStore";
-import { TIME_TABS, HABIT_SETS, GRID_SIZES } from "../lib/constants";
+import { TIME_TABS, HABIT_SETS } from "../lib/constants";
 import {
   WALLPAPER_THEMES,
-  GRID_COLORS,
   resolveThemeKey,
   wallpaperThemeOf,
   gridColorOf,
@@ -136,6 +147,8 @@ import { BackupReminderBanner } from "./ui/BackupReminderBanner";
 import { WallpaperEditorControls } from "./wallpaper/WallpaperEditorControls";
 import {
   clearLocalCompletionDate,
+  completeLocalOnboarding,
+  readLocalData,
   exportLocalBackup,
   getLocalBackupStatus,
   importLocalBackup,
@@ -207,6 +220,17 @@ function generateHeatmap(): number[][] {
     cells.push([0, 0, 0, 0, 0, 0, 0]);
   }
   return cells;
+}
+
+function needsOnboarding(userId: string | null, storageKey: string) {
+  try {
+    return !!userId && !!storageKey && !localStorage.getItem(storageKey) && !readLocalData(userId).prefs.onboardingCompleted;
+  } catch { return false; }
+}
+
+function safeBackupStatus(userId: string | null) {
+  try { return userId ? getLocalBackupStatus(userId) : null; }
+  catch { return null; }
 }
 
 export function Dashboard({ user }: { user?: any }) {
@@ -317,23 +341,21 @@ export function Dashboard({ user }: { user?: any }) {
   const [onboardingOpen, setOnboardingOpen] = useState(() => {
     return (
       typeof window !== "undefined" &&
-      !!onboardingStorageKey &&
-      !localStorage.getItem(onboardingStorageKey)
+      needsOnboarding(userId, onboardingStorageKey)
     );
   });
 
   useEffect(() => {
     if (
       typeof window !== "undefined" &&
-      onboardingStorageKey &&
-      !localStorage.getItem(onboardingStorageKey)
+      needsOnboarding(userId, onboardingStorageKey)
     ) {
       setOnboardingOpen(true);
     }
-  }, [onboardingStorageKey]);
+  }, [onboardingStorageKey, userId]);
   const [weeklyReviewOpen, setWeeklyReviewOpen] = useState(false);
   const [activeSettingTab, setActiveSettingTab] = useState<
-    "theme" | "style" | "color" | "habits" | "stats" | "size"
+    "theme" | "style" | "color" | "habits" | "stats"
   >("theme");
   const [applyMenuOpen, setApplyMenuOpen] = useState(false);
   const toolbarDragStartY = useRef<number | null>(null);
@@ -361,8 +383,30 @@ export function Dashboard({ user }: { user?: any }) {
     toasts,
     removeToast,
   } = useToast();
-  const activeToast = toasts[0];
-  const pillNotice = activeToast;
+  const activeToast = toasts[toasts.length - 1];
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform() || !userId) return;
+    let removed = false;
+    const openRequestedHabit = async () => {
+      const request = await HabitActions.consumeCreateHabitRequest();
+      if (removed || !request.open || (request.userId && request.userId !== userId)) return;
+      switchTab("today", false);
+      setSettingsOpen(false);
+      setOnboardingOpen(false);
+      setDrawerOpen(false);
+      setSwipeMode(false);
+      setModalOpen(true);
+    };
+    const listener = HabitActions.addListener("createHabitRequested", () => {
+      void openRequestedHabit();
+    });
+    void listener.then(() => openRequestedHabit());
+    return () => {
+      removed = true;
+      void listener.then((handle) => handle.remove());
+    };
+  }, [userId, switchTab]);
 
   // Multi-select & Bulk Delete state
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -431,17 +475,21 @@ export function Dashboard({ user }: { user?: any }) {
     loading: heatmapLoading,
     error: heatmapError,
     retry: retryHeatmap,
-  } = useHeatmap(userId, rawHabits, selectedHabit);
+  } = useHeatmap(userId, rawHabits);
+  const consistencySummary = useMemo(
+    () => summarizeConsistency(rawHabits, completionsMap, selectedHabit, selectedDate),
+    [rawHabits, completionsMap, selectedHabit, selectedDate, heatmapStats.currentStreak],
+  );
 
   const dataError = habitsError || completionsError || heatmapError || goalsError;
-  const [backupStatus, setBackupStatus] = useState(() => userId ? getLocalBackupStatus(userId) : null);
+  const [backupStatus, setBackupStatus] = useState(() => safeBackupStatus(userId));
   const hasFirstCompletion = useMemo(
     () => Object.values(completionsMap).some((day) => Object.values(day).some((entry) => entry.done)),
     [completionsMap],
   );
 
   useEffect(() => {
-    setBackupStatus(userId ? getLocalBackupStatus(userId) : null);
+    setBackupStatus(safeBackupStatus(userId));
   }, [userId, rawHabits.length, goals.length, heatmapStats.totalCompletions]);
 
   const retryData = useCallback(() => {
@@ -534,20 +582,19 @@ export function Dashboard({ user }: { user?: any }) {
   const [remindersOn, setRemindersOn] = useState(() => Capacitor.isNativePlatform());
   const [reminderTime, setReminderTime] = useState<string>("20:00");
   const [morningKickoff, setMorningKickoff] = useState<boolean>(false);
+  const [dailySummary, setDailySummary] = useState(false);
+  useExternalHabits(userId, theme, remindersOn, reminderTime, dailySummary, morningKickoff);
 
   useEffect(() => {
     initNotificationChannels();
   }, []);
 
-  const [detail, setDetail] = useState<{ q: Quadrant; i: number } | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [noteDraft, setNoteDraft] = useState("");
 
   useEffect(() => {
-    if (detail) {
-      const h = habits[detail.q]?.[detail.i];
-      if (h) setNoteDraft((h as any).note || "");
-    }
-  }, [detail?.q, detail?.i]);
+    if (detailId) setNoteDraft(completions[detailId]?.note ?? "");
+  }, [detailId]);
 
   const [wallpaperPreview, setWallpaperPreview] = useState(false);
   const [captureBusy, setCaptureBusy] = useState<null | "share" | "save">(null);
@@ -570,23 +617,6 @@ export function Dashboard({ user }: { user?: any }) {
     [rawHabits, completionsMap, habitStreaks],
   );
 
-  // Floating page title pill state & 2-second auto-fade timer
-  const [showTitlePill, setShowTitlePill] = useState(true);
-  const titlePillTimerRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    setShowTitlePill(true);
-    if (titlePillTimerRef.current) window.clearTimeout(titlePillTimerRef.current);
-    titlePillTimerRef.current = window.setTimeout(() => {
-      setShowTitlePill(false);
-      titlePillTimerRef.current = null;
-    }, 2000);
-
-    return () => {
-      if (titlePillTimerRef.current) window.clearTimeout(titlePillTimerRef.current);
-    };
-  }, [activeTab]);
-
   useEffect(() => {
     const handleBackButton = () => {
       try {
@@ -594,6 +624,7 @@ export function Dashboard({ user }: { user?: any }) {
       } catch {}
 
       // 1. Check Modals, Sheets & Overlays in order of precedence
+      if (showStaticTargetSelector && dismissTopOverlay()) return;
       if (applyMenuOpen) {
         setApplyMenuOpen(false);
         return;
@@ -614,6 +645,7 @@ export function Dashboard({ user }: { user?: any }) {
         setResetConfirmOpen(false);
         return;
       }
+      if (dismissTopOverlay()) return;
       if (profileEditOpen) {
         setProfileEditOpen(false);
         return;
@@ -728,14 +760,16 @@ export function Dashboard({ user }: { user?: any }) {
       appStateListener.then((l: any) => l.remove());
     };
   }, [
+    showStaticTargetSelector,
     applyMenuOpen,
     wallpaperEditorOpen,
     bulkDeleteConfirmOpen,
     signOutOpen,
     resetConfirmOpen,
     profileEditOpen,
+    feedbackOpen,
     editHabitTarget,
-    detail,
+    detailId,
     aiCoachOpen,
     badgesOpen,
     shareStreakOpen,
@@ -789,13 +823,17 @@ export function Dashboard({ user }: { user?: any }) {
           initials: docData.initials || "U",
         });
         if (docData.theme) setTheme(docData.theme as Theme);
+        if (typeof docData.remindersOn === "boolean") setRemindersOn(Capacitor.isNativePlatform() && docData.remindersOn);
+        if (docData.reminderTime) setReminderTime(docData.reminderTime);
+        if (typeof docData.morningKickoff === "boolean") setMorningKickoff(docData.morningKickoff);
+        setDailySummary(docData.dailySummary ?? false);
         const prefs = (docData as any).prefs;
         if (prefs) {
           const loadedApplied = {
             theme: prefs.wallpaperTheme ?? "auto",
             gridColorTheme: prefs.gridColorTheme ?? "emerald",
             wallpaperHabitSet: prefs.wallpaperHabitSet ?? "none",
-            wallpaperGridStyle: (prefs.wallpaperGridStyle as any) ?? "weeks",
+            wallpaperGridStyle: prefs.wallpaperGridStyle === "widget" ? "weeks" : (prefs.wallpaperGridStyle as any) ?? "weeks",
             wallpaperCustomPhoto: prefs.wallpaperCustomPhoto ?? null,
             wallpaperPhotoOverlay:
               typeof prefs.wallpaperPhotoOverlay === "number" ? prefs.wallpaperPhotoOverlay : 0.4,
@@ -836,16 +874,16 @@ export function Dashboard({ user }: { user?: any }) {
             setWallpaperStatsAlign(prefs.wallpaperStatsAlign);
           }
           if (typeof prefs.wallpaperSync === "boolean") setWallpaperSync(prefs.wallpaperSync);
-          if (typeof prefs.remindersOn === "boolean")
+          if (typeof docData.remindersOn !== "boolean" && typeof prefs.remindersOn === "boolean")
             setRemindersOn(Capacitor.isNativePlatform() && prefs.remindersOn);
-          if (prefs.reminderTime) setReminderTime(prefs.reminderTime);
-          if (typeof prefs.morningKickoff === "boolean") setMorningKickoff(prefs.morningKickoff);
+          if (!docData.reminderTime && prefs.reminderTime) setReminderTime(prefs.reminderTime);
+          if (typeof docData.morningKickoff !== "boolean" && typeof prefs.morningKickoff === "boolean") setMorningKickoff(prefs.morningKickoff);
           if (typeof prefs.previewWeeks === "number") setPreviewWeeks(prefs.previewWeeks);
           if (prefs.timeFilter) setTimeFilter(prefs.timeFilter);
           if (prefs.theme) setTheme(prefs.theme as Theme);
         }
       }
-    });
+    }).catch(() => { /* Data hooks show the recovery banner without replacing stored data. */ });
   }, [userId, user]);
 
   const previewRef = useRef<HTMLDivElement | null>(null);
@@ -900,7 +938,7 @@ export function Dashboard({ user }: { user?: any }) {
   const [newCustomDays, setNewCustomDays] = useState<number[]>([0, 1, 2, 3, 4]);
   const [newShade, setNewShade] = useState(0);
   const [newIcon, setNewIcon] = useState(0);
-  const [newCategory, setNewCategory] = useState<string>("Mind");
+  const newCategory = useRef("Mind");
   const [newTime, setNewTime] = useState<Habit["time"] | undefined>(undefined);
   const [newIsNumeric, setNewIsNumeric] = useState(false);
   const [newTarget, setNewTarget] = useState<number>(1);
@@ -931,6 +969,17 @@ export function Dashboard({ user }: { user?: any }) {
   }, [habitsByQ, completions, habitStreaks]);
 
   const flatHabits = useMemo(() => Object.values(habits).flat(), [habits]);
+  // Pinning and moving can reorder a quadrant while the sheet is open.
+  // Keep the identity stable and resolve its current position each render.
+  const detail = useMemo(() => {
+    for (const q of QUADRANT_ORDER) {
+      const i = habits[q].findIndex((habit) => habit.id === detailId);
+      if (i !== -1) return { q, i };
+    }
+    return null;
+  }, [habits, detailId]);
+  const setDetail = (target: { q: Quadrant; i: number } | null) =>
+    setDetailId(target ? habits[target.q][target.i]?.id ?? null : null);
 
   const scheduledHabits = useMemo(() => {
     return flatHabits.filter((h) => isScheduledDay(h.frequency, h.customDays, selectedDate));
@@ -997,16 +1046,24 @@ export function Dashboard({ user }: { user?: any }) {
     globalToast(msg, "info", action, duration);
   };
 
-  const toggleDone = async (q: Quadrant, i: number) => {
-    const targetHabit = habits[q][i];
-    if (!targetHabit) return;
+  const completeHabit = async (targetHabit: Habit) => {
     const wasDone = targetHabit.done;
     if (!wasDone) {
       try {
         navigator.vibrate?.([14, 40, 22]);
       } catch {}
     }
-    await toggleHabitDone(targetHabit.id);
+    if (targetHabit.type === "numeric" && targetHabit.target != null) {
+      await setHabitValue(targetHabit.id, wasDone ? 0 : targetHabit.target, targetHabit.target);
+    } else {
+      await toggleHabitDone(targetHabit.id);
+    }
+    if (!wasDone) globalToast(`Completed ${targetHabit.name}`, "success", undefined, 3000);
+  };
+
+  const toggleDone = async (q: Quadrant, i: number) => {
+    const targetHabit = habits[q][i];
+    if (targetHabit) await completeHabit(targetHabit);
   };
 
   const restHabit = async (q: Quadrant, i: number) => {
@@ -1024,6 +1081,9 @@ export function Dashboard({ user }: { user?: any }) {
     if (!targetHabit || targetHabit.target === null || targetHabit.target === undefined) return;
     const step = targetHabit.step ?? 0.25;
     await adjustHabitValue(targetHabit.id, dir, step, targetHabit.target);
+    if (dir === 1 && !targetHabit.done && (targetHabit.value ?? 0) + step >= targetHabit.target) {
+      globalToast(`Completed ${targetHabit.name}`, "success", undefined, 3000);
+    }
   };
 
   const freezeStreak = (q: Quadrant, i: number) => {
@@ -1079,6 +1139,30 @@ export function Dashboard({ user }: { user?: any }) {
     showToast(`Moved to "${QUADRANTS[targetQ].title}"`);
   };
 
+  const resetCreatedDraft = useRef(false);
+  const closeCreateHabit = useCallback(() => {
+    setModalOpen(false);
+    if (!resetCreatedDraft.current) return;
+    resetCreatedDraft.current = false;
+    setNewName("");
+    newCategory.current = "Mind";
+    setNewFreq("Daily");
+    setNewCustomDays([0, 1, 2, 3, 4]);
+    setNewShade(0);
+    setNewIcon(0);
+    setNewTime(undefined);
+    setNewIsNumeric(false);
+    setNewTarget(1);
+    setNewUnit("");
+  }, []);
+  const dismissCreateHabit = useSheetDismiss(closeCreateHabit);
+  const closeProfileEdit = useCallback(() => setProfileEditOpen(false), []);
+  const closeEditHabit = useCallback(() => setEditHabitTarget(null), [setEditHabitTarget]);
+  const closeWallpaperTarget = useCallback(() => setShowStaticTargetSelector(false), []);
+  const closeHabitDetail = useCallback(() => setDetail(null), []);
+  const closeStreak = useCallback(() => setStreakOpen(false), []);
+  const openStreak = useCallback(() => setStreakOpen(true), []);
+
   const createHabit = async () => {
     const name = newName.trim();
     if (!name || isCreatingHabit) {
@@ -1086,10 +1170,18 @@ export function Dashboard({ user }: { user?: any }) {
       return;
     }
     const freq = newFreq === "Weekdays" ? "weekdays" : newFreq === "Custom" ? "custom" : "daily";
+    if (newIsNumeric && (!Number.isFinite(newTarget) || newTarget <= 0)) {
+      showToast("Choose a target greater than zero");
+      return;
+    }
+    if (freq === "custom" && newCustomDays.length === 0) {
+      showToast("Choose at least one repeat day");
+      return;
+    }
 
     const habitData = {
       name,
-      category: newCategory,
+      category: newCategory.current,
       quadrant: selectedQuadrant,
       time: newTime ?? null,
       type: newIsNumeric ? "numeric" : "binary",
@@ -1108,17 +1200,12 @@ export function Dashboard({ user }: { user?: any }) {
     setIsCreatingHabit(true);
     try {
       await addHabit(habitData as any);
-      setModalOpen(false);
-      setNewName("");
-      setNewCategory("Mind");
-      setNewFreq("Daily");
-      setNewCustomDays([0, 1, 2, 3, 4]);
-      setNewShade(0);
-      setNewIcon(0);
-      setNewTime(undefined);
-      setNewIsNumeric(false);
-      setNewTarget(1);
-      setNewUnit("");
+      if (needsOnboarding(userId, onboardingStorageKey) && userId) {
+        updateLocalPrefs(userId, { onboardingCompleted: true });
+        localStorage.setItem(onboardingStorageKey, "true");
+      }
+      resetCreatedDraft.current = true;
+      dismissCreateHabit();
       showToast(`Saved "${name}" on this device`);
     } catch {
       globalToast(
@@ -1355,8 +1442,9 @@ export function Dashboard({ user }: { user?: any }) {
     totalStreak: displayedTotalStreak,
     completionRate: displayedRate,
     wallpaperTheme: appliedWallpaper.theme,
+    appTheme: theme,
     previewWeeks: appliedWallpaper.previewWeeks,
-    wallpaperSync: wallpaperSync && !wallpaperEditorOpen,
+    wallpaperSync: wallpaperSync && !wallpaperEditorOpen && wallpaperState !== "applying",
     isGoalActive: !!(activeGoalId && goals.some((g) => g.id === activeGoalId)),
     accentColor: wallpaperTokens(appliedWallpaper.theme, appliedWallpaper.gridColorTheme, theme)
       .accent,
@@ -1386,10 +1474,12 @@ export function Dashboard({ user }: { user?: any }) {
       return;
     }
 
-    const scheduledTodayHabits = flatHabits.filter((h) =>
-      isScheduledDay(h.frequency, h.customDays, selectedDate),
+    const actualToday = new Date();
+    const todayEntries = completionsMap[todayKey()] ?? {};
+    const scheduledTodayHabits = rawHabits.filter((h) =>
+      isScheduledDay(h.frequency, h.customDays, actualToday),
     );
-    const uncompleted = scheduledTodayHabits.filter((h) => !h.done).length;
+    const uncompleted = scheduledTodayHabits.filter((h) => !todayEntries[h.id]?.done).length;
     const allDone = scheduledTodayHabits.length > 0 && uncompleted === 0;
 
     const timer = setTimeout(() => {
@@ -1400,23 +1490,18 @@ export function Dashboard({ user }: { user?: any }) {
         uncompletedCount: uncompleted,
         streak: displayedTotalStreak,
         allDone,
-        habits: flatHabits.map((h) => ({
+        dailySummary,
+        habits: scheduledTodayHabits.map((h) => ({
           id: h.id,
           name: h.name,
           reminderTime: h.reminderTime || "",
-          done: h.done || false,
+          done: todayEntries[h.id]?.done || false,
         })),
-      });
-
-      WidgetBridge.sync({
-        completed: scheduledTodayHabits.length - uncompleted,
-        total: scheduledTodayHabits.length,
-        streak: displayedTotalStreak,
       });
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [remindersOn, reminderTime, morningKickoff, flatHabits, displayedTotalStreak, selectedDate]);
+  }, [remindersOn, reminderTime, morningKickoff, dailySummary, rawHabits, completionsMap, displayedTotalStreak]);
 
   const applyWallpaper = async (forceStatic: boolean = false, screenTarget: string = "both") => {
     if (wallpaperState !== "idle") return;
@@ -1436,6 +1521,83 @@ export function Dashboard({ user }: { user?: any }) {
         wallpaperScale,
         previewWeeks,
       };
+      if (typeof window !== "undefined" && (window as any).Capacitor?.isNativePlatform()) {
+        const { WallpaperNative } = await import("../lib/wallpaper-bridge");
+        const { supported } = await WallpaperNative.isLiveWallpaperSupported();
+        if (supported && !forceStatic) {
+          const result = await WallpaperNative.setWallpaper({
+            heatmap: displayedHeatmap,
+            heatmapStartMs: heatmapStartDate().getTime(),
+            theme: resolveThemeKey(wallpaperTheme, theme),
+            previewWeeks,
+            currentStreak: displayedTotalStreak,
+            completionRate: displayedRate,
+            isGoalActive: !!(activeGoalId && goals.some((g) => g.id === activeGoalId)),
+            accentColor: wallpaperTokens(wallpaperTheme, gridColorTheme, theme).accent,
+            gridStyle: wallpaperGridStyle,
+            customPhotoBase64: wallpaperTheme === "custom" ? wallpaperCustomPhoto : null,
+            photoOverlay: wallpaperPhotoOverlay,
+            statsAlignment: wallpaperStatsAlign,
+            offsetY:
+              typeof window !== "undefined"
+                ? 50 + (wallpaperOffset.y / window.innerHeight) * 100
+                : 54,
+            offsetX: wallpaperOffset.x,
+            gridScale: wallpaperScale,
+            gridColorTheme: gridColorTheme,
+            photoOffsetX: wallpaperPhotoOffset.x,
+            photoOffsetY: wallpaperPhotoOffset.y,
+            photoScale: wallpaperPhotoScale,
+            stackedGoals: stackedGoals,
+            habitText: habitTextLines,
+          });
+          if (!result.success) {
+            showToast("Wallpaper selection cancelled.");
+            return;
+          }
+          showToast("Live wallpaper applied.", undefined, 4000);
+        } else {
+          const result = await WallpaperNative.setStaticWallpaper({
+            screenTarget,
+            heatmap: displayedHeatmap,
+            heatmapStartMs: heatmapStartDate().getTime(),
+            theme: resolveThemeKey(wallpaperTheme, theme),
+            previewWeeks,
+            currentStreak: displayedTotalStreak,
+            completionRate: displayedRate,
+            isGoalActive: !!(activeGoalId && goals.some((g) => g.id === activeGoalId)),
+            accentColor: wallpaperTokens(wallpaperTheme, gridColorTheme, theme).accent,
+            gridStyle: wallpaperGridStyle,
+            customPhotoBase64: wallpaperTheme === "custom" ? wallpaperCustomPhoto : null,
+            photoOverlay: wallpaperPhotoOverlay,
+            statsAlignment: wallpaperStatsAlign,
+            offsetY:
+              typeof window !== "undefined"
+                ? 50 + (wallpaperOffset.y / window.innerHeight) * 100
+                : 54,
+            offsetX: wallpaperOffset.x,
+            gridScale: wallpaperScale,
+            gridColorTheme: gridColorTheme,
+            photoOffsetX: wallpaperPhotoOffset.x,
+            photoOffsetY: wallpaperPhotoOffset.y,
+            photoScale: wallpaperPhotoScale,
+            stackedGoals: stackedGoals,
+            habitText: habitTextLines,
+          });
+          if (!result.success) throw new Error("Static wallpaper could not be applied.");
+          showToast(`Wallpaper applied to ${screenTarget === "both" ? "home and lock screens" : screenTarget === "home" ? "home screen" : "lock screen"}.`, undefined, 4000);
+        }
+      } else {
+        const cap = await capturePreview();
+        if (!cap) throw new Error("Could not generate the wallpaper image.");
+        if (cap) {
+          const a = document.createElement("a");
+          a.href = cap.dataUrl;
+          a.download = `grain-lockscreen-${wallpaperTheme}-${Date.now()}.png`;
+          a.click();
+          showToast("Wallpaper saved \u2014 select Set as Lock Screen in Gallery", undefined, 4000);
+        }
+      }
       setAppliedWallpaper(currentApplied);
 
       if (user?.uid) {
@@ -1462,77 +1624,6 @@ export function Dashboard({ user }: { user?: any }) {
         } as any).catch((err) => toastError("Failed to save wallpaper prefs"));
       }
 
-      if (typeof window !== "undefined" && (window as any).Capacitor?.isNativePlatform()) {
-        const { WallpaperNative } = await import("../lib/wallpaper-bridge");
-        const { supported } = await WallpaperNative.isLiveWallpaperSupported();
-        if (supported && !forceStatic) {
-          await WallpaperNative.setWallpaper({
-            heatmap: displayedHeatmap,
-            heatmapStartMs: heatmapStartDate().getTime(),
-            theme: wallpaperTheme,
-            previewWeeks,
-            currentStreak: displayedTotalStreak,
-            completionRate: displayedRate,
-            isGoalActive: !!(activeGoalId && goals.some((g) => g.id === activeGoalId)),
-            accentColor: wallpaperTokens(wallpaperTheme, gridColorTheme, theme).accent,
-            gridStyle: wallpaperGridStyle,
-            customPhotoBase64: wallpaperTheme === "custom" ? wallpaperCustomPhoto : null,
-            photoOverlay: wallpaperPhotoOverlay,
-            statsAlignment: wallpaperStatsAlign,
-            offsetY:
-              typeof window !== "undefined"
-                ? 50 + (wallpaperOffset.y / window.innerHeight) * 100
-                : 54,
-            offsetX: wallpaperOffset.x,
-            gridScale: wallpaperScale,
-            gridColorTheme: gridColorTheme,
-            photoOffsetX: wallpaperPhotoOffset.x,
-            photoOffsetY: wallpaperPhotoOffset.y,
-            photoScale: wallpaperPhotoScale,
-            stackedGoals: stackedGoals,
-            habitText: habitTextLines,
-          });
-          showToast("Wallpaper picker opened \u2014 confirm to apply", undefined, 4000);
-        } else {
-          await WallpaperNative.setStaticWallpaper({
-            screenTarget,
-            heatmap: displayedHeatmap,
-            heatmapStartMs: heatmapStartDate().getTime(),
-            theme: wallpaperTheme,
-            previewWeeks,
-            currentStreak: displayedTotalStreak,
-            completionRate: displayedRate,
-            isGoalActive: !!(activeGoalId && goals.some((g) => g.id === activeGoalId)),
-            accentColor: wallpaperTokens(wallpaperTheme, gridColorTheme, theme).accent,
-            gridStyle: wallpaperGridStyle,
-            customPhotoBase64: wallpaperTheme === "custom" ? wallpaperCustomPhoto : null,
-            photoOverlay: wallpaperPhotoOverlay,
-            statsAlignment: wallpaperStatsAlign,
-            offsetY:
-              typeof window !== "undefined"
-                ? 50 + (wallpaperOffset.y / window.innerHeight) * 100
-                : 54,
-            offsetX: wallpaperOffset.x,
-            gridScale: wallpaperScale,
-            gridColorTheme: gridColorTheme,
-            photoOffsetX: wallpaperPhotoOffset.x,
-            photoOffsetY: wallpaperPhotoOffset.y,
-            photoScale: wallpaperPhotoScale,
-            stackedGoals: stackedGoals,
-            habitText: habitTextLines,
-          });
-          showToast("Static wallpaper applied!", undefined, 4000);
-        }
-      } else {
-        const cap = await capturePreview();
-        if (cap) {
-          const a = document.createElement("a");
-          a.href = cap.dataUrl;
-          a.download = `grain-lockscreen-${wallpaperTheme}-${Date.now()}.png`;
-          a.click();
-          showToast("Wallpaper saved \u2014 select Set as Lock Screen in Gallery", undefined, 4000);
-        }
-      }
       setWallpaperState("applied");
       setWallpaperSnapshot(heatmap.map((c) => c.slice()));
     } catch (e: any) {
@@ -1580,6 +1671,10 @@ export function Dashboard({ user }: { user?: any }) {
     try {
       const cap = await capturePreview();
       if (!cap) return;
+      if (Capacitor.isNativePlatform()) {
+        await shareNativeImage(cap.dataUrl);
+        return;
+      }
       const file = new File([cap.blob], `grain-wallpaper.png`, { type: "image/png" });
       const nav = navigator as Navigator & {
         canShare?: (d: ShareData) => boolean;
@@ -1626,10 +1721,7 @@ export function Dashboard({ user }: { user?: any }) {
     try {
       const cap = await capturePreview();
       if (!cap) return;
-      const a = document.createElement("a");
-      a.href = cap.dataUrl;
-      a.download = `grain-${wallpaperTheme}-${Date.now()}.png`;
-      a.click();
+      if (!(await exportImage(cap.dataUrl, `grain-${wallpaperTheme}-${Date.now()}.png`))) return;
       if (!user) return;
       try {
         updateLocalPrefs(user.uid, {
@@ -1662,17 +1754,11 @@ export function Dashboard({ user }: { user?: any }) {
     }
   };
 
-  const exportBackup = () => {
+  const exportBackup = async () => {
     try {
       if (!userId) throw new Error("Not signed in");
       const payload = exportLocalBackup(userId);
-      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `grain-backup-${new Date().toISOString().slice(0, 10)}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
+      if (!(await downloadBackup(payload))) return;
       markLocalBackupExported(userId);
       setBackupStatus(getLocalBackupStatus(userId));
       showToast(`Backup downloaded · ${flatHabits.length} habits`);
@@ -1702,7 +1788,7 @@ export function Dashboard({ user }: { user?: any }) {
 
   const resetToday = async () => {
     try {
-      if (userId) clearLocalCompletionDate(userId, formatDateKey(selectedDate));
+      if (userId) clearLocalCompletionDate(userId, formatDateKey(new Date()));
       try {
         navigator.vibrate?.([28, 60, 40]);
       } catch {}
@@ -1945,12 +2031,6 @@ export function Dashboard({ user }: { user?: any }) {
     }
   };
 
-  useEffect(() => {
-    if (activeSettingTab === "size" && wallpaperGridStyle !== "weeks") {
-      setActiveSettingTab("style");
-    }
-  }, [wallpaperGridStyle, activeSettingTab]);
-
   const renderSettingsMenu = () => {
     const tabs = [
       "theme",
@@ -1958,7 +2038,6 @@ export function Dashboard({ user }: { user?: any }) {
       "color",
       "habits",
       "stats",
-      ...(wallpaperGridStyle === "weeks" ? ["size"] : []),
     ] as const;
     return (
       <div className="flex flex-col gap-5 w-full animate-fade-in">
@@ -1967,7 +2046,7 @@ export function Dashboard({ user }: { user?: any }) {
           <WheelPicker
             options={tabs.map((tab) => ({
               key: tab,
-              label: tab === "size" ? "GRID SIZE" : tab.toUpperCase(),
+              label: tab.toUpperCase(),
             }))}
             value={activeSettingTab}
             onChange={(v) => setActiveSettingTab(v as any)}
@@ -1996,45 +2075,7 @@ export function Dashboard({ user }: { user?: any }) {
             </div>
           )}
           {activeSettingTab === "color" && (
-            <div className="flex gap-4 overflow-x-auto hide-scrollbar snap-x snap-mandatory py-3 px-2 w-full animate-fade-in-right">
-              {GRID_COLORS.map((t) => {
-                const active = gridColorTheme === t.key;
-                return (
-                  <button
-                    key={t.key}
-                    onClick={() => {
-                      setGridColorTheme(t.key);
-                      showToast(`${t.label} grid`);
-                    }}
-                    aria-label={t.label}
-                    title={t.label}
-                    className={`h-8 w-8 rounded-full border transition-all shrink-0 snap-center ${
-                      active
-                        ? "border-white ring-2 ring-white ring-offset-2 ring-offset-black/50 scale-110 shadow-md"
-                        : "border-white/30 hover:scale-105"
-                    }`}
-                    style={{ background: t.color }}
-                  />
-                );
-              })}
-              <label
-                className={`relative h-8 w-8 rounded-full border transition-all shrink-0 snap-center flex items-center justify-center bg-[conic-gradient(red,yellow,lime,aqua,blue,fuchsia,red)] ${
-                  gridColorTheme.startsWith("#")
-                    ? "border-white ring-2 ring-white ring-offset-2 ring-offset-black/50 scale-110 shadow-md"
-                    : "border-white/30 hover:scale-105"
-                }`}
-                title="Custom Color"
-              >
-                <input
-                  type="color"
-                  className="absolute inset-0 opacity-0 w-full h-full cursor-pointer"
-                  value={gridColorTheme.startsWith("#") ? gridColorTheme : "#22c55e"}
-                  onChange={(e) => {
-                    setGridColorTheme(e.target.value);
-                  }}
-                />
-              </label>
-            </div>
+            <AccentPalette value={gridColorTheme} onChange={setGridColorTheme} />
           )}
 
           {activeSettingTab === "habits" && (
@@ -2077,17 +2118,16 @@ export function Dashboard({ user }: { user?: any }) {
             <div className="w-full animate-fade-in-right">
               <WheelPicker
                 options={[
-                  { key: "weeks", label: "Weeks" },
+                  { key: "weeks", label: "7 days" },
                   { key: "month", label: "Month Cal" },
                   { key: "year", label: "Year" },
                   { key: "goals", label: "Goals" },
-                  { key: "widget", label: "Widget" },
                 ]}
                 value={wallpaperGridStyle}
                 onChange={(v) => {
                   setWallpaperGridStyle(v as any);
                   showToast(
-                    `${v === "weeks" ? "Weeks" : v === "month" ? "Month Cal" : v === "year" ? "Year" : v === "goals" ? "Goals" : "Widget"} layout`,
+                    `${v === "weeks" ? "7 days" : v === "month" ? "Month Cal" : v === "year" ? "Year" : "Goals"} layout`,
                   );
                 }}
                 itemWidth={95}
@@ -2096,18 +2136,6 @@ export function Dashboard({ user }: { user?: any }) {
             </div>
           )}
 
-          {activeSettingTab === "size" &&
-            (wallpaperGridStyle === "weeks" || wallpaperGridStyle === "widget") && (
-              <div className="w-full animate-fade-in-right">
-                <WheelPicker
-                  options={GRID_SIZES.map((w) => ({ key: w, label: w }))}
-                  value={previewWeeks}
-                  onChange={setPreviewWeeks}
-                  itemWidth={55}
-                  fontSizeClass="text-[18px]"
-                />
-              </div>
-            )}
         </div>
       </div>
     );
@@ -2116,9 +2144,7 @@ export function Dashboard({ user }: { user?: any }) {
   const appBackgroundImage =
     theme === "light"
       ? "/grain-light.jpg"
-      : wallpaperTheme === "custom" && wallpaperCustomPhoto
-        ? wallpaperCustomPhoto
-        : "/back2.jpg";
+      : "/back2.jpg";
   const backgroundExtensionImage = appBackgroundImage;
 
   return (
@@ -2127,6 +2153,11 @@ export function Dashboard({ user }: { user?: any }) {
       data-app-visible={pageVisible ? "true" : "false"}
       className="fixed inset-0 flex h-full w-full justify-center bg-[var(--backdrop)] overflow-hidden"
     >
+      {activeToast && (
+        <FeedbackToast key={activeToast.id} notice={activeToast} onDismiss={removeToast} />
+      )}
+      <input ref={backupInputRef} type="file" accept="application/json,.json" className="hidden" onChange={importBackup} />
+
       {/* Main app container - 100% Full Edge-to-Edge Responsive */}
       <div className="relative flex h-full w-full flex-col bg-canvas pt-safe pb-safe overflow-hidden">
         <div
@@ -2205,115 +2236,21 @@ export function Dashboard({ user }: { user?: any }) {
             />
           </div>
 
-          {/* Top-Center Brand Icon & Auto-Expanding Title Pill, plus Profile Button */}
-          <div className="absolute top-4 left-0 right-0 z-40 flex items-center justify-between px-4 pointer-events-none">
-            {/* Spacer to maintain true center */}
-            <div className="w-9" />
-
-            <button
-              type="button"
-              onClick={() => {
-                if (pillNotice) {
-                  pillNotice.action?.onClick();
-                  if (activeToast) removeToast(activeToast.id);
-                  return;
-                }
-                if (showTitlePill) {
-                  setStreakOpen(true);
-                } else {
-                  setShowTitlePill(true);
-                  if (titlePillTimerRef.current) window.clearTimeout(titlePillTimerRef.current);
-                  titlePillTimerRef.current = window.setTimeout(() => {
-                    setShowTitlePill(false);
-                    titlePillTimerRef.current = null;
-                  }, 2000);
-                }
-              }}
-              className={`grain-title-pill pointer-events-auto flex items-center justify-center rounded-full border border-[color:var(--hairline-mid)] p-1 pl-1 text-xs font-semibold backdrop-blur-xl shadow-lg active:scale-95 ${
-                pillNotice
-                  ? pillNotice.type === "error"
-                    ? "max-h-12 max-w-[280px] gap-2 pr-3.5 bg-red-500/90 text-white border-red-500/20 opacity-100 translate-y-0 scale-100"
-                    : pillNotice.type === "success"
-                      ? "max-h-12 max-w-[280px] gap-2 pr-3.5 bg-green-500/90 text-white border-green-500/20 opacity-100 translate-y-0 scale-100"
-                      : "max-h-12 max-w-[280px] gap-2 pr-3.5 bg-[color:color-mix(in_srgb,var(--canvas)_94%,transparent)] text-ink border-[color:var(--hairline-mid)] opacity-100 translate-y-0 scale-100"
-                  : showTitlePill
-                    ? "max-h-12 max-w-[280px] gap-2 pr-3.5 bg-canvas text-ink ring-1 ring-ink/10 opacity-100 translate-y-0 scale-100"
-                    : "pointer-events-none max-h-0 max-w-0 gap-0 border-transparent bg-transparent p-0 text-ink opacity-0 -translate-y-1 scale-75"
-              }`}
-              aria-label="App logo and section title"
-            >
-              <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full overflow-hidden relative">
-                {showTitlePill || pillNotice ? (
-                  <div className="grain-title-pill-halo absolute inset-0 rounded-full bg-current opacity-10" />
-                ) : null}
-                {theme === "light" ? (
-                  <Wheat
-                    className={`h-4 w-4 drop-shadow-sm ${
-                      pillNotice?.type === "error" || pillNotice?.type === "success"
-                        ? "text-white"
-                        : "text-ink"
-                    }`}
-                    strokeWidth={2.2}
-                    aria-label="Grain logo"
-                  />
-                ) : (
-                  <img
-                    src="/icon.png"
-                    alt="Grain logo"
-                    className={`h-full w-full object-contain object-center filter drop-shadow-sm scale-105 transition-all duration-500 ${
-                      pillNotice
-                        ? pillNotice.type === "error" || pillNotice.type === "success"
-                          ? "brightness-0 invert"
-                          : ""
-                        : wallpaperThemeOf(wallpaperTheme, theme).bg === "#f5f5f5" ||
-                            (wallpaperThemeOf(wallpaperTheme, theme).bg as string) === "#ffffff"
-                          ? "invert"
-                          : ""
-                    }`}
-                  />
-                )}
-              </div>
-              <span
-                className={`overflow-hidden transition-[max-width,opacity] duration-500 ease-out flex items-center gap-2 ${
-                  showTitlePill || pillNotice ? "max-w-[240px] opacity-100" : "max-w-0 opacity-0"
-                }`}
-              >
-                <span
-                  className={`h-3.5 w-px shrink-0 opacity-70 ${pillNotice ? "bg-current opacity-30" : "bg-[color:var(--hairline-mid)]"}`}
-                />
-                <span
-                  key={pillNotice?.id ?? activeTab}
-                  className={`grain-title-pill-copy font-medium text-[11px] leading-none shrink-0 whitespace-nowrap flex items-center ${pillNotice ? "text-current" : "text-mute"}`}
-                >
-                  {pillNotice
-                    ? pillNotice.message
-                    : activeTab === "today"
-                      ? `Daily habits · ${totalStreak}d streak`
-                      : activeTab === "consistency"
-                        ? `Consistency · ${totalStreak}d streak`
-                        : activeTab === "myday"
-                          ? "My Day"
-                          : activeTab === "goal"
-                            ? "Your goals"
-                            : "Live wallpaper"}
-                </span>
-                {pillNotice?.action && (
-                  <span className="rounded-full bg-current/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wide">
-                    {pillNotice.action.label}
-                  </span>
-                )}
-              </span>
-            </button>
-
+          {/* Profile button */}
+          <div className="absolute top-4 left-0 right-0 z-40 flex items-center justify-end px-4 pointer-events-none">
             {/* Profile Button (Top Right) */}
             <button
               onClick={() => setSettingsOpen(true)}
+              type="button"
+              aria-label="Open settings"
               className="pointer-events-auto grid h-9 w-9 shrink-0 place-items-center rounded-full bg-ink text-sm font-bold text-on-ink shadow-[0_4px_12px_rgba(0,0,0,0.1)] transition active:scale-95 hover:scale-105"
             >
               {user?.email?.[0]?.toUpperCase() || "U"}
             </button>
           </div>
 
+          {(dataError || (backupStatus?.reminderDue && !onboardingOpen)) && (
+            <div className="shrink-0 space-y-2 pt-16">
           {dataError && (
             <DataStatusBanner
               message={dataError.message || "Some local data could not be loaded. Your saved items remain on this device."}
@@ -2332,6 +2269,8 @@ export function Dashboard({ user }: { user?: any }) {
                 showToast("Backup reminder snoozed for 3 days");
               }}
             />
+          )}
+            </div>
           )}
 
           <div
@@ -2376,7 +2315,10 @@ export function Dashboard({ user }: { user?: any }) {
                       }
                       return null;
                     })()}
-                    onCompleteNext={(q: Quadrant, i: number) => toggleDone(q, i)}
+                    onCompleteNext={(q: Quadrant, i: number) => {
+                      if (habits[q][i]?.type === "numeric") void adjustValue(q, i, 1);
+                      else void toggleDone(q, i);
+                    }}
                     dateSelectorSlot={
                       <div className="relative">
                         {dateStyle === "underline" && (
@@ -2486,26 +2428,7 @@ export function Dashboard({ user }: { user?: any }) {
                         <Loader2 className="h-4 w-4 animate-spin" /> Loading your habits…
                       </div>
                     ) : totalCount === 0 ? (
-                      /* ── Empty state: invitation + ghost card ── */
-                      <div className="flex flex-col items-center gap-4 py-8">
-                        {/* Ghost habit card */}
-                        <div
-                          className="animate-breathe w-full rounded-2xl border-2 border-dashed border-[color:color-mix(in_srgb,var(--accent)_20%,transparent)] bg-[color:color-mix(in_srgb,var(--canvas)_72%,transparent)] shadow-[inset_0_1px_1px_color-mix(in_srgb,var(--accent)_15%,transparent),0_8px_24px_rgba(0,0,0,0.2)] p-4 flex items-center gap-3.5 cursor-pointer transition-all hover:bg-[color:color-mix(in_srgb,var(--canvas)_82%,transparent)] hover:border-[color:color-mix(in_srgb,var(--accent)_30%,transparent)]"
-                          onClick={() => setModalOpen(true)}
-                        >
-                          <div className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-dashed border-[color:color-mix(in_srgb,var(--accent)_30%,transparent)] bg-[color:color-mix(in_srgb,var(--canvas)_40%,transparent)]">
-                            <Plus className="h-4 w-4 text-ink" strokeWidth={2.5} />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold text-ink">
-                              Tap to add your first habit
-                            </p>
-                            <p className="text-[11px] text-body mt-0.5">
-                              Your streak starts with one check ✓
-                            </p>
-                          </div>
-                        </div>
-                      </div>
+                      <GrainState icon={Plus} eyebrow="Today" title="Small actions. Lasting change." description="Choose one habit you can return to. Your progress starts with a single check-in." action={{ label: "Create habit", onClick: () => setModalOpen(true) }} />
                     ) : (
                       <div className="habit-list-surface overflow-hidden rounded-[24px]">
                         {QUADRANT_ORDER.flatMap((q) =>
@@ -2523,7 +2446,7 @@ export function Dashboard({ user }: { user?: any }) {
                             onToggle={toggleDone}
                             onOpenDetail={(quad, idx) => {
                               setDetail({ q: quad, i: idx });
-                              setNoteDraft("");
+                              setNoteDraft(completions[habits[quad][idx].id]?.note ?? "");
                             }}
                             isSelectionMode={isSelectionMode}
                             isSelected={selectedHabitIds.has(h.id)}
@@ -2552,10 +2475,11 @@ export function Dashboard({ user }: { user?: any }) {
                       heatmap={heatmap}
                       selectedHabit={selectedHabit}
                       setSelectedHabit={setSelectedHabit}
-                      doneCount={doneCount}
-                      totalCount={totalCount}
-                      totalStreak={totalStreak}
-                      rate={rate}
+                      doneCount={consistencySummary.done}
+                      totalCount={consistencySummary.total}
+                      totalStreak={consistencySummary.streak}
+                      bestStreak={consistencySummary.best}
+                      rate={consistencySummary.rate}
                       weeklyInsights={weeklyInsights}
                       showToast={showToast}
                       onOpenWeeklyReview={() => setWeeklyReviewOpen(true)}
@@ -2575,22 +2499,7 @@ export function Dashboard({ user }: { user?: any }) {
                 <div className="pt-16 pb-32">
                   <section className="px-5">
                     {totalCount === 0 ? (
-                      <div className="liquid-glass specular flex flex-col items-center justify-center gap-3 px-5 py-10 text-center rounded-3xl">
-                        <div>
-                          <p className="font-display text-base font-bold text-ink">No habits yet</p>
-                          <p className="mt-1 max-w-[240px] text-[12px] text-body">
-                            Add your first habit to start a streak. It'll show up here in your daily
-                            routine.
-                          </p>
-                        </div>
-                        <button
-                          onClick={() => setModalOpen(true)}
-                          className="pill mt-2 flex items-center gap-1.5 bg-ink px-5 py-2.5 text-[13px] font-semibold text-on-ink shadow-lg active:scale-95 transition"
-                          data-lg-press
-                        >
-                          <Plus className="h-4 w-4" strokeWidth={3} /> Create habit
-                        </button>
-                      </div>
+                      <GrainState icon={Sun} eyebrow="My day" title="Start with one small action." description="Add a habit to give your daily routine a little direction." action={{ label: "Create habit", onClick: () => setModalOpen(true) }} />
                     ) : (
                       <>
                         {(() => {
@@ -2607,17 +2516,7 @@ export function Dashboard({ user }: { user?: any }) {
 
                           if (!recommended) {
                             return (
-                              <div className="absolute inset-x-5 top-1/2 flex -translate-y-1/2 flex-col items-center px-6 py-10 text-center animate-fade-in">
-                                <div className="grid h-14 w-14 place-items-center rounded-full bg-emerald-500 text-white shadow-lg shadow-emerald-500/20">
-                                  <Check className="h-7 w-7" strokeWidth={3} />
-                                </div>
-                                <h2 className="mt-4 font-display text-xl font-bold text-ink">
-                                  Today is complete
-                                </h2>
-                                <p className="mt-1 text-sm text-body">
-                                  You finished all {totalCount} habits. Enjoy the rest of your day.
-                                </p>
-                              </div>
+                              <GrainState className="absolute inset-x-5 top-1/2 -translate-y-1/2 animate-fade-in" icon={Check} eyebrow="My day" title="Today is complete." description={`You finished all ${totalCount} habits. Enjoy the rest of your day.`} />
                             );
                           }
 
@@ -2671,9 +2570,9 @@ export function Dashboard({ user }: { user?: any }) {
                                   onClick={() => {
                                     if (isNumeric) {
                                       setDetail({ q: recommended.quadrant, i: habitIndex });
-                                      setNoteDraft("");
+                                      setNoteDraft(completions[recommended.id]?.note ?? "");
                                     } else {
-                                      void toggleHabitDone(recommended.id);
+                                      void completeHabit(recommended);
                                       setMyDayOverrideId(null);
                                     }
                                   }}
@@ -2729,8 +2628,8 @@ export function Dashboard({ user }: { user?: any }) {
                                       {myDayCompletedOpen ? "Hide" : "View"}
                                     </span>
                                   </button>
-                                  {myDayCompletedOpen && (
-                                    <div className="border-t border-[color:var(--hairline)] px-4 py-2 animate-fade-in">
+                                  <CollapseMotion open={myDayCompletedOpen}>
+                                    <div className="border-t border-[color:var(--hairline)] px-4 py-2">
                                       {completed.map((habit) => (
                                         <p
                                           key={habit.id}
@@ -2740,7 +2639,7 @@ export function Dashboard({ user }: { user?: any }) {
                                         </p>
                                       ))}
                                     </div>
-                                  )}
+                                  </CollapseMotion>
                                 </div>
                               )}
                               <p className="hidden text-center text-xs text-body">
@@ -2804,7 +2703,7 @@ export function Dashboard({ user }: { user?: any }) {
                                         setOpenMenuId(openMenuId === h.id ? null : h.id)
                                       }
                                       onMenuClose={() => setOpenMenuId(null)}
-                                      onToggle={() => toggleHabitDone(h.id)}
+                                      onToggle={() => completeHabit(h)}
                                       onRest={() => setHabitRestDay(h.id)}
                                       onPin={() => {
                                         togglePin(
@@ -2845,7 +2744,7 @@ export function Dashboard({ user }: { user?: any }) {
                                           q: h.quadrant,
                                           i: habits[h.quadrant].findIndex((hx) => hx.id === h.id),
                                         });
-                                        setNoteDraft("");
+                                        setNoteDraft(completions[h.id]?.note ?? "");
                                       }}
                                     />
                                   ))}
@@ -2980,7 +2879,6 @@ export function Dashboard({ user }: { user?: any }) {
             </button>
           )}
 
-          {/* Toast removed (merged into title pill) */}
 
           {/* Fullscreen wallpaper lock-screen preview removed */}
 
@@ -2988,7 +2886,7 @@ export function Dashboard({ user }: { user?: any }) {
           {swipeMode && (
             <Suspense fallback={null}>
               <SwipeModeView
-                habits={habits}
+                habits={Object.fromEntries(QUADRANT_ORDER.map((q) => [q, scheduledHabitsByQuadrant[q].map(({ habit }) => habit)])) as Record<Quadrant, Habit[]>}
                 onClose={() => setSwipeMode(false)}
                 onToggleDone={(habitId) => {
                   for (const q of QUADRANT_ORDER) {
@@ -3043,9 +2941,6 @@ export function Dashboard({ user }: { user?: any }) {
                       <span className="font-semibold text-sm text-ink truncate">
                         {profile.name}
                       </span>
-                      <span className="rounded-full bg-gradient-to-r from-indigo-500/20 to-purple-500/20 px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-widest text-ink border border-indigo-500/30 shrink-0">
-                        Pro
-                      </span>
                     </div>
                     <p className="text-xs text-mute truncate">
                       {totalStreak} day streak · {rate}% today
@@ -3092,6 +2987,13 @@ export function Dashboard({ user }: { user?: any }) {
                   >
                     <ArrowUpRight className="h-4 w-4 text-mute" strokeWidth={2} /> Share
                   </button>
+                </div>
+
+                <div className="pt-4 pb-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-mute">Quick access</p>
+                </div>
+                <div className="space-y-3">
+                  <WidgetSettings onMessage={showToast} />
                 </div>
 
                 {/* Section: Appearance */}
@@ -3167,8 +3069,10 @@ export function Dashboard({ user }: { user?: any }) {
                           <div className="absolute inset-x-[12%] top-[13%] text-center text-[7px] font-bold tracking-[0.16em] opacity-80" style={{ color: wallpaperThemeOf(wallpaperTheme, theme).fg }}>
                             GRAIN
                           </div>
-                          <div className="absolute inset-x-[12%] top-[25%] grid aspect-[5/6] grid-cols-5 grid-rows-6 gap-[3px]">
-                            {Array.from({ length: 30 }, (_, index) => (
+                          <div className={`absolute inset-x-[12%] grid gap-[3px] ${wallpaperGridStyle === "weeks" ? "top-[42%] grid-cols-7" : "top-[25%] aspect-[5/6] grid-cols-5 grid-rows-6"}`}>
+                            {wallpaperGridStyle === "weeks" ? wallpaperSevenDays(displayedHeatmap, heatmapStartDate()).map(({ key, level, isToday }) => (
+                              <span key={key} className="aspect-square rounded-[2px]" style={{ backgroundColor: gridColorOf(gridColorTheme).color, opacity: [0.2, 0.4, 0.7, 1][level] ?? 0.2, outline: isToday ? `1px solid ${wallpaperThemeOf(wallpaperTheme, theme).fg}` : undefined }} />
+                            )) : Array.from({ length: 30 }, (_, index) => (
                               <span
                                 key={index}
                                 className="aspect-square rounded-[1px]"
@@ -3191,7 +3095,7 @@ export function Dashboard({ user }: { user?: any }) {
                         <div>
                           <span className="text-sm font-medium text-ink block">Lock Screen</span>
                           <p className="text-[11px] text-mute">
-                            {wallpaperGridStyle} · {gridColorTheme}
+                            {wallpaperGridStyle === "weeks" ? "7 days" : wallpaperGridStyle} · {gridColorTheme}
                           </p>
                         </div>
                       </div>
@@ -3339,6 +3243,7 @@ export function Dashboard({ user }: { user?: any }) {
 
                   {remindersOn && (
                     <div className="px-5 py-4 space-y-3 animate-fade-in">
+                      <p className="text-xs text-mute leading-relaxed">Tap Done or +1 in a notification. Use each habit's own reminder time, or this default time. Remind me later snoozes for 15 minutes.</p>
                       {/* Time picker */}
                       {(() => {
                         const [hStr, mStr] = (reminderTime || "20:00").split(":");
@@ -3480,6 +3385,14 @@ export function Dashboard({ user }: { user?: any }) {
                       })()}
 
                       <div className="flex items-center justify-between">
+                        <span className="text-xs text-body">Daily summary</span>
+                        <Toggle checked={dailySummary} ariaLabel="Toggle daily summary" onChange={() => {
+                          const next = !dailySummary;
+                          setDailySummary(next);
+                          if (userId) void updateUserProfile(userId, { dailySummary: next });
+                        }} />
+                      </div>
+                      <div className="flex items-center justify-between">
                         <span className="flex items-center gap-1.5 text-xs text-body">
                           <Sunrise className="h-3.5 w-3.5 text-amber-400" /> Morning kickoff (8 AM)
                         </span>
@@ -3503,7 +3416,7 @@ export function Dashboard({ user }: { user?: any }) {
                           try {
                             navigator.vibrate?.(15);
                           } catch {}
-                          showToast("Sending test notification in 2 seconds...");
+                          showToast("Sending a test notification...");
                           const ok = await sendTestNotification();
                           if (!ok)
                             showToast("Please allow notification permission in system settings");
@@ -3567,7 +3480,6 @@ export function Dashboard({ user }: { user?: any }) {
                     </span>
                     <ArrowRight className="h-4 w-4 text-mute group-hover:translate-x-0.5 transition-transform" />
                   </button>
-                  <input ref={backupInputRef} type="file" accept="application/json,.json" className="hidden" onChange={importBackup} />
                   <div className="mx-5 mb-2 rounded-2xl border border-amber-500/25 bg-amber-500/8 px-3.5 py-3 text-[11px] leading-relaxed text-body">
                     <strong className="text-ink">Local data only.</strong> Your account remains online, but habits and progress stay on this device. Download a backup before uninstalling or changing phones.
                     <span className="mt-1.5 block text-mute">
@@ -3691,10 +3603,11 @@ export function Dashboard({ user }: { user?: any }) {
           {profileEditOpen && (
             <ProfileEditSheet
               profile={profile}
-              onClose={() => setProfileEditOpen(false)}
+              onClose={closeProfileEdit}
               onSave={(next) => {
-                setProfileEditOpen(false);
-                saveProfile(next).catch((err) => toastError("An error occurred"));
+                requestOverlayClose(closeProfileEdit, () => {
+                  saveProfile(next).catch((err) => toastError("An error occurred"));
+                });
               }}
             />
           )}
@@ -4190,110 +4103,18 @@ export function Dashboard({ user }: { user?: any }) {
                       );
                     })()
                   ) : wallpaperGridStyle === "weeks" ? (
-                    /* ── Weeks Portrait 7-Day Calendar Grid ── */
-                    <div
-                      className={`flex flex-col items-center mt-6 ${wallpaperSync ? "" : "opacity-60"}`}
-                    >
-                      {/* Day headers: M T W T F S S */}
-                      <div className="flex items-center mb-2" style={{ gap: "4px" }}>
-                        <div className="w-7 shrink-0" />
-                        {["M", "T", "W", "T", "F", "S", "S"].map((d, i) => (
-                          <div
-                            key={i}
-                            className="text-[10px] font-bold text-center opacity-40 uppercase"
-                            style={(() => {
-                              const cellSize =
-                                previewWeeks > 32
-                                  ? 10
-                                  : previewWeeks > 20
-                                    ? 14
-                                    : previewWeeks > 12
-                                      ? 18
-                                      : 24;
-                              return { width: `${cellSize}px` };
-                            })()}
-                          >
-                            {d}
+                    <div className={`mt-6 flex flex-col items-center gap-5 ${wallpaperSync ? "" : "opacity-60"}`} aria-label="Last seven days of progress">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] opacity-60">Last 7 days</p>
+                      <div className="flex gap-2">
+                        {wallpaperSevenDays(displayedHeatmap, heatmapStartDate()).map(({ date, key, level, isToday }) => (
+                          <div key={key} className="flex w-9 flex-col items-center gap-2" aria-label={`${date.toLocaleDateString()}: progress level ${level}${isToday ? ", today" : ""}`}>
+                            <span className="text-[10px] font-semibold opacity-60">{date.toLocaleDateString("en-US", { weekday: "short" })}</span>
+                            <div className={`grid h-9 w-9 place-items-center rounded-xl text-[12px] font-bold ${isToday ? "ring-2 ring-[color:var(--wp-accent)]" : ""}`} style={{ background: ["var(--wp-empty)", "var(--wp-low)", "var(--wp-mid)", "var(--wp-hi)"][level] ?? "var(--wp-empty)" }}>{date.getDate()}</div>
+                            <span className="h-3 text-[8px] font-bold uppercase tracking-wider">{isToday ? "Today" : ""}</span>
                           </div>
                         ))}
                       </div>
-
-                      {/* Weeks rows */}
-                      <div className="flex flex-col" style={{ gap: "4px" }}>
-                        {displayedHeatmap.slice(-previewWeeks).map((col, ci) => {
-                          const absCi = 52 - previewWeeks + ci;
-                          const weekStartDate = new Date(
-                            heatmapStartDate().getTime() + absCi * 7 * 86400000,
-                          );
-                          const prevWeekStartDate =
-                            ci > 0
-                              ? new Date(heatmapStartDate().getTime() + (absCi - 1) * 7 * 86400000)
-                              : null;
-                          const weekLabelDate = heatmapWeekLabelDate(weekStartDate);
-                          const prevWeekLabelDate = prevWeekStartDate
-                            ? heatmapWeekLabelDate(prevWeekStartDate)
-                            : null;
-                          const isNewMonth =
-                            ci === 0 ||
-                            (prevWeekLabelDate &&
-                              (weekLabelDate.getMonth() !== prevWeekLabelDate.getMonth() ||
-                                weekLabelDate.getFullYear() !== prevWeekLabelDate.getFullYear()));
-                          const monthName = weekLabelDate.toLocaleDateString("en-US", {
-                            month: "short",
-                          });
-                          const cellSize =
-                            previewWeeks > 32
-                              ? 10
-                              : previewWeeks > 20
-                                ? 14
-                                : previewWeeks > 12
-                                  ? 18
-                                  : 24;
-                          const radius = cellSize > 16 ? 5 : 3;
-                          const themeColors = wallpaperTokens(
-                            wallpaperTheme,
-                            gridColorTheme,
-                            theme,
-                          );
-
-                          return (
-                            <div key={ci} className="flex items-center" style={{ gap: "4px" }}>
-                              {/* Month Label (left side) */}
-                              <div className="w-7 text-[9px] font-bold uppercase tracking-wider text-right pr-1.5 opacity-60 shrink-0 select-none">
-                                {isNewMonth ? monthName : ""}
-                              </div>
-
-                              {/* 7 Day Squares in this week */}
-                              {col.map((v, ri) => {
-                                const isToday = absCi === todayCol && ri === todayRow;
-                                const isFuture = absCi === todayCol && ri > todayRow;
-
-                                return (
-                                  <div
-                                    key={`${ci}-${ri}`}
-                                    className={`relative ${isToday ? "animate-cell-flash ring-2 ring-inset ring-[color:var(--wp-accent)]" : ""}`}
-                                    style={{
-                                      width: `${cellSize}px`,
-                                      height: `${cellSize}px`,
-                                      borderRadius: `${radius}px`,
-                                      background: isFuture
-                                        ? "color-mix(in srgb, var(--wp-empty) 40%, transparent)"
-                                        : v === 0
-                                          ? "var(--wp-empty)"
-                                          : v === 1
-                                            ? "var(--wp-low)"
-                                            : v === 2
-                                              ? "var(--wp-mid)"
-                                              : "var(--wp-hi)",
-                                      opacity: isFuture ? 0.3 : 1,
-                                    }}
-                                  />
-                                );
-                              })}
-                            </div>
-                          );
-                        })}
-                      </div>
+                      <div className="flex items-center gap-2 text-[9px] opacity-60"><span>Less</span>{["empty", "low", "mid", "hi"].map(level => <span key={level} className="h-2 w-2 rounded-sm" style={{ background: `var(--wp-${level})` }} />)}<span>More</span></div>
                     </div>
                   ) : wallpaperGridStyle === "widget" ? (
                     /* ── Frosted Liquid-Glass Widget Card ── */
@@ -4518,7 +4339,7 @@ export function Dashboard({ user }: { user?: any }) {
 
           {streakOpen && (
             <SheetShell
-              onClose={() => setStreakOpen(false)}
+              onClose={closeStreak}
               title={`${totalStreak}-day streak`}
               subtitle="Overview"
             >
@@ -4578,14 +4399,14 @@ export function Dashboard({ user }: { user?: any }) {
                       }
                     }
                     showToast("All streaks frozen for today");
-                    setStreakOpen(false);
+                    requestOverlayClose(closeStreak);
                   }}
                   className="pill w-full bg-canvas-soft py-3 text-[13px] font-semibold text-ink"
                 >
                   <Snowflake className="mr-1.5 inline h-3.5 w-3.5" /> Freeze today's streak
                 </button>
                 <button
-                  onClick={() => setStreakOpen(false)}
+                  onClick={() => requestOverlayClose(closeStreak)}
                   className="btn-primary-uber w-full py-3 text-sm"
                 >
                   Done
@@ -4603,23 +4424,23 @@ export function Dashboard({ user }: { user?: any }) {
                 <EditHabitSheet
                   habit={h}
                   quadrant={t.q}
-                  onClose={() => setEditHabitTarget(null)}
+                  onClose={closeEditHabit}
                   onSave={(patch, newQ) => {
-                    setEditHabitTarget(null);
-                    (async () => {
-                      try {
-                        const updates: Partial<Omit<HabitDoc, "id" | "createdAt">> = { ...patch };
-                        if (newQ && newQ !== t.q) updates.quadrant = newQ;
-                        await updateHabitDoc(h.id, updates);
-                        showToast("Habit updated");
-                      } catch (err) {
-                        toastError("Failed to update habit");
-                      }
-                    })();
+                    requestOverlayClose(closeEditHabit, () => {
+                      void (async () => {
+                        try {
+                          const updates: Partial<Omit<HabitDoc, "id" | "createdAt">> = { ...patch };
+                          if (newQ && newQ !== t.q) updates.quadrant = newQ;
+                          await updateHabitDoc(h.id, updates);
+                          showToast("Habit updated");
+                        } catch {
+                          toastError("Failed to update habit");
+                        }
+                      })();
+                    });
                   }}
                   onDelete={() => {
-                    deleteHabit(t.q, t.i);
-                    setEditHabitTarget(null);
+                    requestOverlayClose(closeEditHabit, () => deleteHabit(t.q, t.i));
                   }}
                 />
               );
@@ -4628,7 +4449,7 @@ export function Dashboard({ user }: { user?: any }) {
           {/* Modal */}
           {modalOpen && (
             <SheetShell
-              onClose={() => setModalOpen(false)}
+              onClose={closeCreateHabit}
               title="Create habit"
               subtitle="Build something you'll be proud of."
             >
@@ -4664,22 +4485,7 @@ export function Dashboard({ user }: { user?: any }) {
                 </Field>
 
                 <Field label="Category">
-                  <div className="flex flex-wrap gap-1.5">
-                    {["Mind", "Health", "Growth", "Focus", "Fitness", "Admin"].map((c) => {
-                      const active = newCategory === c;
-                      return (
-                        <button
-                          key={c}
-                          onClick={() => setNewCategory(c)}
-                          className={`pill px-3 py-1.5 text-[11px] font-medium transition ${
-                            active ? "bg-ink text-on-ink" : "liquid-input text-ink"
-                          }`}
-                        >
-                          {c}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <HabitCategoryDraftPicker draft={newCategory} />
                 </Field>
 
                 <Field label="Time of day">
@@ -4722,9 +4528,7 @@ export function Dashboard({ user }: { user?: any }) {
                   />
                 </button>
 
-                <div
-                  className={`overflow-hidden transition-all duration-300 ease-out ${showCustomize ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"}`}
-                >
+                <CollapseMotion open={showCustomize}>
                   <div className="space-y-4 pt-1">
                     <Field label="Type">
                       <div className="grid grid-cols-2 gap-2">
@@ -4799,6 +4603,7 @@ export function Dashboard({ user }: { user?: any }) {
                               <button
                                 key={`${day}-${index}`}
                                 type="button"
+                                aria-label={`Repeat on ${["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][index]}`}
                                 onClick={() =>
                                   setNewCustomDays((days) =>
                                     active ? days.filter((d) => d !== index) : [...days, index],
@@ -4828,6 +4633,7 @@ export function Dashboard({ user }: { user?: any }) {
                             <button
                               key={i}
                               onClick={() => setNewShade(i)}
+                              aria-label={`Choose habit shade ${i + 1}`}
                               style={{ background: c }}
                               className={`h-8 w-8 rounded-full border border-[color:var(--hairline)] transition ${
                                 i === newShade
@@ -4844,6 +4650,7 @@ export function Dashboard({ user }: { user?: any }) {
                             <button
                               key={i}
                               onClick={() => setNewIcon(i)}
+                              aria-label={`Choose habit icon ${i + 1}`}
                               className={`grid h-8 w-8 place-items-center rounded-lg transition ${
                                 i === newIcon ? "bg-ink text-on-ink" : "liquid-input text-ink"
                               }`}
@@ -4855,12 +4662,12 @@ export function Dashboard({ user }: { user?: any }) {
                       </Field>
                     </div>
                   </div>
-                </div>
+                </CollapseMotion>
 
                 <button
                   onClick={createHabit}
                   disabled={!newName.trim() || isCreatingHabit}
-                  className={`mt-2 flex w-full items-center justify-center rounded-xl bg-ink/10 backdrop-blur-[40px] border border-ink/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] py-3 text-[14px] font-bold text-ink shadow-lg active:scale-[0.98] transition ${!newName.trim() || isCreatingHabit ? "opacity-50 cursor-not-allowed" : ""}`}
+                  className="btn-glass mt-2 flex w-full items-center justify-center py-3 text-[14px] font-bold"
                 >
                   {isCreatingHabit ? "Saving…" : "Create habit"}
                 </button>
@@ -4877,7 +4684,7 @@ export function Dashboard({ user }: { user?: any }) {
               const todayDate = new Date();
               return (
                 <SheetShell
-                  onClose={() => setDetail(null)}
+                  onClose={closeHabitDetail}
                   title={h.name}
                   subtitle={QUADRANTS[detail.q].title}
                 >
@@ -4898,6 +4705,24 @@ export function Dashboard({ user }: { user?: any }) {
                           {completions[h.id]?.value ?? 0}/{h.target} {h.unit ?? ""}
                         </span>
                       )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {h.type === "numeric" && h.target != null ? (
+                        <>
+                          <button type="button" className="btn-subtle-uber px-4 py-3" aria-label={`Decrease ${h.name}`} onClick={() => void adjustValue(detail.q, detail.i, -1)}><Minus className="h-4 w-4" /></button>
+                          <span className="flex-1 text-center text-sm font-semibold text-ink">{completions[h.id]?.value ?? 0} / {h.target} {h.unit}</span>
+                          <button type="button" className="btn-subtle-uber px-4 py-3" aria-label={`Increase ${h.name}`} onClick={() => void adjustValue(detail.q, detail.i, 1)}><Plus className="h-4 w-4" /></button>
+                        </>
+                      ) : (
+                        <button type="button" className="btn-primary-uber w-full py-3 text-xs" onClick={() => void completeHabit(h)}>{h.done ? "Undo completion" : "Complete habit"}</button>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                      <button type="button" className="btn-subtle-uber py-2.5 text-xs" onClick={() => requestOverlayClose(closeHabitDetail, () => setEditHabitTarget(detail))}>Edit habit</button>
+                      <button type="button" className="btn-subtle-uber py-2.5 text-xs" onClick={() => void togglePin(detail.q, detail.i)}>{h.pinned ? "Unpin" : "Pin"}</button>
+                      <button type="button" className="btn-subtle-uber py-2.5 text-xs" onClick={() => requestOverlayClose(closeHabitDetail, () => void moveHabit(detail.q, detail.i))}>Move</button>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2">
@@ -4975,36 +4800,24 @@ export function Dashboard({ user }: { user?: any }) {
                         <Snowflake className="h-3.5 w-3.5" /> Freeze today
                       </button>
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           try {
-                            // Persist note to Firestore first (fire and forget)
-                            if (noteDraft.trim()) {
-                              saveHabitNote(h.id, noteDraft.trim()).catch((err) =>
-                                toastError(err.message || "An error occurred"),
-                              );
-                            }
-                            if (!h.done) {
-                              toggleHabitDone(h.id).catch((err) =>
-                                toastError(err.message || "An error occurred"),
-                              );
-                            }
-                            showToast(
-                              noteDraft.trim() ? "Note saved & marked done" : "Marked done",
-                            );
-                          } finally {
-                            setDetail(null);
+                            await saveHabitNote(h.id, noteDraft.trim());
+                            showToast("Note saved");
+                            requestOverlayClose(closeHabitDetail);
+                          } catch (error) {
+                            toastError(error instanceof Error ? error.message : "Note could not be saved");
                           }
                         }}
                         className="btn-primary-uber py-3 text-xs"
                       >
-                        Save
+                        Save note
                       </button>
                     </div>
 
                     <button
                       onClick={() => {
-                        deleteHabit(detail.q, detail.i);
-                        setDetail(null);
+                        requestOverlayClose(closeHabitDetail, () => deleteHabit(detail.q, detail.i));
                       }}
                       className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-rose-500/20 bg-rose-500/10 py-2.5 text-xs font-semibold text-rose-400 transition hover:bg-rose-500/20 active:scale-98 mt-1"
                     >
@@ -5062,11 +4875,10 @@ export function Dashboard({ user }: { user?: any }) {
                 onClose={() => setOnboardingOpen(false)}
                 storageKey={onboardingStorageKey}
                 onAddHabits={async (newHabits) => {
-                  for (const h of newHabits) {
-                    await addHabit(h);
-                  }
+                  if (!userId) throw new Error("Sign in to add your starter habits.");
+                  completeLocalOnboarding(userId, newHabits);
                   showToast(
-                    "Your first habit is ready · complete it to unlock more tools",
+                    `${newHabits.length === 1 ? "Your first habit is" : "Your starter habits are"} ready · complete one to unlock more tools`,
                     { label: "Got it", onClick: () => undefined },
                     6000,
                   );
@@ -5078,182 +4890,48 @@ export function Dashboard({ user }: { user?: any }) {
       </div>
 
       {showStaticTargetSelector && (
-        <div className="fixed inset-0 z-[9999] flex flex-col justify-end animate-fade-in pointer-events-auto p-4 pb-0">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 backdrop-blur-sm"
-            style={{ background: "color-mix(in srgb, var(--ink) 30%, transparent)" }}
-            onClick={() => setShowStaticTargetSelector(false)}
-          />
-          {/* Content */}
-          <div className="relative liquid-glass sheet-glass specular rounded-t-[32px] p-6 pb-12 shadow-2xl animate-sheet-slide-up border border-[color:var(--hairline-strong)]">
-            <div className="mx-auto mt-0 mb-6 h-1.5 w-12 rounded-full bg-[color:var(--hairline-strong)]" />
-
-            <h2 className="text-xl font-bold text-center text-[color:var(--ink)] mb-2">
-              Set Static Wallpaper
-            </h2>
-            <p className="text-center text-[color:var(--mute)] mb-6 text-sm">
-              Choose where to apply the wallpaper.
-            </p>
-
-            <div className="flex flex-col gap-3 max-w-sm mx-auto">
-              <button
-                onClick={() => {
-                  setShowStaticTargetSelector(false);
-                  applyWallpaper(true, "home");
-                }}
-                className="w-full bg-[color:var(--canvas-soft)] text-[color:var(--ink)] font-bold h-14 rounded-2xl flex items-center justify-center border border-[color:var(--hairline)] active:scale-[0.98] transition-all hover:bg-[color:var(--canvas-softer)]"
-              >
-                Home Screen
-              </button>
-              <button
-                onClick={() => {
-                  setShowStaticTargetSelector(false);
-                  applyWallpaper(true, "lock");
-                }}
-                className="w-full bg-[color:var(--canvas-soft)] text-[color:var(--ink)] font-bold h-14 rounded-2xl flex items-center justify-center border border-[color:var(--hairline)] active:scale-[0.98] transition-all hover:bg-[color:var(--canvas-softer)]"
-              >
-                Lock Screen
-              </button>
-              <button
-                onClick={() => {
-                  setShowStaticTargetSelector(false);
-                  applyWallpaper(true, "both");
-                }}
-                className="w-full bg-ink text-on-ink font-bold h-14 rounded-2xl flex items-center justify-center active:scale-[0.98] transition-all hover:opacity-90 shadow-lg"
-              >
-                Both Screens
-              </button>
-
-              <button
-                onClick={() => setShowStaticTargetSelector(false)}
-                className="w-full mt-2 h-12 font-semibold text-[color:var(--mute)] active:text-[color:var(--ink)] transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </main>
-  );
-}
-
-function SheetShell({
-  onClose,
-  title,
-  subtitle,
-  children,
-}: {
-  onClose: () => void;
-  title: string;
-  subtitle?: string;
-  children: React.ReactNode;
-}) {
-  const [dragY, setDragY] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const startY = useRef<number | null>(null);
-  const hapticFired = useRef(false);
-
-  const DISMISS_THRESHOLD = 90;
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  const onPointerDown = (e: React.PointerEvent) => {
-    startY.current = e.clientY;
-    setIsDragging(true);
-    hapticFired.current = false;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  };
-
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (startY.current === null) return;
-    const deltaY = e.clientY - startY.current;
-    if (deltaY > 0) {
-      setDragY(deltaY);
-      if (deltaY >= DISMISS_THRESHOLD && !hapticFired.current) {
-        hapticFired.current = true;
-        try {
-          navigator.vibrate?.(18);
-        } catch {}
-      }
-    } else {
-      setDragY(deltaY * 0.2);
-    }
-  };
-
-  const onPointerUp = (e: React.PointerEvent) => {
-    if (startY.current === null) return;
-    try {
-      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-    } catch {}
-
-    if (dragY >= DISMISS_THRESHOLD) {
-      onClose();
-    }
-    setDragY(0);
-    setIsDragging(false);
-    startY.current = null;
-    hapticFired.current = false;
-  };
-
-  const backdropOpacity = Math.max(0.1, 1 - Math.min(0.75, dragY / 300));
-
-  return (
-    <div
-      onClick={onClose}
-      className="absolute inset-0 z-[60] flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in transition-opacity"
-      style={{ opacity: backdropOpacity }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          transform: `translate3d(0, ${Math.max(0, dragY)}px, 0)`,
-          transition: isDragging ? "none" : "transform 250ms cubic-bezier(0.2, 0.9, 0.3, 1)",
-        }}
-        className="w-full max-h-[85vh] overflow-y-auto rounded-t-[24px] liquid-glass sheet-glass p-5 select-none animate-sheet-slide-up"
-      >
-        {/* Drag Handle & Header Drag Area */}
-        <div
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          className="group cursor-grab active:cursor-grabbing touch-none pb-2"
+        <SheetShell
+          onClose={closeWallpaperTarget}
+          title="Set Static Wallpaper"
+          subtitle="Choose where to apply the wallpaper."
+          priority={9999}
         >
-          <div
-            className={`mx-auto mb-3 h-1.5 rounded-full transition-all duration-200 ${
-              dragY >= DISMISS_THRESHOLD
-                ? "w-20 bg-rose-500"
-                : isDragging
-                  ? "w-16 bg-ink"
-                  : "w-12 bg-[color:var(--surface-pressed)] group-hover:bg-[color:var(--hairline-mid)]"
-            }`}
-          />
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-display text-xl font-bold text-ink">{title}</h3>
-              {subtitle && <p className="text-xs text-body">{subtitle}</p>}
-            </div>
+          <div className="flex flex-col gap-3 max-w-sm mx-auto">
             <button
-              onClick={onClose}
-              className="grid h-8 w-8 place-items-center rounded-full bg-canvas-soft text-ink hover:bg-[color:var(--surface-pressed)]"
-              aria-label="Close"
+              onClick={() => {
+                requestOverlayClose(closeWallpaperTarget, () => void applyWallpaper(true, "home"));
+              }}
+              className="btn-glass w-full h-14 flex items-center justify-center font-bold"
             >
-              <X className="h-4 w-4" />
+              Home Screen
+            </button>
+            <button
+              onClick={() => {
+                requestOverlayClose(closeWallpaperTarget, () => void applyWallpaper(true, "lock"));
+              }}
+              className="btn-glass w-full h-14 flex items-center justify-center font-bold"
+            >
+              Lock Screen
+            </button>
+            <button
+              onClick={() => {
+                requestOverlayClose(closeWallpaperTarget, () => void applyWallpaper(true, "both"));
+              }}
+              className="btn-glass w-full h-14 flex items-center justify-center font-bold"
+            >
+              Both Screens
+            </button>
+
+            <button
+              onClick={() => requestOverlayClose(closeWallpaperTarget)}
+              className="w-full mt-2 h-12 font-semibold text-[color:var(--mute)] active:text-[color:var(--ink)] transition-colors"
+            >
+              Cancel
             </button>
           </div>
-        </div>
-
-        {children}
-      </div>
-    </div>
+        </SheetShell>
+      )}
+    </main>
   );
 }
 
@@ -5263,37 +4941,6 @@ function Row({ label, action }: { label: React.ReactNode; action: React.ReactNod
       <div className="text-sm font-medium text-ink">{label}</div>
       {action}
     </div>
-  );
-}
-
-function Toggle({
-  checked,
-  onChange,
-  ariaLabel,
-}: {
-  checked: boolean;
-  onChange: () => void;
-  ariaLabel?: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={ariaLabel}
-      data-lg-press
-      onClick={onChange}
-      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-ink/30 ${
-        checked ? "bg-ink border-ink" : "bg-canvas border-[color:var(--hairline)]"
-      }`}
-    >
-      <span
-        aria-hidden
-        className={`inline-block h-5 w-5 rounded-full shadow-sm transition-all duration-200 ${
-          checked ? "translate-x-[22px] bg-on-ink" : "translate-x-[3px] bg-ink"
-        }`}
-      />
-    </button>
   );
 }
 
@@ -5317,16 +4964,19 @@ function ConfirmDialog({
   icon?: React.ReactNode;
 }) {
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    return registerOverlayDismissal({
+      close: (afterClose) => {
+        onClose();
+        afterClose?.();
+      },
+      owner: () => onClose,
+      priority: 80,
+    });
   }, [onClose]);
   return (
     <div
       onClick={onClose}
-      className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-6 animate-fade-in"
+      className="absolute inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-md p-6 animate-fade-in"
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-title"
@@ -5359,7 +5009,7 @@ function ConfirmDialog({
               onClose();
             }}
             className={`pill w-full py-3 text-[14px] font-semibold transition ${
-              destructive ? "bg-red-500 text-white hover:bg-red-500/90" : "bg-ink text-on-ink"
+              destructive ? "bg-red-500 text-white hover:bg-red-500/90" : "btn-primary-uber"
             }`}
           >
             {confirmLabel}
@@ -5368,7 +5018,7 @@ function ConfirmDialog({
             type="button"
             data-lg-press
             onClick={onClose}
-            className="pill w-full border border-[color:var(--hairline)] bg-canvas-soft py-3 text-[14px] font-semibold text-ink"
+            className="btn-subtle-uber w-full py-3 text-[14px] font-semibold"
           >
             {cancelLabel}
           </button>
@@ -5481,7 +5131,7 @@ function QuadrantCard({
       </button>
 
       {/* Content Area */}
-      {!collapsed && (
+      <CollapseMotion open={!collapsed}>
         <div className="px-3 pb-3 pt-0 space-y-1.5">
           {visible.map(({ h, i }) => (
             <HabitRow
@@ -5507,7 +5157,7 @@ function QuadrantCard({
             </div>
           )}
         </div>
-      )}
+      </CollapseMotion>
     </div>
   );
 }
@@ -5865,6 +5515,7 @@ function ProfileEditSheet({
   const [tagline, setTagline] = useState(profile.tagline);
   const [initials, setInitials] = useState(profile.initials);
   const [initialsTouched, setInitialsTouched] = useState(false);
+  const dismiss = useSheetDismiss(onClose);
 
   const derivedInitials =
     (name || "U")
@@ -5928,8 +5579,8 @@ function ProfileEditSheet({
         <div className="grid grid-cols-2 gap-2 pt-1">
           <button
             type="button"
-            onClick={onClose}
-            className="pill w-full border border-[color:var(--hairline)] bg-canvas-soft py-3 text-sm font-semibold text-ink"
+            onClick={dismiss}
+            className="btn-subtle-uber w-full py-3 text-sm font-semibold"
           >
             Cancel
           </button>
@@ -5977,7 +5628,6 @@ function EditHabitSheet({
   const [customDays, setCustomDays] = useState<number[]>(habit.customDays ?? []);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const CATS = ["Mind", "Health", "Growth", "Focus", "Fitness", "Admin"];
   const TIMES: Array<{ key: NonNullable<Habit["time"]> | "any"; label: string }> = [
     { key: "any", label: "Anytime" },
     { key: "morning", label: "Morning" },
@@ -5998,22 +5648,7 @@ function EditHabitSheet({
           </Field>
 
           <Field label="Category">
-            <div className="flex flex-wrap gap-1.5">
-              {CATS.map((c) => {
-                const active = category === c;
-                return (
-                  <button
-                    key={c}
-                    onClick={() => setCategory(c)}
-                    className={`pill px-3 py-1.5 text-[11px] font-medium transition ${
-                      active ? "bg-ink text-on-ink" : "bg-canvas-soft text-ink"
-                    }`}
-                  >
-                    {c}
-                  </button>
-                );
-              })}
-            </div>
+            <HabitCategoryPicker value={category} onChange={setCategory} />
           </Field>
 
           <Field label="Priority quadrant">
@@ -6075,6 +5710,7 @@ function EditHabitSheet({
                     <button
                       key={`${day}-${index}`}
                       type="button"
+                      aria-label={`Repeat on ${["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][index]}`}
                       onClick={() =>
                         setCustomDays((days) =>
                           active ? days.filter((value) => value !== index) : [...days, index],
@@ -6141,6 +5777,7 @@ function EditHabitSheet({
             </button>
             <button
               data-lg-press
+              disabled={(isNumeric && (!Number.isFinite(target) || target <= 0)) || (frequency === "custom" && customDays.length === 0)}
               onClick={() => {
                 const patch: Partial<Habit> = {
                   name: name.trim() || habit.name,
