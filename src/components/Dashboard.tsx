@@ -3876,9 +3876,6 @@ export function Dashboard({ user }: { user?: any }) {
                                       border: isToday
                                         ? `1px solid ${themeColors.accent}`
                                         : undefined,
-                                      boxShadow: isToday
-                                        ? `0 0 6px ${themeColors.accent}`
-                                        : undefined,
                                       flexShrink: 0,
                                     }}
                                   />,

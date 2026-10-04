@@ -858,7 +858,6 @@ public class GrainWallpaperService extends WallpaperService {
                     paint.setStyle(Paint.Style.STROKE);
                     paint.setStrokeWidth(1f * dp);
                     paint.setColor(accent[0]);
-                    paint.setShadowLayer(6f * dp, 0, 0, (accent[0] & 0x00FFFFFF) | 0x40000000);
                     canvas.drawRoundRect(rcf, 2f * dp, 2f * dp, paint);
                     paint.clearShadowLayer();
                     paint.setStyle(Paint.Style.FILL);
