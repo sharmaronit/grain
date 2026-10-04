@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { SheetShell } from "../SheetShell";
+import { useSheetDismiss } from "../../hooks/useSheetMotion";
 import { 
   MessageSquareHeart, 
   Lightbulb, 
@@ -60,6 +61,7 @@ export function FeedbackSheet({
   userName = "",
   onToast,
 }: FeedbackSheetProps) {
+  const dismiss = useSheetDismiss(onClose);
   const [category, setCategory] = useState<FeedbackCategory>("feature");
   const [rating, setRating] = useState<number>(5);
   const [hoverRating, setHoverRating] = useState<number | null>(null);
@@ -141,8 +143,8 @@ export function FeedbackSheet({
           <div className="pt-4 w-full">
             <button
               type="button"
-              onClick={onClose}
-              className="w-full btn-primary-uber py-3.5 text-sm font-bold shadow-md active:scale-98 transition"
+              onClick={dismiss}
+              className="w-full btn-primary-uber py-3.5 text-sm font-bold"
             >
               Done
             </button>
@@ -279,7 +281,7 @@ export function FeedbackSheet({
             <button
               type="submit"
               disabled={submitting || !message.trim()}
-              className="w-full btn-primary-uber py-3.5 text-sm font-bold flex items-center justify-center gap-2 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed active:scale-98 transition"
+              className="w-full btn-primary-uber py-3.5 text-sm font-bold flex items-center justify-center gap-2"
             >
               {submitting ? (
                 <>

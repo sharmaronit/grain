@@ -1,0 +1,7 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="64dp" android:gravity="center_vertical" android:orientation="horizontal" android:paddingTop="6dp" android:paddingBottom="6dp">
+    <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical" android:layout_marginEnd="8dp">
+        <TextView android:id="@+id/habit_name" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="15sp" android:textColor="#F4F4F5" android:fontFamily="sans-serif-medium" android:maxLines="2" android:ellipsize="end" />
+        <TextView android:id="@+id/habit_value" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="11sp" android:textColor="#A1A1AA" android:layout_marginTop="3dp" android:maxLines="1" android:ellipsize="end" />
+    </LinearLayout>
+    <TextView android:id="@+id/habit_done" android:layout_width="48dp" android:layout_height="48dp" android:gravity="center" android:background="@drawable/widget_button_dark" android:text="✓" android:textSize="20sp" android:textColor="#F4F4F5" android:contentDescription="Complete habit or add one unit" />
+</LinearLayout>

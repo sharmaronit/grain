@@ -81,7 +81,7 @@ export function SwipeModeView({
         </p>
         <button
           onClick={onClose}
-          className="rounded-full btn-primary-uber px-8 py-3.5 font-bold shadow-lg"
+          className="btn-primary-uber px-8 py-3.5 font-bold"
         >
           Back to Dashboard
         </button>

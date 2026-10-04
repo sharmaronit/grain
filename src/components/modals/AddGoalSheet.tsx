@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { SheetShell } from "../SheetShell";
+import { useSheetDismiss } from "../../hooks/useSheetMotion";
 import { Check } from "lucide-react";
 import { useStore } from "../../store/useStore";
 import { auth } from "../../lib/firebase";
@@ -17,6 +18,7 @@ const COLORS = [
 ];
 
 export function AddGoalSheet({ onClose, goal }: { onClose: () => void; goal?: GoalDoc }) {
+  const dismiss = useSheetDismiss(onClose);
   const [name, setName] = useState(goal?.name ?? "");
   const [emoji, setEmoji] = useState(goal?.emoji ?? ICONS[0]);
   const [color, setColor] = useState(goal?.color ?? COLORS[0]);
@@ -66,7 +68,7 @@ export function AddGoalSheet({ onClose, goal }: { onClose: () => void; goal?: Go
         setActiveGoalId(id);
         updateLocalPrefs(uid, { activeGoalId: id });
       }
-      onClose();
+      dismiss();
     } catch (e: unknown) {
       console.error(e);
       setError(e instanceof Error ? e.message : "Failed to create goal");
@@ -176,7 +178,7 @@ export function AddGoalSheet({ onClose, goal }: { onClose: () => void; goal?: Go
         <button
           type="submit"
           disabled={isSubmitting}
-          className="liquid-glass mt-2 flex w-full items-center justify-center rounded-xl py-3 text-[14px] font-bold text-ink shadow-lg active:scale-[0.98] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+          className="btn-glass mt-2 flex w-full items-center justify-center py-3 text-[14px] font-bold"
         >
           {isSubmitting ? "Saving..." : goal ? "Save Changes" : "Create Goal"}
         </button>

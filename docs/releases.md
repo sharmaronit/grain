@@ -3,6 +3,8 @@
 Keep one current APK at `releases/android/grain.apk`. Root-level APKs, APKs in
 website public assets, and versioned APK copies are not part of the repository.
 
+The current artifact is **v1.18**, Android version code **20**.
+
 On Windows, run from the repository root:
 
 ```powershell

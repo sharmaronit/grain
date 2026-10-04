@@ -5,6 +5,7 @@
 
 import { Capacitor } from "@capacitor/core";
 import { LocalNotifications } from "@capacitor/local-notifications";
+import { HabitActions } from "./habit-actions-bridge";
 
 export const NOTIFICATION_CHANNEL_ID = "grain_reminders";
 
@@ -70,6 +71,7 @@ export async function sendTestNotification(): Promise<boolean> {
   if (Capacitor.isNativePlatform()) {
     try {
       await initNotificationChannels();
+      if (Capacitor.getPlatform() === "android") return (await HabitActions.testReminder()).shown;
       await LocalNotifications.schedule({
         notifications: [
           {
@@ -112,6 +114,7 @@ export interface HabitReminderOptions {
   uncompletedCount?: number;
   streak?: number;
   allDone?: boolean;
+  dailySummary?: boolean;
   habits?: { id: string; name: string; reminderTime: string; done: boolean }[];
 }
 
@@ -127,6 +130,7 @@ export async function scheduleHabitReminders(opts: HabitReminderOptions): Promis
     uncompletedCount = 0,
     streak = 0,
     allDone = false,
+    dailySummary = false,
     habits = [],
   } = opts;
 
@@ -155,6 +159,10 @@ export async function scheduleHabitReminders(opts: HabitReminderOptions): Promis
         await LocalNotifications.cancel({ notifications: pending.notifications });
       }
 
+      // Android owns actionable reminders and reads live completion state at delivery.
+      // Clear the old Capacitor schedule to avoid duplicate reminders after upgrading.
+      if (Capacitor.getPlatform() === "android") return true;
+
       const [eHourStr, eMinStr] = reminderTime.split(":");
       const eveningHour = parseInt(eHourStr || "20", 10);
       const eveningMin = parseInt(eMinStr || "0", 10);
@@ -176,7 +184,7 @@ export async function scheduleHabitReminders(opts: HabitReminderOptions): Promis
         // For today: only schedule if not already past time and not all habits done
         const skipEveningToday = i === 0 && (allDone || eveningDate.getTime() <= now.getTime());
 
-        if (!skipEveningToday) {
+        if (dailySummary && !skipEveningToday) {
           let eveningBody = "Don't break the chain today! Check off your habits now.";
           if (i === 0 && uncompletedCount > 0) {
             eveningBody = `You have ${uncompletedCount} habit${uncompletedCount > 1 ? "s" : ""} left today! Protect your ${
@@ -272,6 +280,7 @@ export async function scheduleDailyReminder(
 ): Promise<boolean> {
   return scheduleHabitReminders({
     enabled,
+    dailySummary: true,
     reminderTime,
     morningKickoff,
   });

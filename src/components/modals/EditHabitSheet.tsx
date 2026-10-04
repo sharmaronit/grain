@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { SheetShell } from "../SheetShell";
+import { HabitCategoryPicker } from "../ui/HabitCategoryPicker";
 import type { Habit, Quadrant } from "../types";
 
 const QUADRANTS: Record<Quadrant, { title: string; sub: string }> = {
@@ -41,7 +42,6 @@ export function EditHabitSheet({
   const [unit, setUnit] = useState<string>(habit.unit ?? "");
   const [reminderTime, setReminderTime] = useState<string>(habit.reminderTime ?? "");
 
-  const CATS = ["Mind", "Health", "Growth", "Focus", "Fitness", "Admin"];
   const TIMES: Array<{ key: NonNullable<Habit["time"]> | "any"; label: string }> = [
     { key: "any", label: "Anytime" },
     { key: "morning", label: "Morning" },
@@ -61,22 +61,7 @@ export function EditHabitSheet({
         </Field>
 
         <Field label="Category">
-          <div className="flex flex-wrap gap-1.5">
-            {CATS.map((c) => {
-              const active = category === c;
-              return (
-                <button
-                  key={c}
-                  onClick={() => setCategory(c)}
-                  className={`pill px-3 py-1.5 text-[11px] font-medium transition ${
-                    active ? "bg-white/10 backdrop-blur-[40px] border border-white/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2),0_8px_32px_rgba(0,0,0,0.25)] text-white" : "bg-white/5 backdrop-blur-[32px] border border-white/10 shadow-[inset_0_1px_1px_rgba(255,255,255,0.1),0_8px_24px_rgba(0,0,0,0.2)] text-ink"
-                  }`}
-                >
-                  {c}
-                </button>
-              );
-            })}
-          </div>
+          <HabitCategoryPicker value={category} onChange={setCategory} />
         </Field>
 
         <Field label="Priority quadrant">

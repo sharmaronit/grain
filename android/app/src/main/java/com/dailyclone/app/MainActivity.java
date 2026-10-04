@@ -12,6 +12,8 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(FirebaseAuthenticationPlugin.class);
         registerPlugin(WallpaperPlugin.class);
+        registerPlugin(HabitActionsPlugin.class);
+        registerPlugin(GrainDisplayPlugin.class);
         super.onCreate(savedInstanceState);
         WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
         getWindow().setStatusBarColor(android.graphics.Color.TRANSPARENT);

@@ -26,6 +26,7 @@ import { useEffect, useState } from "react";
 import { auth, db } from "./firebase";
 
 import { Capacitor } from "@capacitor/core";
+import { syncExternalHabits } from "./habit-actions-bridge";
 
 // ── Friendly error messages ──────────────────────────────
 const errorMessages: Record<string, string> = {
@@ -258,6 +259,7 @@ export async function signOut(): Promise<void> {
     sessionStorage.removeItem("grain_onboarded");
   } catch { }
   await firebaseSignOut(auth());
+  if (Capacitor.getPlatform() === "android") await syncExternalHabits(null, { theme: "dark", enabled: false, reminderTime: "20:00", dailySummary: false, morningKickoff: false }).catch(error => console.error("Could not clear external habit display", error));
 }
 
 export { friendlyError };
@@ -281,6 +283,7 @@ export function useAuth(): AuthState {
       // Release the app immediately after Firebase restores the local session.
       setState({ user, loading: false });
       if (user) migrateLegacyUserDataInBackground(user);
+      else if (Capacitor.getPlatform() === "android") void syncExternalHabits(null, { theme: "dark", enabled: false, reminderTime: "20:00", dailySummary: false, morningKickoff: false }).catch(error => console.error("Could not clear external habit display", error));
     });
     return unsubscribe;
   }, []);

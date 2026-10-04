@@ -239,7 +239,7 @@ function LoginScreen() {
               type="button"
               data-lg-press
               disabled={busy}
-              className="auth-glass-button mt-5 sm:mt-6 flex w-full items-center justify-center gap-2 rounded-2xl py-3 sm:py-3.5 text-[13px] sm:text-[14px] font-semibold transition disabled:opacity-70"
+              className="btn-glass mt-5 sm:mt-6 flex w-full items-center justify-center gap-2 py-3 sm:py-3.5 text-[13px] sm:text-[14px] font-semibold"
             >
               <GoogleGlyph /> Continue with Google
             </button>
@@ -343,7 +343,7 @@ function LoginScreen() {
             type="submit"
             data-lg-press
             disabled={busy}
-            className="auth-primary-button mt-1 flex w-full items-center justify-center gap-2 rounded-2xl py-3 sm:py-3.5 text-[13px] sm:text-[14px] font-bold transition disabled:opacity-70"
+            className="btn-glass mt-1 flex w-full items-center justify-center gap-2 py-3 sm:py-3.5 text-[13px] sm:text-[14px] font-bold"
           >
             {mode === "signup" ? (<>Create account <ArrowRight className="h-4 w-4" /></>) :
               mode === "forgot" ? (<>Send reset link <ArrowRight className="h-4 w-4" /></>) :

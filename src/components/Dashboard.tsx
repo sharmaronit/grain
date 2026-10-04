@@ -1,4 +1,13 @@
 import { HabitCard } from "./HabitCard";
+import { SheetShell } from "./SheetShell";
+import { GrainPill } from "./GrainPill";
+import { PillPlacementSettings } from "./settings/PillPlacementSettings";
+import { SettingsToggle as Toggle } from "./settings/SettingsToggle";
+import { usePillPreferences } from "../hooks/usePillPlacement";
+import { FeedbackToast } from "./ui/FeedbackToast";
+import { HabitCategoryDraftPicker, HabitCategoryPicker } from "./ui/HabitCategoryPicker";
+import { dismissTopOverlay, registerOverlayDismissal, requestOverlayClose } from "../lib/overlay-dismissal";
+import { useSheetDismiss } from "../hooks/useSheetMotion";
 import { BottomNavigation } from "./BottomNavigation";
 import { DropdownMotion } from "./ui/DropdownMotion";
 import {
@@ -12,7 +21,6 @@ import {
   lazy,
   Suspense,
 } from "react";
-import type { PointerEvent as ReactPointerEvent } from "react";
 import {
   Flame,
   Settings,
@@ -58,7 +66,6 @@ import {
   ImagePlus,
   Move,
   Infinity,
-  Wheat,
 } from "lucide-react";
 import { App as CapacitorApp } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
@@ -112,7 +119,8 @@ import { computeWeeklyInsights } from "../lib/insights";
 import { computeMilestones } from "../lib/badges";
 import { InsightsCard } from "../components/InsightsCard";
 import { TodayHero } from "../components/TodayHero";
-import { WidgetBridge } from "../lib/widget-bridge";
+import { useExternalHabits } from "../hooks/useExternalHabits";
+import { WidgetSettings } from "./settings/WidgetSettings";
 import { useWallpaperSync } from "../hooks/useWallpaperSync";
 import { useGoals } from "../hooks/useGoals";
 import { deleteGoal } from "../lib/firestore";
@@ -137,6 +145,8 @@ import { BackupReminderBanner } from "./ui/BackupReminderBanner";
 import { WallpaperEditorControls } from "./wallpaper/WallpaperEditorControls";
 import {
   clearLocalCompletionDate,
+  completeLocalOnboarding,
+  readLocalData,
   exportLocalBackup,
   getLocalBackupStatus,
   importLocalBackup,
@@ -318,20 +328,24 @@ export function Dashboard({ user }: { user?: any }) {
   const [onboardingOpen, setOnboardingOpen] = useState(() => {
     return (
       typeof window !== "undefined" &&
+      !!userId &&
       !!onboardingStorageKey &&
-      !localStorage.getItem(onboardingStorageKey)
+      !localStorage.getItem(onboardingStorageKey) &&
+      !readLocalData(userId).prefs.onboardingCompleted
     );
   });
 
   useEffect(() => {
     if (
       typeof window !== "undefined" &&
+      userId &&
       onboardingStorageKey &&
-      !localStorage.getItem(onboardingStorageKey)
+      !localStorage.getItem(onboardingStorageKey) &&
+      !readLocalData(userId).prefs.onboardingCompleted
     ) {
       setOnboardingOpen(true);
     }
-  }, [onboardingStorageKey]);
+  }, [onboardingStorageKey, userId]);
   const [weeklyReviewOpen, setWeeklyReviewOpen] = useState(false);
   const [activeSettingTab, setActiveSettingTab] = useState<
     "theme" | "style" | "color" | "habits" | "stats" | "size"
@@ -362,8 +376,8 @@ export function Dashboard({ user }: { user?: any }) {
     toasts,
     removeToast,
   } = useToast();
-  const activeToast = toasts[0];
-  const pillNotice = activeToast;
+  const activeToast = toasts[toasts.length - 1];
+  const pillPreferences = usePillPreferences();
 
   // Multi-select & Bulk Delete state
   const [isSelectionMode, setIsSelectionMode] = useState(false);
@@ -535,6 +549,8 @@ export function Dashboard({ user }: { user?: any }) {
   const [remindersOn, setRemindersOn] = useState(() => Capacitor.isNativePlatform());
   const [reminderTime, setReminderTime] = useState<string>("20:00");
   const [morningKickoff, setMorningKickoff] = useState<boolean>(false);
+  const [dailySummary, setDailySummary] = useState(false);
+  useExternalHabits(userId, theme, remindersOn, reminderTime, dailySummary, morningKickoff);
 
   useEffect(() => {
     initNotificationChannels();
@@ -571,29 +587,6 @@ export function Dashboard({ user }: { user?: any }) {
     [rawHabits, completionsMap, habitStreaks],
   );
 
-  // Floating page title pill state & 2-second auto-fade timer
-  const [showTitlePill, setShowTitlePill] = useState(true);
-  const titlePillTimerRef = useRef<number | null>(null);
-  const [pillDragX, setPillDragX] = useState(0);
-  const [pillDragY, setPillDragY] = useState(0);
-  const pillDragStartRef = useRef<{ x: number; y: number } | null>(null);
-  const pillDraggingRef = useRef(false);
-  const pillSuppressClickRef = useRef(false);
-  const PILL_DISMISS_THRESHOLD = 72;
-
-  useEffect(() => {
-    setShowTitlePill(true);
-    if (titlePillTimerRef.current) window.clearTimeout(titlePillTimerRef.current);
-    titlePillTimerRef.current = window.setTimeout(() => {
-      setShowTitlePill(false);
-      titlePillTimerRef.current = null;
-    }, 2000);
-
-    return () => {
-      if (titlePillTimerRef.current) window.clearTimeout(titlePillTimerRef.current);
-    };
-  }, [activeTab]);
-
   useEffect(() => {
     const handleBackButton = () => {
       try {
@@ -601,6 +594,7 @@ export function Dashboard({ user }: { user?: any }) {
       } catch {}
 
       // 1. Check Modals, Sheets & Overlays in order of precedence
+      if (showStaticTargetSelector && dismissTopOverlay()) return;
       if (applyMenuOpen) {
         setApplyMenuOpen(false);
         return;
@@ -621,6 +615,7 @@ export function Dashboard({ user }: { user?: any }) {
         setResetConfirmOpen(false);
         return;
       }
+      if (dismissTopOverlay()) return;
       if (profileEditOpen) {
         setProfileEditOpen(false);
         return;
@@ -735,12 +730,14 @@ export function Dashboard({ user }: { user?: any }) {
       appStateListener.then((l: any) => l.remove());
     };
   }, [
+    showStaticTargetSelector,
     applyMenuOpen,
     wallpaperEditorOpen,
     bulkDeleteConfirmOpen,
     signOutOpen,
     resetConfirmOpen,
     profileEditOpen,
+    feedbackOpen,
     editHabitTarget,
     detail,
     aiCoachOpen,
@@ -796,6 +793,10 @@ export function Dashboard({ user }: { user?: any }) {
           initials: docData.initials || "U",
         });
         if (docData.theme) setTheme(docData.theme as Theme);
+        if (typeof docData.remindersOn === "boolean") setRemindersOn(Capacitor.isNativePlatform() && docData.remindersOn);
+        if (docData.reminderTime) setReminderTime(docData.reminderTime);
+        if (typeof docData.morningKickoff === "boolean") setMorningKickoff(docData.morningKickoff);
+        setDailySummary(docData.dailySummary ?? false);
         const prefs = (docData as any).prefs;
         if (prefs) {
           const loadedApplied = {
@@ -843,10 +844,10 @@ export function Dashboard({ user }: { user?: any }) {
             setWallpaperStatsAlign(prefs.wallpaperStatsAlign);
           }
           if (typeof prefs.wallpaperSync === "boolean") setWallpaperSync(prefs.wallpaperSync);
-          if (typeof prefs.remindersOn === "boolean")
+          if (typeof docData.remindersOn !== "boolean" && typeof prefs.remindersOn === "boolean")
             setRemindersOn(Capacitor.isNativePlatform() && prefs.remindersOn);
-          if (prefs.reminderTime) setReminderTime(prefs.reminderTime);
-          if (typeof prefs.morningKickoff === "boolean") setMorningKickoff(prefs.morningKickoff);
+          if (!docData.reminderTime && prefs.reminderTime) setReminderTime(prefs.reminderTime);
+          if (typeof docData.morningKickoff !== "boolean" && typeof prefs.morningKickoff === "boolean") setMorningKickoff(prefs.morningKickoff);
           if (typeof prefs.previewWeeks === "number") setPreviewWeeks(prefs.previewWeeks);
           if (prefs.timeFilter) setTimeFilter(prefs.timeFilter);
           if (prefs.theme) setTheme(prefs.theme as Theme);
@@ -907,7 +908,7 @@ export function Dashboard({ user }: { user?: any }) {
   const [newCustomDays, setNewCustomDays] = useState<number[]>([0, 1, 2, 3, 4]);
   const [newShade, setNewShade] = useState(0);
   const [newIcon, setNewIcon] = useState(0);
-  const [newCategory, setNewCategory] = useState<string>("Mind");
+  const newCategory = useRef("Mind");
   const [newTime, setNewTime] = useState<Habit["time"] | undefined>(undefined);
   const [newIsNumeric, setNewIsNumeric] = useState(false);
   const [newTarget, setNewTarget] = useState<number>(1);
@@ -1004,43 +1005,7 @@ export function Dashboard({ user }: { user?: any }) {
     globalToast(msg, "info", action, duration);
   };
 
-  const handlePillPointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    pillDragStartRef.current = { x: event.clientX, y: event.clientY };
-    pillDraggingRef.current = true;
-    event.currentTarget.setPointerCapture(event.pointerId);
-  };
-
-  const handlePillPointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    if (pillDragStartRef.current === null) return;
-    const deltaX = event.clientX - pillDragStartRef.current.x;
-    const deltaY = event.clientY - pillDragStartRef.current.y;
-    pillSuppressClickRef.current = Math.max(Math.abs(deltaX), Math.abs(deltaY)) > 8;
-    setPillDragX(deltaX);
-    setPillDragY(deltaY);
-  };
-
-  const handlePillPointerUp = (event: ReactPointerEvent<HTMLButtonElement>) => {
-    if (pillDragStartRef.current === null) return;
-    const deltaX = event.clientX - pillDragStartRef.current.x;
-    const deltaY = event.clientY - pillDragStartRef.current.y;
-    try {
-      event.currentTarget.releasePointerCapture(event.pointerId);
-    } catch {}
-    if (Math.abs(deltaX) >= PILL_DISMISS_THRESHOLD || deltaY <= -PILL_DISMISS_THRESHOLD) {
-      try { navigator.vibrate?.(16); } catch {}
-      setShowTitlePill(false);
-      if (activeToast) removeToast(activeToast.id);
-      if (titlePillTimerRef.current) window.clearTimeout(titlePillTimerRef.current);
-    }
-    pillDragStartRef.current = null;
-    pillDraggingRef.current = false;
-    setPillDragX(0);
-    setPillDragY(0);
-  };
-
-  const toggleDone = async (q: Quadrant, i: number) => {
-    const targetHabit = habits[q][i];
-    if (!targetHabit) return;
+  const completeHabit = async (targetHabit: Habit) => {
     const wasDone = targetHabit.done;
     if (!wasDone) {
       try {
@@ -1048,6 +1013,12 @@ export function Dashboard({ user }: { user?: any }) {
       } catch {}
     }
     await toggleHabitDone(targetHabit.id);
+    if (!wasDone) globalToast(`Completed ${targetHabit.name}`, "success", undefined, 3000);
+  };
+
+  const toggleDone = async (q: Quadrant, i: number) => {
+    const targetHabit = habits[q][i];
+    if (targetHabit) await completeHabit(targetHabit);
   };
 
   const restHabit = async (q: Quadrant, i: number) => {
@@ -1065,6 +1036,9 @@ export function Dashboard({ user }: { user?: any }) {
     if (!targetHabit || targetHabit.target === null || targetHabit.target === undefined) return;
     const step = targetHabit.step ?? 0.25;
     await adjustHabitValue(targetHabit.id, dir, step, targetHabit.target);
+    if (dir === 1 && !targetHabit.done && (targetHabit.value ?? 0) + step >= targetHabit.target) {
+      globalToast(`Completed ${targetHabit.name}`, "success", undefined, 3000);
+    }
   };
 
   const freezeStreak = (q: Quadrant, i: number) => {
@@ -1120,6 +1094,30 @@ export function Dashboard({ user }: { user?: any }) {
     showToast(`Moved to "${QUADRANTS[targetQ].title}"`);
   };
 
+  const resetCreatedDraft = useRef(false);
+  const closeCreateHabit = useCallback(() => {
+    setModalOpen(false);
+    if (!resetCreatedDraft.current) return;
+    resetCreatedDraft.current = false;
+    setNewName("");
+    newCategory.current = "Mind";
+    setNewFreq("Daily");
+    setNewCustomDays([0, 1, 2, 3, 4]);
+    setNewShade(0);
+    setNewIcon(0);
+    setNewTime(undefined);
+    setNewIsNumeric(false);
+    setNewTarget(1);
+    setNewUnit("");
+  }, []);
+  const dismissCreateHabit = useSheetDismiss(closeCreateHabit);
+  const closeProfileEdit = useCallback(() => setProfileEditOpen(false), []);
+  const closeEditHabit = useCallback(() => setEditHabitTarget(null), [setEditHabitTarget]);
+  const closeWallpaperTarget = useCallback(() => setShowStaticTargetSelector(false), []);
+  const closeHabitDetail = useCallback(() => setDetail(null), []);
+  const closeStreak = useCallback(() => setStreakOpen(false), []);
+  const openStreak = useCallback(() => setStreakOpen(true), []);
+
   const createHabit = async () => {
     const name = newName.trim();
     if (!name || isCreatingHabit) {
@@ -1130,7 +1128,7 @@ export function Dashboard({ user }: { user?: any }) {
 
     const habitData = {
       name,
-      category: newCategory,
+      category: newCategory.current,
       quadrant: selectedQuadrant,
       time: newTime ?? null,
       type: newIsNumeric ? "numeric" : "binary",
@@ -1149,17 +1147,8 @@ export function Dashboard({ user }: { user?: any }) {
     setIsCreatingHabit(true);
     try {
       await addHabit(habitData as any);
-      setModalOpen(false);
-      setNewName("");
-      setNewCategory("Mind");
-      setNewFreq("Daily");
-      setNewCustomDays([0, 1, 2, 3, 4]);
-      setNewShade(0);
-      setNewIcon(0);
-      setNewTime(undefined);
-      setNewIsNumeric(false);
-      setNewTarget(1);
-      setNewUnit("");
+      resetCreatedDraft.current = true;
+      dismissCreateHabit();
       showToast(`Saved "${name}" on this device`);
     } catch {
       globalToast(
@@ -1427,10 +1416,12 @@ export function Dashboard({ user }: { user?: any }) {
       return;
     }
 
-    const scheduledTodayHabits = flatHabits.filter((h) =>
-      isScheduledDay(h.frequency, h.customDays, selectedDate),
+    const actualToday = new Date();
+    const todayEntries = completionsMap[todayKey()] ?? {};
+    const scheduledTodayHabits = rawHabits.filter((h) =>
+      isScheduledDay(h.frequency, h.customDays, actualToday),
     );
-    const uncompleted = scheduledTodayHabits.filter((h) => !h.done).length;
+    const uncompleted = scheduledTodayHabits.filter((h) => !todayEntries[h.id]?.done).length;
     const allDone = scheduledTodayHabits.length > 0 && uncompleted === 0;
 
     const timer = setTimeout(() => {
@@ -1441,23 +1432,18 @@ export function Dashboard({ user }: { user?: any }) {
         uncompletedCount: uncompleted,
         streak: displayedTotalStreak,
         allDone,
-        habits: flatHabits.map((h) => ({
+        dailySummary,
+        habits: scheduledTodayHabits.map((h) => ({
           id: h.id,
           name: h.name,
           reminderTime: h.reminderTime || "",
-          done: h.done || false,
+          done: todayEntries[h.id]?.done || false,
         })),
-      });
-
-      WidgetBridge.sync({
-        completed: scheduledTodayHabits.length - uncompleted,
-        total: scheduledTodayHabits.length,
-        streak: displayedTotalStreak,
       });
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [remindersOn, reminderTime, morningKickoff, flatHabits, displayedTotalStreak, selectedDate]);
+  }, [remindersOn, reminderTime, morningKickoff, dailySummary, rawHabits, completionsMap, displayedTotalStreak]);
 
   const applyWallpaper = async (forceStatic: boolean = false, screenTarget: string = "both") => {
     if (wallpaperState !== "idle") return;
@@ -2166,6 +2152,13 @@ export function Dashboard({ user }: { user?: any }) {
       data-app-visible={pageVisible ? "true" : "false"}
       className="fixed inset-0 flex h-full w-full justify-center bg-[var(--backdrop)] overflow-hidden"
     >
+      {pillPreferences.enabled && (
+        <GrainPill tab={activeTab} streak={totalStreak} notice={activeToast} onDismissNotice={removeToast} onDetails={openStreak} />
+      )}
+      {!pillPreferences.enabled && activeToast && (
+        <FeedbackToast notice={activeToast} onDismiss={removeToast} />
+      )}
+
       {/* Main app container - 100% Full Edge-to-Edge Responsive */}
       <div className="relative flex h-full w-full flex-col bg-canvas pt-safe pb-safe overflow-hidden">
         <div
@@ -2244,119 +2237,8 @@ export function Dashboard({ user }: { user?: any }) {
             />
           </div>
 
-          {/* Top-Center Brand Icon & Auto-Expanding Title Pill, plus Profile Button */}
-          <div className="absolute top-4 left-0 right-0 z-40 flex items-center justify-between px-4 pointer-events-none">
-            {/* Spacer to maintain true center */}
-            <div className="w-9" />
-
-            <button
-              type="button"
-              onPointerDown={handlePillPointerDown}
-              onPointerMove={handlePillPointerMove}
-              onPointerUp={handlePillPointerUp}
-              onPointerCancel={handlePillPointerUp}
-              onClick={() => {
-                if (pillDraggingRef.current || pillSuppressClickRef.current) {
-                  pillSuppressClickRef.current = false;
-                  return;
-                }
-                if (pillNotice) {
-                  pillNotice.action?.onClick();
-                  if (activeToast) removeToast(activeToast.id);
-                  return;
-                }
-                if (showTitlePill) {
-                  setStreakOpen(true);
-                } else {
-                  setShowTitlePill(true);
-                  if (titlePillTimerRef.current) window.clearTimeout(titlePillTimerRef.current);
-                  titlePillTimerRef.current = window.setTimeout(() => {
-                    setShowTitlePill(false);
-                    titlePillTimerRef.current = null;
-                  }, 2000);
-                }
-              }}
-              className={`grain-title-pill pointer-events-auto flex items-center justify-center rounded-full border border-[color:var(--hairline-mid)] p-1 pl-1 text-xs font-semibold backdrop-blur-xl shadow-lg active:scale-95 ${
-                pillNotice
-                  ? pillNotice.type === "error"
-                    ? "max-h-12 max-w-[280px] gap-2 pr-3.5 bg-red-500/90 text-white border-red-500/20 opacity-100 translate-y-0 scale-100"
-                    : pillNotice.type === "success"
-                      ? "max-h-12 max-w-[280px] gap-2 pr-3.5 bg-green-500/90 text-white border-green-500/20 opacity-100 translate-y-0 scale-100"
-                      : "max-h-12 max-w-[280px] gap-2 pr-3.5 bg-[color:color-mix(in_srgb,var(--canvas)_94%,transparent)] text-ink border-[color:var(--hairline-mid)] opacity-100 translate-y-0 scale-100"
-                  : showTitlePill
-                    ? "max-h-12 max-w-[280px] gap-2 pr-3.5 bg-canvas text-ink ring-1 ring-ink/10 opacity-100 translate-y-0 scale-100"
-                    : "pointer-events-none max-h-0 max-w-0 gap-0 border-transparent bg-transparent p-0 text-ink opacity-0 -translate-y-1 scale-75"
-              }`}
-              aria-label="App logo and section title"
-              style={{
-                transform: `translate3d(${pillDragX}px, ${pillDragY}px, 0) scale(${Math.max(0.72, 1 - Math.max(Math.abs(pillDragX), Math.abs(pillDragY)) / 520)})`,
-                transition: pillDragStartRef.current === null ? "transform 320ms cubic-bezier(0.22, 1, 0.36, 1)" : "none",
-                touchAction: "none",
-              }}
-            >
-              <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full overflow-hidden relative">
-                {showTitlePill || pillNotice ? (
-                  <div className="grain-title-pill-halo absolute inset-0 rounded-full bg-current opacity-10" />
-                ) : null}
-                {theme === "light" ? (
-                  <Wheat
-                    className={`h-4 w-4 drop-shadow-sm ${
-                      pillNotice?.type === "error" || pillNotice?.type === "success"
-                        ? "text-white"
-                        : "text-ink"
-                    }`}
-                    strokeWidth={2.2}
-                    aria-label="Grain logo"
-                  />
-                ) : (
-                  <img
-                    src="/icon.png"
-                    alt="Grain logo"
-                    className={`h-full w-full object-contain object-center filter drop-shadow-sm scale-105 transition-all duration-500 ${
-                      pillNotice
-                        ? pillNotice.type === "error" || pillNotice.type === "success"
-                          ? "brightness-0 invert"
-                          : ""
-                        : wallpaperThemeOf(wallpaperTheme, theme).bg === "#f5f5f5" ||
-                            (wallpaperThemeOf(wallpaperTheme, theme).bg as string) === "#ffffff"
-                          ? "invert"
-                          : ""
-                    }`}
-                  />
-                )}
-              </div>
-              <span
-                className={`overflow-hidden transition-[max-width,opacity] duration-500 ease-out flex items-center gap-2 ${
-                  showTitlePill || pillNotice ? "max-w-[240px] opacity-100" : "max-w-0 opacity-0"
-                }`}
-              >
-                <span
-                  className={`h-3.5 w-px shrink-0 opacity-70 ${pillNotice ? "bg-current opacity-30" : "bg-[color:var(--hairline-mid)]"}`}
-                />
-                <span
-                  key={pillNotice?.id ?? activeTab}
-                  className={`grain-title-pill-copy font-medium text-[11px] leading-none shrink-0 whitespace-nowrap flex items-center ${pillNotice ? "text-current" : "text-mute"}`}
-                >
-                  {pillNotice
-                    ? pillNotice.message
-                    : activeTab === "today"
-                      ? `Daily habits · ${totalStreak}d streak`
-                      : activeTab === "consistency"
-                        ? `Consistency · ${totalStreak}d streak`
-                        : activeTab === "myday"
-                          ? "My Day"
-                          : activeTab === "goal"
-                            ? "Your goals"
-                            : "Live wallpaper"}
-                </span>
-                {pillNotice?.action && (
-                  <span className="rounded-full bg-current/15 px-2 py-1 text-[10px] font-bold uppercase tracking-wide">
-                    {pillNotice.action.label}
-                  </span>
-                )}
-              </span>
-            </button>
-
+          {/* Profile button; the camera-aware Grain pill is mounted at viewport level. */}
+          <div className="absolute top-4 left-0 right-0 z-40 flex items-center justify-end px-4 pointer-events-none">
             {/* Profile Button (Top Right) */}
             <button
               onClick={() => setSettingsOpen(true)}
@@ -2725,7 +2607,7 @@ export function Dashboard({ user }: { user?: any }) {
                                       setDetail({ q: recommended.quadrant, i: habitIndex });
                                       setNoteDraft("");
                                     } else {
-                                      void toggleHabitDone(recommended.id);
+                                      void completeHabit(recommended);
                                       setMyDayOverrideId(null);
                                     }
                                   }}
@@ -2856,7 +2738,7 @@ export function Dashboard({ user }: { user?: any }) {
                                         setOpenMenuId(openMenuId === h.id ? null : h.id)
                                       }
                                       onMenuClose={() => setOpenMenuId(null)}
-                                      onToggle={() => toggleHabitDone(h.id)}
+                                      onToggle={() => completeHabit(h)}
                                       onRest={() => setHabitRestDay(h.id)}
                                       onPin={() => {
                                         togglePin(
@@ -3146,6 +3028,19 @@ export function Dashboard({ user }: { user?: any }) {
                   </button>
                 </div>
 
+                <div className="pt-4 pb-2">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-mute">Quick access</p>
+                </div>
+                <div className="space-y-3">
+                  <WidgetSettings onMessage={showToast} />
+                  <PillPlacementSettings
+                    onPreview={() => {
+                      setSettingsOpen(false);
+                      showToast("Grain pill preview", undefined, 3000);
+                    }}
+                  />
+                </div>
+
                 {/* Section: Appearance */}
                 <div className="pt-4 pb-2">
                   <p className="text-[10px] font-bold uppercase tracking-widest text-mute">
@@ -3391,6 +3286,7 @@ export function Dashboard({ user }: { user?: any }) {
 
                   {remindersOn && (
                     <div className="px-5 py-4 space-y-3 animate-fade-in">
+                      <p className="text-xs text-mute leading-relaxed">Tap Done or +1 in a notification. Use each habit's own reminder time, or this default time. Remind me later snoozes for 15 minutes.</p>
                       {/* Time picker */}
                       {(() => {
                         const [hStr, mStr] = (reminderTime || "20:00").split(":");
@@ -3531,6 +3427,14 @@ export function Dashboard({ user }: { user?: any }) {
                         );
                       })()}
 
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-body">Daily summary</span>
+                        <Toggle checked={dailySummary} ariaLabel="Toggle daily summary" onChange={() => {
+                          const next = !dailySummary;
+                          setDailySummary(next);
+                          if (userId) void updateUserProfile(userId, { dailySummary: next });
+                        }} />
+                      </div>
                       <div className="flex items-center justify-between">
                         <span className="flex items-center gap-1.5 text-xs text-body">
                           <Sunrise className="h-3.5 w-3.5 text-amber-400" /> Morning kickoff (8 AM)
@@ -3743,10 +3647,11 @@ export function Dashboard({ user }: { user?: any }) {
           {profileEditOpen && (
             <ProfileEditSheet
               profile={profile}
-              onClose={() => setProfileEditOpen(false)}
+              onClose={closeProfileEdit}
               onSave={(next) => {
-                setProfileEditOpen(false);
-                saveProfile(next).catch((err) => toastError("An error occurred"));
+                requestOverlayClose(closeProfileEdit, () => {
+                  saveProfile(next).catch((err) => toastError("An error occurred"));
+                });
               }}
             />
           )}
@@ -4570,7 +4475,7 @@ export function Dashboard({ user }: { user?: any }) {
 
           {streakOpen && (
             <SheetShell
-              onClose={() => setStreakOpen(false)}
+              onClose={closeStreak}
               title={`${totalStreak}-day streak`}
               subtitle="Overview"
             >
@@ -4630,14 +4535,14 @@ export function Dashboard({ user }: { user?: any }) {
                       }
                     }
                     showToast("All streaks frozen for today");
-                    setStreakOpen(false);
+                    requestOverlayClose(closeStreak);
                   }}
                   className="pill w-full bg-canvas-soft py-3 text-[13px] font-semibold text-ink"
                 >
                   <Snowflake className="mr-1.5 inline h-3.5 w-3.5" /> Freeze today's streak
                 </button>
                 <button
-                  onClick={() => setStreakOpen(false)}
+                  onClick={() => requestOverlayClose(closeStreak)}
                   className="btn-primary-uber w-full py-3 text-sm"
                 >
                   Done
@@ -4655,23 +4560,23 @@ export function Dashboard({ user }: { user?: any }) {
                 <EditHabitSheet
                   habit={h}
                   quadrant={t.q}
-                  onClose={() => setEditHabitTarget(null)}
+                  onClose={closeEditHabit}
                   onSave={(patch, newQ) => {
-                    setEditHabitTarget(null);
-                    (async () => {
-                      try {
-                        const updates: Partial<Omit<HabitDoc, "id" | "createdAt">> = { ...patch };
-                        if (newQ && newQ !== t.q) updates.quadrant = newQ;
-                        await updateHabitDoc(h.id, updates);
-                        showToast("Habit updated");
-                      } catch (err) {
-                        toastError("Failed to update habit");
-                      }
-                    })();
+                    requestOverlayClose(closeEditHabit, () => {
+                      void (async () => {
+                        try {
+                          const updates: Partial<Omit<HabitDoc, "id" | "createdAt">> = { ...patch };
+                          if (newQ && newQ !== t.q) updates.quadrant = newQ;
+                          await updateHabitDoc(h.id, updates);
+                          showToast("Habit updated");
+                        } catch {
+                          toastError("Failed to update habit");
+                        }
+                      })();
+                    });
                   }}
                   onDelete={() => {
-                    deleteHabit(t.q, t.i);
-                    setEditHabitTarget(null);
+                    requestOverlayClose(closeEditHabit, () => deleteHabit(t.q, t.i));
                   }}
                 />
               );
@@ -4680,7 +4585,7 @@ export function Dashboard({ user }: { user?: any }) {
           {/* Modal */}
           {modalOpen && (
             <SheetShell
-              onClose={() => setModalOpen(false)}
+              onClose={closeCreateHabit}
               title="Create habit"
               subtitle="Build something you'll be proud of."
             >
@@ -4716,22 +4621,7 @@ export function Dashboard({ user }: { user?: any }) {
                 </Field>
 
                 <Field label="Category">
-                  <div className="flex flex-wrap gap-1.5">
-                    {["Mind", "Health", "Growth", "Focus", "Fitness", "Admin"].map((c) => {
-                      const active = newCategory === c;
-                      return (
-                        <button
-                          key={c}
-                          onClick={() => setNewCategory(c)}
-                          className={`pill px-3 py-1.5 text-[11px] font-medium transition ${
-                            active ? "bg-ink text-on-ink" : "liquid-input text-ink"
-                          }`}
-                        >
-                          {c}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <HabitCategoryDraftPicker draft={newCategory} />
                 </Field>
 
                 <Field label="Time of day">
@@ -4912,7 +4802,7 @@ export function Dashboard({ user }: { user?: any }) {
                 <button
                   onClick={createHabit}
                   disabled={!newName.trim() || isCreatingHabit}
-                  className={`mt-2 flex w-full items-center justify-center rounded-xl bg-ink/10 backdrop-blur-[40px] border border-ink/20 shadow-[inset_0_1px_1px_rgba(255,255,255,0.2)] py-3 text-[14px] font-bold text-ink shadow-lg active:scale-[0.98] transition ${!newName.trim() || isCreatingHabit ? "opacity-50 cursor-not-allowed" : ""}`}
+                  className="btn-glass mt-2 flex w-full items-center justify-center py-3 text-[14px] font-bold"
                 >
                   {isCreatingHabit ? "Saving…" : "Create habit"}
                 </button>
@@ -4929,7 +4819,7 @@ export function Dashboard({ user }: { user?: any }) {
               const todayDate = new Date();
               return (
                 <SheetShell
-                  onClose={() => setDetail(null)}
+                  onClose={closeHabitDetail}
                   title={h.name}
                   subtitle={QUADRANTS[detail.q].title}
                 >
@@ -5044,7 +4934,7 @@ export function Dashboard({ user }: { user?: any }) {
                               noteDraft.trim() ? "Note saved & marked done" : "Marked done",
                             );
                           } finally {
-                            setDetail(null);
+                            requestOverlayClose(closeHabitDetail);
                           }
                         }}
                         className="btn-primary-uber py-3 text-xs"
@@ -5055,8 +4945,7 @@ export function Dashboard({ user }: { user?: any }) {
 
                     <button
                       onClick={() => {
-                        deleteHabit(detail.q, detail.i);
-                        setDetail(null);
+                        requestOverlayClose(closeHabitDetail, () => deleteHabit(detail.q, detail.i));
                       }}
                       className="flex w-full items-center justify-center gap-1.5 rounded-2xl border border-rose-500/20 bg-rose-500/10 py-2.5 text-xs font-semibold text-rose-400 transition hover:bg-rose-500/20 active:scale-98 mt-1"
                     >
@@ -5114,11 +5003,10 @@ export function Dashboard({ user }: { user?: any }) {
                 onClose={() => setOnboardingOpen(false)}
                 storageKey={onboardingStorageKey}
                 onAddHabits={async (newHabits) => {
-                  for (const h of newHabits) {
-                    await addHabit(h);
-                  }
+                  if (!userId) throw new Error("Sign in to add your starter habits.");
+                  completeLocalOnboarding(userId, newHabits);
                   showToast(
-                    "Your first habit is ready · complete it to unlock more tools",
+                    `${newHabits.length === 1 ? "Your first habit is" : "Your starter habits are"} ready · complete one to unlock more tools`,
                     { label: "Got it", onClick: () => undefined },
                     6000,
                   );
@@ -5130,182 +5018,48 @@ export function Dashboard({ user }: { user?: any }) {
       </div>
 
       {showStaticTargetSelector && (
-        <div className="fixed inset-0 z-[9999] flex flex-col justify-end animate-fade-in pointer-events-auto p-4 pb-0">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 backdrop-blur-sm"
-            style={{ background: "color-mix(in srgb, var(--ink) 30%, transparent)" }}
-            onClick={() => setShowStaticTargetSelector(false)}
-          />
-          {/* Content */}
-          <div className="relative liquid-glass sheet-glass specular rounded-t-[32px] p-6 pb-12 shadow-2xl animate-sheet-slide-up border border-[color:var(--hairline-strong)]">
-            <div className="mx-auto mt-0 mb-6 h-1.5 w-12 rounded-full bg-[color:var(--hairline-strong)]" />
-
-            <h2 className="text-xl font-bold text-center text-[color:var(--ink)] mb-2">
-              Set Static Wallpaper
-            </h2>
-            <p className="text-center text-[color:var(--mute)] mb-6 text-sm">
-              Choose where to apply the wallpaper.
-            </p>
-
-            <div className="flex flex-col gap-3 max-w-sm mx-auto">
-              <button
-                onClick={() => {
-                  setShowStaticTargetSelector(false);
-                  applyWallpaper(true, "home");
-                }}
-                className="w-full bg-[color:var(--canvas-soft)] text-[color:var(--ink)] font-bold h-14 rounded-2xl flex items-center justify-center border border-[color:var(--hairline)] active:scale-[0.98] transition-all hover:bg-[color:var(--canvas-softer)]"
-              >
-                Home Screen
-              </button>
-              <button
-                onClick={() => {
-                  setShowStaticTargetSelector(false);
-                  applyWallpaper(true, "lock");
-                }}
-                className="w-full bg-[color:var(--canvas-soft)] text-[color:var(--ink)] font-bold h-14 rounded-2xl flex items-center justify-center border border-[color:var(--hairline)] active:scale-[0.98] transition-all hover:bg-[color:var(--canvas-softer)]"
-              >
-                Lock Screen
-              </button>
-              <button
-                onClick={() => {
-                  setShowStaticTargetSelector(false);
-                  applyWallpaper(true, "both");
-                }}
-                className="w-full bg-ink text-on-ink font-bold h-14 rounded-2xl flex items-center justify-center active:scale-[0.98] transition-all hover:opacity-90 shadow-lg"
-              >
-                Both Screens
-              </button>
-
-              <button
-                onClick={() => setShowStaticTargetSelector(false)}
-                className="w-full mt-2 h-12 font-semibold text-[color:var(--mute)] active:text-[color:var(--ink)] transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </main>
-  );
-}
-
-function SheetShell({
-  onClose,
-  title,
-  subtitle,
-  children,
-}: {
-  onClose: () => void;
-  title: string;
-  subtitle?: string;
-  children: React.ReactNode;
-}) {
-  const [dragY, setDragY] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const startY = useRef<number | null>(null);
-  const hapticFired = useRef(false);
-
-  const DISMISS_THRESHOLD = 90;
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  const onPointerDown = (e: React.PointerEvent) => {
-    startY.current = e.clientY;
-    setIsDragging(true);
-    hapticFired.current = false;
-    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-  };
-
-  const onPointerMove = (e: React.PointerEvent) => {
-    if (startY.current === null) return;
-    const deltaY = e.clientY - startY.current;
-    if (deltaY > 0) {
-      setDragY(deltaY);
-      if (deltaY >= DISMISS_THRESHOLD && !hapticFired.current) {
-        hapticFired.current = true;
-        try {
-          navigator.vibrate?.(18);
-        } catch {}
-      }
-    } else {
-      setDragY(deltaY * 0.2);
-    }
-  };
-
-  const onPointerUp = (e: React.PointerEvent) => {
-    if (startY.current === null) return;
-    try {
-      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
-    } catch {}
-
-    if (dragY >= DISMISS_THRESHOLD) {
-      onClose();
-    }
-    setDragY(0);
-    setIsDragging(false);
-    startY.current = null;
-    hapticFired.current = false;
-  };
-
-  const backdropOpacity = Math.max(0.1, 1 - Math.min(0.75, dragY / 300));
-
-  return (
-    <div
-      onClick={onClose}
-      className="absolute inset-0 z-[60] flex items-end justify-center bg-black/60 backdrop-blur-sm animate-fade-in transition-opacity"
-      style={{ opacity: backdropOpacity }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          transform: `translate3d(0, ${Math.max(0, dragY)}px, 0)`,
-          transition: isDragging ? "none" : "transform 250ms cubic-bezier(0.2, 0.9, 0.3, 1)",
-        }}
-        className="w-full max-h-[85vh] overflow-y-auto rounded-t-[24px] liquid-glass sheet-glass p-5 select-none animate-sheet-slide-up"
-      >
-        {/* Drag Handle & Header Drag Area */}
-        <div
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          className="group cursor-grab active:cursor-grabbing touch-none pb-2"
+        <SheetShell
+          onClose={closeWallpaperTarget}
+          title="Set Static Wallpaper"
+          subtitle="Choose where to apply the wallpaper."
+          priority={9999}
         >
-          <div
-            className={`mx-auto mb-3 h-1.5 rounded-full transition-all duration-200 ${
-              dragY >= DISMISS_THRESHOLD
-                ? "w-20 bg-rose-500"
-                : isDragging
-                  ? "w-16 bg-ink"
-                  : "w-12 bg-[color:var(--surface-pressed)] group-hover:bg-[color:var(--hairline-mid)]"
-            }`}
-          />
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-display text-xl font-bold text-ink">{title}</h3>
-              {subtitle && <p className="text-xs text-body">{subtitle}</p>}
-            </div>
+          <div className="flex flex-col gap-3 max-w-sm mx-auto">
             <button
-              onClick={onClose}
-              className="grid h-8 w-8 place-items-center rounded-full bg-canvas-soft text-ink hover:bg-[color:var(--surface-pressed)]"
-              aria-label="Close"
+              onClick={() => {
+                requestOverlayClose(closeWallpaperTarget, () => void applyWallpaper(true, "home"));
+              }}
+              className="btn-glass w-full h-14 flex items-center justify-center font-bold"
             >
-              <X className="h-4 w-4" />
+              Home Screen
+            </button>
+            <button
+              onClick={() => {
+                requestOverlayClose(closeWallpaperTarget, () => void applyWallpaper(true, "lock"));
+              }}
+              className="btn-glass w-full h-14 flex items-center justify-center font-bold"
+            >
+              Lock Screen
+            </button>
+            <button
+              onClick={() => {
+                requestOverlayClose(closeWallpaperTarget, () => void applyWallpaper(true, "both"));
+              }}
+              className="btn-glass w-full h-14 flex items-center justify-center font-bold"
+            >
+              Both Screens
+            </button>
+
+            <button
+              onClick={() => requestOverlayClose(closeWallpaperTarget)}
+              className="w-full mt-2 h-12 font-semibold text-[color:var(--mute)] active:text-[color:var(--ink)] transition-colors"
+            >
+              Cancel
             </button>
           </div>
-        </div>
-
-        {children}
-      </div>
-    </div>
+        </SheetShell>
+      )}
+    </main>
   );
 }
 
@@ -5315,37 +5069,6 @@ function Row({ label, action }: { label: React.ReactNode; action: React.ReactNod
       <div className="text-sm font-medium text-ink">{label}</div>
       {action}
     </div>
-  );
-}
-
-function Toggle({
-  checked,
-  onChange,
-  ariaLabel,
-}: {
-  checked: boolean;
-  onChange: () => void;
-  ariaLabel?: string;
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      aria-label={ariaLabel}
-      data-lg-press
-      onClick={onChange}
-      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-ink/30 ${
-        checked ? "bg-ink border-ink" : "bg-canvas border-[color:var(--hairline)]"
-      }`}
-    >
-      <span
-        aria-hidden
-        className={`inline-block h-5 w-5 rounded-full shadow-sm transition-all duration-200 ${
-          checked ? "translate-x-[22px] bg-on-ink" : "translate-x-[3px] bg-ink"
-        }`}
-      />
-    </button>
   );
 }
 
@@ -5369,16 +5092,19 @@ function ConfirmDialog({
   icon?: React.ReactNode;
 }) {
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    return registerOverlayDismissal({
+      close: (afterClose) => {
+        onClose();
+        afterClose?.();
+      },
+      owner: () => onClose,
+      priority: 80,
+    });
   }, [onClose]);
   return (
     <div
       onClick={onClose}
-      className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-6 animate-fade-in"
+      className="absolute inset-0 z-[80] flex items-center justify-center bg-black/60 backdrop-blur-md p-6 animate-fade-in"
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-title"
@@ -5411,7 +5137,7 @@ function ConfirmDialog({
               onClose();
             }}
             className={`pill w-full py-3 text-[14px] font-semibold transition ${
-              destructive ? "bg-red-500 text-white hover:bg-red-500/90" : "bg-ink text-on-ink"
+              destructive ? "bg-red-500 text-white hover:bg-red-500/90" : "btn-primary-uber"
             }`}
           >
             {confirmLabel}
@@ -5420,7 +5146,7 @@ function ConfirmDialog({
             type="button"
             data-lg-press
             onClick={onClose}
-            className="pill w-full border border-[color:var(--hairline)] bg-canvas-soft py-3 text-[14px] font-semibold text-ink"
+            className="btn-subtle-uber w-full py-3 text-[14px] font-semibold"
           >
             {cancelLabel}
           </button>
@@ -5917,6 +5643,7 @@ function ProfileEditSheet({
   const [tagline, setTagline] = useState(profile.tagline);
   const [initials, setInitials] = useState(profile.initials);
   const [initialsTouched, setInitialsTouched] = useState(false);
+  const dismiss = useSheetDismiss(onClose);
 
   const derivedInitials =
     (name || "U")
@@ -5980,8 +5707,8 @@ function ProfileEditSheet({
         <div className="grid grid-cols-2 gap-2 pt-1">
           <button
             type="button"
-            onClick={onClose}
-            className="pill w-full border border-[color:var(--hairline)] bg-canvas-soft py-3 text-sm font-semibold text-ink"
+            onClick={dismiss}
+            className="btn-subtle-uber w-full py-3 text-sm font-semibold"
           >
             Cancel
           </button>
@@ -6029,7 +5756,6 @@ function EditHabitSheet({
   const [customDays, setCustomDays] = useState<number[]>(habit.customDays ?? []);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const CATS = ["Mind", "Health", "Growth", "Focus", "Fitness", "Admin"];
   const TIMES: Array<{ key: NonNullable<Habit["time"]> | "any"; label: string }> = [
     { key: "any", label: "Anytime" },
     { key: "morning", label: "Morning" },
@@ -6050,22 +5776,7 @@ function EditHabitSheet({
           </Field>
 
           <Field label="Category">
-            <div className="flex flex-wrap gap-1.5">
-              {CATS.map((c) => {
-                const active = category === c;
-                return (
-                  <button
-                    key={c}
-                    onClick={() => setCategory(c)}
-                    className={`pill px-3 py-1.5 text-[11px] font-medium transition ${
-                      active ? "bg-ink text-on-ink" : "bg-canvas-soft text-ink"
-                    }`}
-                  >
-                    {c}
-                  </button>
-                );
-              })}
-            </div>
+            <HabitCategoryPicker value={category} onChange={setCategory} />
           </Field>
 
           <Field label="Priority quadrant">
