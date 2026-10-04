@@ -122,6 +122,15 @@ export interface HabitReminderOptions {
  * Schedules dynamic, intelligent multi-day notifications based on habit state.
  */
 export async function scheduleHabitReminders(opts: HabitReminderOptions): Promise<boolean> {
+  // Android's action receiver owns scheduling, including closed-app actions.
+  // Remove reminders left by older APKs instead of scheduling a duplicate set.
+  if (Capacitor.getPlatform() === "android") {
+    try {
+      const pending = await LocalNotifications.getPending();
+      if (pending.notifications.length) await LocalNotifications.cancel({ notifications: pending.notifications });
+    } catch {}
+    return opts.enabled ? requestNotificationPermission() : false;
+  }
   const {
     enabled,
     reminderTime = "20:00",

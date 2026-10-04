@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
 import { SettingsToggle } from "./SettingsToggle";
+import { CollapseMotion } from "../ui/CollapseMotion";
 
 export function FeatureSettingsCard({
   id,
@@ -49,7 +50,7 @@ export function FeatureSettingsCard({
           type="button"
           className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-left text-xs focus-visible:outline-offset-[-3px]"
           aria-expanded={expanded}
-          aria-controls={expanded ? `${id}-controls` : undefined}
+          aria-controls={`${id}-controls`}
           onClick={() => setOpen(!open)}
         >
           <span className="text-body">{setupLabel}</span>
@@ -58,16 +59,16 @@ export function FeatureSettingsCard({
             <ChevronDown
               size={14}
               aria-hidden="true"
-              className={`transition-transform duration-200 motion-reduce:transition-none ${expanded ? "rotate-180" : ""}`}
+              className={`grain-disclosure-chevron ${expanded ? "rotate-180" : ""}`}
             />
           </span>
         </button>
       )}
-      {expanded && (
-        <div id={`${id}-controls`} className="space-y-3 px-4 py-3">
+      <CollapseMotion open={expanded} id={`${id}-controls`}>
+        <div className="space-y-3 px-4 py-3">
           {children}
         </div>
-      )}
+      </CollapseMotion>
     </section>
   );
 }

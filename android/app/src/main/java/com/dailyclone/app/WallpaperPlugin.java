@@ -1,6 +1,9 @@
 package com.dailyclone.app;
 
 import android.app.WallpaperManager;
+import android.app.Activity;
+import androidx.activity.result.ActivityResult;
+import com.getcapacitor.annotation.ActivityCallback;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -34,6 +37,34 @@ public class WallpaperPlugin extends Plugin {
 
     private final ScheduledExecutorService debounceExecutor = Executors.newSingleThreadScheduledExecutor();
     private ScheduledFuture<?> scheduledStaticUpdate;
+    private volatile boolean livePickerPending;
+
+    private SharedPreferences wallpaperPrefs() {
+        return getContext().getSharedPreferences(GrainWallpaperService.PREFS_NAME, Context.MODE_PRIVATE);
+    }
+    private void clearPreview() {
+        String staged = wallpaperPrefs().getString(GrainWallpaperService.KEY_PREVIEW_PHOTO, null);
+        if (staged != null && !staged.equals(wallpaperPrefs().getString(GrainWallpaperService.KEY_PHOTO_PATH, null)))
+            discardStagedPhoto(staged);
+        wallpaperPrefs().edit().remove(GrainWallpaperService.KEY_PREVIEW_DATA).remove(GrainWallpaperService.KEY_PREVIEW_PHOTO).apply();
+    }
+    private void discardStagedPhoto(String path) {
+        try {
+            File file = new File(path).getCanonicalFile();
+            if (getContext().getFilesDir().getCanonicalFile().equals(file.getParentFile())
+                && file.getName().startsWith("grain_wallpaper_preview_")) file.delete();
+        } catch (Exception ignored) {}
+    }
+    private void commitPreview(String json, boolean live) {
+        SharedPreferences prefs = wallpaperPrefs();
+        String previousPhoto = prefs.getString(GrainWallpaperService.KEY_PHOTO_PATH, null);
+        SharedPreferences.Editor edit = prefs.edit().putString(GrainWallpaperService.KEY_LIVE_DATA, json)
+            .putBoolean("GRAIN_IS_STATIC_FALLBACK", !live);
+        String photo = prefs.getString(GrainWallpaperService.KEY_PREVIEW_PHOTO, null);
+        if (photo != null) edit.putString(GrainWallpaperService.KEY_PHOTO_PATH, photo);
+        edit.remove(GrainWallpaperService.KEY_PREVIEW_DATA).remove(GrainWallpaperService.KEY_PREVIEW_PHOTO).apply();
+        if (photo != null && previousPhoto != null && !photo.equals(previousPhoto)) discardStagedPhoto(previousPhoto);
+    }
 
     // ── syncWallpaperData ────────────────────────────────────────────────
     // Saves GRAIN_LIVE_DATA to SharedPreferences.
@@ -48,6 +79,9 @@ public class WallpaperPlugin extends Plugin {
 
     @PluginMethod
     public void syncWallpaperData(PluginCall call) {
+        if (livePickerPending) {
+            JSObject result = new JSObject(); result.put("success", false); call.resolve(result); return;
+        }
         try {
             JSObject data = call.getData();
             if (data != null) {
@@ -64,7 +98,8 @@ public class WallpaperPlugin extends Plugin {
                         scheduledStaticUpdate.cancel(false);
                     }
                     scheduledStaticUpdate = debounceExecutor.schedule(() -> {
-                        updateStaticWallpaperSilently(prefs, jsonStr);
+                        if (!livePickerPending && prefs.getBoolean("GRAIN_IS_STATIC_FALLBACK", false))
+                            updateStaticWallpaperSilently(prefs, jsonStr);
                     }, 1000, TimeUnit.MILLISECONDS);
                 }
             }
@@ -110,36 +145,50 @@ public class WallpaperPlugin extends Plugin {
 
     @PluginMethod
     public void setWallpaper(PluginCall call) {
+        if (livePickerPending) { call.reject("A wallpaper picker is already open"); return; }
+        if (getActivity() == null) { call.reject("No foreground activity"); return; }
         try {
             JSObject data = call.getData();
-            if (data != null && data.has("heatmap")) {
-                String jsonStr = savePhotoAndSanitizeJson(data);
-                SharedPreferences prefs = getContext()
-                    .getSharedPreferences(GrainWallpaperService.PREFS_NAME, Context.MODE_PRIVATE);
-                prefs.edit()
-                     .putString(GrainWallpaperService.KEY_LIVE_DATA, jsonStr)
-                     .putBoolean("GRAIN_IS_STATIC_FALLBACK", false)
-                     .apply();
-            }
-
+            if (data == null || !data.has("heatmap")) { call.reject("Missing wallpaper data"); return; }
+            if (scheduledStaticUpdate != null) scheduledStaticUpdate.cancel(false);
+            clearPreview();
+            String json = savePhotoAndSanitizeJson(data, true);
+            wallpaperPrefs().edit().putString(GrainWallpaperService.KEY_PREVIEW_DATA, json).apply();
+            livePickerPending = true;
             Intent intent = new Intent(WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER);
             intent.putExtra(WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT,
-                            new ComponentName(getContext(), GrainWallpaperService.class));
-
-            android.app.Activity activity = getActivity();
-            if (activity == null) { call.reject("No foreground activity"); return; }
-
+                new ComponentName(getContext(), GrainWallpaperService.class));
             try {
-                activity.startActivity(intent);
+                startActivityForResult(call, intent, "wallpaperSelected");
             } catch (android.content.ActivityNotFoundException e) {
-                activity.startActivity(new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER));
+                startActivityForResult(call, new Intent(WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER), "wallpaperSelected");
             }
-
-            JSObject ret = new JSObject();
-            ret.put("success", true);
-            call.resolve(ret);
         } catch (Exception e) {
-            call.reject("Failed to set live wallpaper", e);
+            livePickerPending = false;
+            clearPreview();
+            call.reject("Failed to open live wallpaper picker", e);
+        }
+    }
+
+    @ActivityCallback
+    private void wallpaperSelected(PluginCall call, ActivityResult result) {
+        livePickerPending = false;
+        try {
+            WallpaperManager manager = WallpaperManager.getInstance(getContext());
+            ComponentName grain = new ComponentName(getContext(), GrainWallpaperService.class);
+            android.app.WallpaperInfo home = manager.getWallpaperInfo();
+            android.app.WallpaperInfo lock = Build.VERSION.SDK_INT >= 34 ? manager.getWallpaperInfo(WallpaperManager.FLAG_LOCK) : null;
+            boolean isGrain = (home != null && grain.equals(home.getComponent())) || (lock != null && grain.equals(lock.getComponent()));
+            boolean applied = result.getResultCode() == Activity.RESULT_OK && isGrain;
+            String json = wallpaperPrefs().getString(GrainWallpaperService.KEY_PREVIEW_DATA, null);
+            if (applied && json != null) commitPreview(json, true);
+            else { applied = false; clearPreview(); }
+            if (call != null) {
+                JSObject response = new JSObject(); response.put("success", applied); call.resolve(response);
+            }
+        } catch (Exception e) {
+            clearPreview();
+            if (call != null) call.reject("Could not confirm the live wallpaper", e);
         }
     }
 
@@ -147,13 +196,20 @@ public class WallpaperPlugin extends Plugin {
 
     @PluginMethod
     public void setStaticWallpaper(PluginCall call) {
+        if (livePickerPending) { call.reject("Close the live wallpaper picker first"); return; }
         Bitmap bitmap = null;
         try {
+            if (!WallpaperManager.getInstance(getContext()).isSetWallpaperAllowed()) {
+                call.reject("Static wallpaper changes are not allowed on this device"); return;
+            }
+            if (scheduledStaticUpdate != null) scheduledStaticUpdate.cancel(false);
             JSObject data = call.getData();
-            String jsonStr = savePhotoAndSanitizeJson(data);
+            clearPreview();
+            String jsonStr = savePhotoAndSanitizeJson(data, true);
 
             GrainWallpaperService.WallpaperData parsed =
                 GrainWallpaperService.WallpaperData.fromJson(jsonStr);
+            parsed.photoPathOverride = wallpaperPrefs().getString(GrainWallpaperService.KEY_PREVIEW_PHOTO, null);
 
             DisplayMetrics metrics = getContext().getResources().getDisplayMetrics();
             int width  = metrics.widthPixels;
@@ -171,21 +227,19 @@ public class WallpaperPlugin extends Plugin {
                 flags = WallpaperManager.FLAG_LOCK;
             }
 
-            WallpaperManager.getInstance(getContext()).setBitmap(
+            int wallpaperId = WallpaperManager.getInstance(getContext()).setBitmap(
                 bitmap,
                 null,
                 true,
                 flags
             );
+            if (wallpaperId <= 0) throw new IllegalStateException("Static wallpaper was not applied");
 
             // Persist so future auto-updates work
             SharedPreferences prefs = getContext()
                 .getSharedPreferences(GrainWallpaperService.PREFS_NAME, Context.MODE_PRIVATE);
-            prefs.edit()
-                 .putString(GrainWallpaperService.KEY_LIVE_DATA, jsonStr)
-                 .putString("GRAIN_STATIC_SCREEN_TARGET", screenTarget)
-                 .putBoolean("GRAIN_IS_STATIC_FALLBACK", true)
-                 .apply();
+            prefs.edit().putString("GRAIN_STATIC_SCREEN_TARGET", screenTarget).apply();
+            commitPreview(jsonStr, false);
 
             WallpaperWorker.scheduleNextUpdate(getContext());
 
@@ -195,6 +249,7 @@ public class WallpaperPlugin extends Plugin {
         } catch (Exception e) {
             call.reject("Failed to set static wallpaper", e);
         } finally {
+            clearPreview();
             if (bitmap != null) bitmap.recycle();
         }
     }
@@ -251,6 +306,9 @@ public class WallpaperPlugin extends Plugin {
      * Returns the sanitised JSON string ready to be stored in GRAIN_LIVE_DATA.
      */
     private String savePhotoAndSanitizeJson(JSObject data) {
+        return savePhotoAndSanitizeJson(data, false);
+    }
+    private String savePhotoAndSanitizeJson(JSObject data, boolean preview) {
         if (data == null) return "{}";
         try {
             String b64 = data.optString("customPhotoBase64", null);
@@ -259,7 +317,7 @@ public class WallpaperPlugin extends Plugin {
                 if (b64.contains(",")) b64 = b64.substring(b64.indexOf(",") + 1);
 
                 byte[] bytes = Base64.decode(b64, Base64.DEFAULT);
-                File photoFile = new File(getContext().getFilesDir(), "grain_wallpaper_photo.jpg");
+                File photoFile = new File(getContext().getFilesDir(), preview ? "grain_wallpaper_preview_" + java.util.UUID.randomUUID() + ".jpg" : "grain_wallpaper_photo.jpg");
                 
                 // Downsample & write clean JPEG to avoid storing massive raw bitmaps on disk
                 BitmapFactory.Options opts = new BitmapFactory.Options();
@@ -291,7 +349,7 @@ public class WallpaperPlugin extends Plugin {
                 SharedPreferences prefs = getContext()
                     .getSharedPreferences(GrainWallpaperService.PREFS_NAME, Context.MODE_PRIVATE);
                 prefs.edit()
-                     .putString(GrainWallpaperService.KEY_PHOTO_PATH, photoFile.getAbsolutePath())
+                     .putString(preview ? GrainWallpaperService.KEY_PREVIEW_PHOTO : GrainWallpaperService.KEY_PHOTO_PATH, photoFile.getAbsolutePath())
                      .apply();
             }
         } catch (Throwable t) {

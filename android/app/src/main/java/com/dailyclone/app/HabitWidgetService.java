@@ -17,7 +17,7 @@ public class HabitWidgetService extends RemoteViewsService {
             List<JSONObject> habits = Collections.emptyList();
             @Override public void onCreate() { onDataSetChanged(); }
             @Override public void onDataSetChanged() {
-                snapshot = HabitActionStore.snapshot(HabitWidgetService.this);
+                snapshot = WidgetDesign.snapshot(HabitWidgetService.this, id);
                 habits = HabitWidgetViews.habits(HabitWidgetService.this, snapshot, id, false);
             }
             @Override public void onDestroy() {}

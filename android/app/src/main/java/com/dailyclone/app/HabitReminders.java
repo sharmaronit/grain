@@ -28,7 +28,14 @@ final class HabitReminders {
     }
     private static void alarm(Context context, Intent intent, long time) {
         AlarmManager manager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-        manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, time, pending(context, intent));
+        PendingIntent action = pending(context, intent);
+        if (android.os.Build.VERSION.SDK_INT < 31 || manager.canScheduleExactAlarms()) {
+            try {
+                manager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, time, action);
+                return;
+            } catch (SecurityException ignored) { /* Access can be revoked while rescheduling. */ }
+        }
+        manager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, time, action);
     }
     static synchronized void reschedule(Context context) {
         try {

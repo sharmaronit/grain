@@ -1,10 +1,12 @@
 import React, { useState, useMemo } from "react";
-import { X, Check, ArrowLeft, Layers, PartyPopper } from "lucide-react";
+import { X, Check, ArrowLeft, Layers } from "lucide-react";
 import type { Habit, Quadrant } from "./types";
 import { SwipeCard } from "./SwipeCard";
-import { Confetti } from "./Confetti";
+import { GrainState } from "./ui/GrainState";
 
 const QUADRANT_ORDER: Quadrant[] = ["q1", "q2", "q3", "q4"];
+type DeckFilter = "all" | Quadrant;
+const DECK_FILTERS: DeckFilter[] = ["all", ...QUADRANT_ORDER];
 const QUADRANT_LABELS: Record<Quadrant, string> = {
   q1: "Do first",
   q2: "Schedule",
@@ -25,13 +27,15 @@ export function SwipeModeView({
   onToggleDone,
   onMarkSkipped,
 }: SwipeModeViewProps) {
-  const [activeQuadrant, setActiveQuadrant] = useState<Quadrant>("q1");
-  const [allDoneCelebrated, setAllDoneCelebrated] = useState(false);
+  const [activeQuadrant, setActiveQuadrant] = useState<DeckFilter>("all");
 
   // Filter out habits that are numeric, already done, or already skipped
   const pendingHabits = useMemo(() => {
-    return habits[activeQuadrant].filter(
-      (h) => !h.isNumeric && !h.done && !h.skipped
+    const selectedHabits = activeQuadrant === "all"
+      ? QUADRANT_ORDER.flatMap((q) => habits[q])
+      : habits[activeQuadrant];
+    return selectedHabits.filter(
+      (h) => h.type !== "numeric" && !h.done && !h.skipped
     );
   }, [habits, activeQuadrant]);
 
@@ -39,7 +43,7 @@ export function SwipeModeView({
     return QUADRANT_ORDER.reduce(
       (sum, q) =>
         sum +
-        habits[q].filter((h) => !h.isNumeric && !h.done && !h.skipped).length,
+        habits[q].filter((h) => h.type !== "numeric" && !h.done && !h.skipped).length,
       0
     );
   }, [habits]);
@@ -47,9 +51,9 @@ export function SwipeModeView({
   // When 0 everywhere
   const isAllDone = totalPendingGlobal === 0;
 
-  if (isAllDone && !allDoneCelebrated) {
-    setAllDoneCelebrated(true);
-  }
+  const hasCheckIns = QUADRANT_ORDER.some(q => habits[q].some(h => h.type !== "numeric"));
+  const numericPending = QUADRANT_ORDER.some(q => habits[q].some(h => h.type === "numeric" && !h.done && !h.skipped));
+  const nextQuadrant = QUADRANT_ORDER.find(q => habits[q].some(h => h.type !== "numeric" && !h.done && !h.skipped));
 
   const topHabit = pendingHabits[0];
   const nextHabit = pendingHabits[1];
@@ -66,29 +70,6 @@ export function SwipeModeView({
     }
   };
 
-  if (isAllDone) {
-    return (
-      <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-canvas p-6 animate-fade-in text-center">
-        <Confetti count={80} />
-        <div className="flex justify-center mb-6 animate-bounce">
-          <PartyPopper size={64} className="text-amber-500" />
-        </div>
-        <h1 className="text-3xl font-display font-bold text-ink mb-2">
-          All caught up!
-        </h1>
-        <p className="text-mute mb-12">
-          You've swept through all your habits for today.
-        </p>
-        <button
-          onClick={onClose}
-          className="btn-primary-uber px-8 py-3.5 font-bold"
-        >
-          Back to Dashboard
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="deck-view absolute inset-0 z-50 flex flex-col animate-fade-in safe-pt safe-pb">
       {/* Header */}
@@ -96,6 +77,7 @@ export function SwipeModeView({
         <button
           onClick={onClose}
           className="grid h-10 w-10 place-items-center rounded-full card-soft text-ink hover:bg-[color:var(--surface-pressed)] transition"
+          aria-label="Close Deck"
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
@@ -112,23 +94,25 @@ export function SwipeModeView({
       <div className="px-4 mb-4">
         <div
           className="deck-quadrant-tabs"
-          style={{ "--quadrant-index": QUADRANT_ORDER.indexOf(activeQuadrant) } as React.CSSProperties}
+          style={{ "--quadrant-index": DECK_FILTERS.indexOf(activeQuadrant) } as React.CSSProperties}
+          aria-label="Filter Deck cards"
         >
           <span className="deck-quadrant-selection" aria-hidden="true" />
-          {QUADRANT_ORDER.map((q) => {
+          {DECK_FILTERS.map((q) => {
             const isActive = activeQuadrant === q;
-            const count = habits[q].filter((h) => !h.isNumeric && !h.done && !h.skipped).length;
+            const count = q === "all" ? totalPendingGlobal : habits[q].filter((h) => h.type !== "numeric" && !h.done && !h.skipped).length;
             return (
               <button
                 key={q}
+                aria-pressed={isActive}
                 onClick={() => setActiveQuadrant(q)}
-                className={`deck-quadrant-tab flex items-center justify-center gap-1.5 rounded-full px-2 text-[11px] font-bold whitespace-nowrap ${
+                className={`deck-quadrant-tab flex flex-col sm:flex-row items-center justify-center gap-1 rounded-full px-1 text-[10px] sm:text-[11px] font-bold whitespace-nowrap ${
                   isActive
                     ? "deck-quadrant-tab--active"
                     : "text-mute"
                 }`}
               >
-                {QUADRANT_LABELS[q]}
+                {q === "all" ? "All cards" : QUADRANT_LABELS[q]}
                 {count > 0 && (
                   <span className={`deck-quadrant-count ${isActive ? "deck-quadrant-count--active" : ""}`}>
                     {count}
@@ -141,15 +125,18 @@ export function SwipeModeView({
       </div>
 
       {/* Cards Area */}
-      <div className="flex-1 relative mx-5 my-2">
-        {pendingHabits.length === 0 ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-            <Check className="h-12 w-12 text-mute/30 mb-4" />
-            <h3 className="text-xl font-display font-bold text-ink mb-1">
-              Quadrant Clear
-            </h3>
-            <p className="text-sm text-mute">Select another tab to continue</p>
-          </div>
+      <div className={`flex-1 relative mx-5 my-2 ${isAllDone ? "mb-8" : ""}`}>
+        {isAllDone ? (
+          <GrainState
+            className="h-full"
+            icon={hasCheckIns ? Check : Layers}
+            eyebrow="Deck"
+            title={hasCheckIns ? "All caught up." : "A little space to begin."}
+            description={numericPending ? "Your Deck is clear. Numeric habits are ready to track in Today." : hasCheckIns ? "No check-ins left in your Deck. Take a breath. Come back when you're ready." : "Your daily check-in habits will appear here, one at a time."}
+            action={{ label: "Back to Grain", onClick: onClose }}
+          />
+        ) : pendingHabits.length === 0 ? (
+          <GrainState className="h-full" icon={Check} eyebrow={activeQuadrant === "all" ? "All cards" : QUADRANT_LABELS[activeQuadrant]} title="Nothing waiting here." description="This part of your day is clear. Keep going when you're ready." action={nextQuadrant ? { label: `Continue to ${QUADRANT_LABELS[nextQuadrant].toLowerCase()}`, onClick: () => setActiveQuadrant(nextQuadrant) } : undefined} />
         ) : (
           <div className="relative w-full h-full">
             {/* Background card (next habit) */}
@@ -183,9 +170,10 @@ export function SwipeModeView({
       </div>
 
       {/* Actions */}
-      <div className="p-6 pb-12 flex justify-center items-center gap-6">
+      {!isAllDone && <div className="p-6 pb-12 flex justify-center items-center gap-6">
         <button
           onClick={handleSwipeLeft}
+          aria-label="Skip habit"
           disabled={!topHabit}
           className="grid h-16 w-16 place-items-center rounded-full border-2 border-[color:var(--hairline-mid)] text-rose-400 bg-canvas transition active:scale-95 disabled:opacity-30 disabled:active:scale-100 hover:bg-rose-400/10 hover:border-rose-400/50"
         >
@@ -194,12 +182,13 @@ export function SwipeModeView({
 
         <button
           onClick={handleSwipeRight}
+          aria-label="Complete habit"
           disabled={!topHabit}
           className="grid h-16 w-16 place-items-center rounded-full border-2 border-[color:var(--hairline-mid)] text-emerald-400 bg-canvas transition active:scale-95 disabled:opacity-30 disabled:active:scale-100 hover:bg-emerald-400/10 hover:border-emerald-400/50"
         >
           <Check className="h-8 w-8" strokeWidth={3} />
         </button>
-      </div>
+      </div>}
     </div>
   );
 }

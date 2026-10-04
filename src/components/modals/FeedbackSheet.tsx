@@ -80,6 +80,10 @@ export function FeedbackSheet({
       onToast("Please write a brief message before submitting");
       return;
     }
+    if (!navigator.onLine) {
+      setSubmitError("You're offline. Reconnect to send your feedback.");
+      return;
+    }
 
     setSubmitting(true);
     setSubmitError(null);

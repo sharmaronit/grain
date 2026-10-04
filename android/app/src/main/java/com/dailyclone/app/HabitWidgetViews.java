@@ -15,9 +15,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 final class HabitWidgetViews {
-    static boolean light(JSONObject snapshot) { return "light".equals(snapshot.optString("theme")); }
-    static int foreground(JSONObject snapshot) { return Color.parseColor(light(snapshot) ? "#151517" : "#F4F4F5"); }
-    static int muted(JSONObject snapshot) { return Color.parseColor(light(snapshot) ? "#66666E" : "#A1A1AA"); }
+    static boolean light(JSONObject snapshot) { return WidgetDesign.light(snapshot); }
+    static int foreground(JSONObject snapshot) { return WidgetDesign.color(snapshot, "ink"); }
+    static int muted(JSONObject snapshot) { return WidgetDesign.color(snapshot, "muted"); }
     static List<JSONObject> habits(Context context, JSONObject snapshot, int widgetId, boolean compact) {
         List<JSONObject> result = new ArrayList<>();
         if (!snapshot.optBoolean("widgetsEnabled", true)) return result;
@@ -58,7 +58,7 @@ final class HabitWidgetViews {
         if (numeric && scheduled) status = HabitReminders.number(entry == null ? 0 : entry.optDouble("value", 0)) + " / " + HabitReminders.number(Math.max(1, habit.optDouble("target", 1))) + " " + habit.optString("unit", "");
         row.setTextViewText(R.id.habit_value, status);
         row.setTextViewText(R.id.habit_done, pending ? (numeric ? "+1" : "✓") : "✓");
-        row.setInt(R.id.habit_done, "setBackgroundResource", light(snapshot) ? R.drawable.widget_button_light : R.drawable.widget_button_dark);
+        row.setInt(R.id.habit_done, "setBackgroundResource", WidgetDesign.button(snapshot));
         row.setTextColor(R.id.habit_done, foreground(snapshot));
         row.setViewVisibility(R.id.habit_done, pending ? View.VISIBLE : View.INVISIBLE);
         if (pending) {
@@ -70,22 +70,24 @@ final class HabitWidgetViews {
     }
     static void update(Context context, AppWidgetManager manager, int id, boolean compact) {
         try {
-            JSONObject snapshot = HabitActionStore.snapshot(context);
+            JSONObject snapshot = WidgetDesign.snapshot(context, id);
             boolean enabled = snapshot.optBoolean("widgetsEnabled", true);
             RemoteViews views = new RemoteViews(context.getPackageName(), R.layout.grain_widget);
             if (compact) {
-                int padding = Math.round(12 * context.getResources().getDisplayMetrics().density);
+                int padding = Math.round(16 * context.getResources().getDisplayMetrics().density);
                 views.setViewPadding(R.id.widget_root, padding, padding, padding, padding);
                 views.setViewVisibility(R.id.widget_progress, View.GONE);
             }
-            int background = light(snapshot) ? R.drawable.widget_surface_light : "amoled".equals(snapshot.optString("theme")) ? R.drawable.widget_surface_amoled : R.drawable.widget_surface_dark;
+            int background = WidgetDesign.background(snapshot);
             views.setInt(R.id.widget_root, "setBackgroundResource", background);
             views.setTextColor(R.id.widget_title, foreground(snapshot));
+            views.setTextColor(R.id.widget_brand, muted(snapshot));
             views.setTextColor(R.id.widget_progress, muted(snapshot));
             views.setTextColor(R.id.widget_empty, muted(snapshot));
             views.setTextColor(R.id.widget_undo, foreground(snapshot));
             views.setTextColor(R.id.widget_configure, muted(snapshot));
-            views.setTextViewText(R.id.widget_title, compact ? "One small action" : "Today · Grain");
+            views.setTextColor(R.id.widget_add, foreground(snapshot));
+            views.setTextViewText(R.id.widget_title, compact ? "One small action" : "Today");
             int total = 0, done = 0;
             JSONArray all = snapshot.optJSONArray("habits");
             if (all != null) for (int i = 0; i < all.length(); i++) {
@@ -124,6 +126,14 @@ final class HabitWidgetViews {
             Intent configure = new Intent(context, HabitWidgetConfigureActivity.class).putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id).setData(Uri.parse("grain://configure/" + id));
             views.setOnClickPendingIntent(R.id.widget_configure, PendingIntent.getActivity(context, id, configure, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
             views.setViewVisibility(R.id.widget_configure, enabled ? View.VISIBLE : View.GONE);
+            views.setViewVisibility(R.id.widget_add, enabled ? View.VISIBLE : View.GONE);
+            Intent add = new Intent(context, MainActivity.class)
+                .setAction("com.dailyclone.app.CREATE_HABIT")
+                .setData(Uri.parse("grain://widget/create/" + id))
+                .putExtra(HabitActionsPlugin.EXTRA_CREATE_HABIT, true)
+                .putExtra(HabitActionsPlugin.EXTRA_WIDGET_USER, snapshot.optString("userId", ""))
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            views.setOnClickPendingIntent(R.id.widget_add, PendingIntent.getActivity(context, id + 100000, add, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
             Intent open = new Intent(context, MainActivity.class);
             views.setOnClickPendingIntent(R.id.widget_title, PendingIntent.getActivity(context, 0, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
             JSONObject last = HabitActionStore.lastAction(context);

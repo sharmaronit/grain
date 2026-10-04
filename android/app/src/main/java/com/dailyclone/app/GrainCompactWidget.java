@@ -13,6 +13,6 @@ public class GrainCompactWidget extends AppWidgetProvider {
         HabitWidgetViews.update(context, manager, id, true);
     }
     @Override public void onDeleted(Context context, int[] ids) {
-        for (int id : ids) context.getSharedPreferences("grain_widget_config", 0).edit().remove("ids_" + id).remove("user_" + id).apply();
+        WidgetDesign.delete(context, ids);
     }
 }

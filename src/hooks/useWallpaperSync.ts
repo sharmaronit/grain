@@ -1,12 +1,14 @@
 import { useEffect, useRef } from "react";
 import { Capacitor } from "@capacitor/core";
 import equal from "fast-deep-equal";
+import { resolveThemeKey } from "../lib/theme";
 
 export interface UseWallpaperSyncProps {
   heatmap: number[][];
   totalStreak: number;
   completionRate: number;
   wallpaperTheme: string;
+  appTheme: string;
   previewWeeks: number;
   wallpaperSync: boolean;
   isGoalActive?: boolean;
@@ -44,6 +46,7 @@ export function useWallpaperSync({
   totalStreak,
   completionRate,
   wallpaperTheme,
+  appTheme,
   previewWeeks,
   wallpaperSync,
   isGoalActive,
@@ -78,7 +81,7 @@ export function useWallpaperSync({
     const payload = {
       heatmap,
       heatmapStartMs,
-      theme: wallpaperTheme,
+      theme: resolveThemeKey(wallpaperTheme, appTheme),
       previewWeeks,
       currentStreak: totalStreak,
       completionRate,
@@ -126,6 +129,7 @@ export function useWallpaperSync({
     totalStreak,
     completionRate,
     wallpaperTheme,
+    appTheme,
     previewWeeks,
     wallpaperSync,
     isGoalActive,

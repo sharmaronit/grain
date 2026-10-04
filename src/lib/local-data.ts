@@ -1,5 +1,6 @@
 import type { GoalDoc, HabitDoc, UserProfile } from "./firestore";
 import type { CompletionEntry } from "./streaks";
+import { validateBackup } from "./backup-validation";
 import { reduceExternalActions, type ExternalHabitAction } from "./external-actions";
 
 export interface GrainLocalData {
@@ -212,6 +213,7 @@ export function getLocalBackupStatus(userId: string): LocalBackupStatus {
 }
 
 export function importLocalBackup(userId: string, value: unknown): void {
+  validateBackup(value);
   if (!value || typeof value !== "object") throw new Error("Invalid backup file");
   const candidate = value as Partial<GrainLocalData>;
   if (!Array.isArray(candidate.habits) || !Array.isArray(candidate.goals) || typeof candidate.completions !== "object") {

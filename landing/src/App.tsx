@@ -1,7 +1,7 @@
 import { Landing } from './Landing';
+import { SitePage } from './SitePages';
 
 export function App() {
-  return (
-    <Landing />
-  );
+  const path = window.location.pathname.replace(/\/+$/, '') || '/';
+  return path === '/' ? <Landing /> : <SitePage path={path} />;
 }

@@ -7,9 +7,10 @@ import { getWidgetsEnabled } from "./widget-preferences";
 interface HabitActionsPlugin {
   getPending(): Promise<{ actions: ExternalHabitAction[] }>;
   synchronize(options: { snapshot: unknown; ackIds: string[] }): Promise<void>;
-  pinWidget(options: { compact: boolean }): Promise<{ supported: boolean }>;
+  pinWidget(options: { compact?: boolean; kind?: "compact" | "checklist" | "heatmap" | "progress"; design?: "classic" | "paper" | "oled" | "botanical" | "dots" }): Promise<{ supported: boolean }>;
   testReminder(): Promise<{ shown: boolean }>;
-  addListener(event: "changed", listener: () => void): Promise<PluginListenerHandle>;
+  consumeCreateHabitRequest(): Promise<{ open: boolean; userId: string }>;
+  addListener(event: "changed" | "createHabitRequested", listener: () => void): Promise<PluginListenerHandle>;
 }
 export const HabitActions = registerPlugin<HabitActionsPlugin>("HabitActions");
 let queue: Promise<void> = Promise.resolve();

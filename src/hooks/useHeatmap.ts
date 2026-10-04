@@ -21,6 +21,7 @@ import { calculateStreak, calculateBestStreak, type CompletionEntry } from "../l
 import type { HabitDoc } from "../lib/firestore";
 import { usePageVisible } from "./usePageVisible";
 import { readLocalData, subscribeLocalData } from "../lib/local-data";
+import { isTrackedDay } from "../lib/consistency-summary";
 
 export interface HeatmapStats {
   currentStreak: number; // consecutive days with >= 1 habit done
@@ -108,9 +109,14 @@ export function useHeatmap(
     setError(null);
 
     const refresh = () => {
+      try {
       const all = readLocalData(userId).completions;
       const map = Object.fromEntries(Object.entries(all).filter(([key]) => key >= startKey && key <= endKey));
       setCompletionsMap(map);
+      setError(null);
+      } catch (error) {
+        setError(error instanceof Error ? error : new Error("History could not be read"));
+      }
       setLoading(false);
     };
     refresh();
@@ -166,7 +172,7 @@ export function useHeatmap(
       let done = 0;
 
       for (const habit of filteredHabits) {
-        if (!isScheduledDay(habit.frequency, habit.customDays, cur)) continue;
+        if (!isTrackedDay(habit, cur, today)) continue;
         scheduled++;
         totalScheduledHabits++;
 

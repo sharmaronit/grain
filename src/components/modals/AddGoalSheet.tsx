@@ -129,6 +129,7 @@ export function AddGoalSheet({ onClose, goal }: { onClose: () => void; goal?: Go
                 key={e}
                 type="button"
                 onClick={() => setEmoji(e)}
+                aria-label={`Choose ${e} icon`}
                 className={`grid h-12 w-12 shrink-0 snap-center place-items-center rounded-2xl transition-all ${
                   emoji === e
                     ? "border border-[#86efac] bg-[#28513f] text-[#dcfce7] shadow-[0_0_18px_rgba(110,231,183,0.18)] scale-105"
@@ -156,6 +157,7 @@ export function AddGoalSheet({ onClose, goal }: { onClose: () => void; goal?: Go
                 type="button"
                 key={c}
                 onClick={() => setColor(c)}
+                aria-label={`Choose ${c} color`}
                 className={`relative h-8 w-8 rounded-full border border-white/10 transition hover:scale-110 ${color === c ? "ring-2 ring-white/70 ring-offset-2 ring-offset-[color:var(--canvas)]" : ""}`}
                 style={{ backgroundColor: c }}
               >

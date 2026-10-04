@@ -30,6 +30,8 @@ public class GrainWallpaperService extends WallpaperService {
     // ── Prefs key for the saved custom photo path ───────────────────────
     static final String PREFS_NAME      = "CapacitorStorage";
     static final String KEY_LIVE_DATA   = "GRAIN_LIVE_DATA";
+    static final String KEY_PREVIEW_DATA = "GRAIN_PREVIEW_DATA";
+    static final String KEY_PREVIEW_PHOTO = "GRAIN_PREVIEW_PHOTO";
     static final String KEY_PHOTO_PATH  = "GRAIN_CUSTOM_PHOTO_PATH"; // file path, not base64
 
     private static final Paint PILL_BG_PAINT = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -50,6 +52,7 @@ public class GrainWallpaperService extends WallpaperService {
         public float   photoOverlay  = 0.4f;
         public String  statsAlignment = "center"; // "left" | "center" | "right"
         public String  gridColorTheme = "emerald";
+        public String photoPathOverride = null;
         public float   offsetX        = 0f;
         public float   gridScale      = 1f;
         public float   photoOffsetX   = 0f;
@@ -165,6 +168,7 @@ public class GrainWallpaperService extends WallpaperService {
             copy.photoOverlay = this.photoOverlay;
             copy.statsAlignment = this.statsAlignment;
             copy.gridColorTheme = this.gridColorTheme;
+            copy.photoPathOverride = this.photoPathOverride;
             copy.offsetX = this.offsetX;
             copy.gridScale = this.gridScale;
             copy.photoOffsetX = this.photoOffsetX;
@@ -250,12 +254,18 @@ public class GrainWallpaperService extends WallpaperService {
 
         switch (t) {
             case "mono":
-                bg[0]     = Color.parseColor("#E9E9EA");
-                fg[0]     = Color.parseColor("#111111");
+                bg[0]     = Color.parseColor("#F5F5F5");
+                fg[0]     = Color.parseColor("#171717");
                 accent[0] = Color.parseColor("#059669");
                 ints[0]   = new int[]{
                     Color.parseColor("#D4D4D8"), Color.parseColor("#A1A1AA"),
                     Color.parseColor("#059669"), Color.parseColor("#16A34A")};
+                break;
+            case "charcoal":
+                bg[0] = Color.parseColor("#171717");
+                fg[0] = Color.parseColor("#F5F5F5");
+                accent[0] = Color.parseColor("#22C55E");
+                ints[0] = new int[]{0xff262626, 0xff404040, 0xff166534, 0xff22c55e};
                 break;
             case "slate":
                 bg[0]     = Color.parseColor("#1F2937");
@@ -285,6 +295,12 @@ public class GrainWallpaperService extends WallpaperService {
 
         // Apply gridColorTheme overrides for mid, hi, and accent
         if (gridKey != null) {
+            int[] custom = WallpaperPalette.customLevels(gridKey);
+            if (custom != null) {
+                ints[0] = custom;
+                accent[0] = custom[3];
+                return;
+            }
             switch (gridKey) {
                 case "crimson":
                     accent[0] = Color.parseColor("#dc2626");
@@ -349,7 +365,7 @@ public class GrainWallpaperService extends WallpaperService {
         if ("custom".equals(adjusted.themeKey)) {
             // Load saved photo safely with downsampling to prevent OutOfMemory crashes
             SharedPreferences prefs = ctx.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-            String photoPath = prefs.getString(KEY_PHOTO_PATH, null);
+            String photoPath = adjusted.photoPathOverride != null ? adjusted.photoPathOverride : prefs.getString(KEY_PHOTO_PATH, null);
             if (photoPath != null) {
                 try {
                     Bitmap photo = decodeSampledBitmapFromFile(photoPath, width, height);
@@ -430,118 +446,54 @@ public class GrainWallpaperService extends WallpaperService {
     // ── Weeks grid (Portrait 7-Day Calendar Layout) ──────────────────────
 
     private static void drawWeeksGrid(Canvas canvas, int w, int h, WallpaperData data,
-                                      Paint paint, Paint tp,
-                                      int[] fg, int[] accent, int[][] ints, float dp) {
-        int previewWeeks = Math.max(1, data.previewWeeks);
-        int cols = 7;
-        int rows = previewWeeks;
-
-        float baseCellSize = previewWeeks > 32 ? 10f : (previewWeeks > 20 ? 14f : (previewWeeks > 12 ? 18f : 24f));
-        float sq = baseCellSize * dp * data.gridScale;
-        float gap = 4f * dp * data.gridScale;
-        float cr = (sq > 16f * dp ? 5f : 3f) * dp;
-        float monthColW = 28f * dp * data.gridScale;
-        float headerH = 18f * dp * data.gridScale;
-
-        float gridW = monthColW + cols * sq + (cols - 1) * gap;
-        float gridH = headerH + rows * sq + (rows - 1) * gap;
-
-        float startX = (w - gridW) / 2f + (data.offsetX * dp);
-        float startY = h * data.offsetY - gridH / 2f;
-
-        // Draw day headers: M T W T F S S
-        String[] dayLabels = {"M", "T", "W", "T", "F", "S", "S"};
+                                      Paint paint, Paint tp, int[] fg, int[] accent, int[][] ints, float dp) {
+        float scale = dp * data.gridScale;
+        float sq = 36f * scale, gap = 8f * scale;
+        float gridW = 7 * sq + 6 * gap;
+        float startX = (w - gridW) / 2f + data.offsetX * dp;
+        float startY = h * data.offsetY - 45f * scale;
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.LocalDate start = data.heatmapStartMs > 0
+            ? java.time.Instant.ofEpochMilli(data.heatmapStartMs).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
+            : today.minusDays(today.getDayOfWeek().getValue() - 1).minusWeeks(51);
         tp.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
-        tp.setTextSize(10f * dp * data.gridScale);
-        tp.setColor(fg[0]);
-        tp.setAlpha(100);
         tp.setTextAlign(Paint.Align.CENTER);
-
-        float cellsStartX = startX + monthColW;
-        for (int c = 0; c < 7; c++) {
-            float cx = cellsStartX + c * (sq + gap) + sq / 2f;
-            canvas.drawText(dayLabels[c], cx, startY + 12f * dp * data.gridScale, tp);
+        tp.setColor(fg[0]); tp.setAlpha(150); tp.setTextSize(11f * scale);
+        canvas.drawText("LAST 7 DAYS", startX + gridW / 2f, startY - 22f * scale, tp);
+        for (int i = 0; i < 7; i++) {
+            java.time.LocalDate date = today.minusDays(6 - i);
+            long offset = java.time.temporal.ChronoUnit.DAYS.between(start, date);
+            int col = (int) (offset / 7), row = (int) (offset % 7);
+            int level = offset >= 0 && col < data.heatmap.length && data.heatmap[col] != null && row < data.heatmap[col].length ? clamp(data.heatmap[col][row]) : 0;
+            float x = startX + i * (sq + gap);
+            tp.setAlpha(150); tp.setTextSize(10f * scale);
+            canvas.drawText(date.getDayOfWeek().getDisplayName(java.time.format.TextStyle.SHORT, java.util.Locale.ENGLISH), x + sq / 2f, startY, tp);
+            float y = startY + 12f * scale;
+            paint.clearShadowLayer(); paint.setStyle(Paint.Style.FILL); paint.setColor(ints[0][level]);
+            canvas.drawRoundRect(new RectF(x, y, x + sq, y + sq), 12f * scale, 12f * scale, paint);
+            if (i == 6) {
+                paint.setStyle(Paint.Style.STROKE); paint.setStrokeWidth(2f * scale); paint.setColor(accent[0]);
+                canvas.drawRoundRect(new RectF(x, y, x + sq, y + sq), 12f * scale, 12f * scale, paint);
+                paint.setStyle(Paint.Style.FILL);
+            }
+            tp.setAlpha(255); tp.setTextSize(12f * scale);
+            canvas.drawText(Integer.toString(date.getDayOfMonth()), x + sq / 2f, y + sq / 2f - (tp.ascent() + tp.descent()) / 2f, tp);
+            if (i == 6) {
+                tp.setTextSize(8f * scale);
+                canvas.drawText("TODAY", x + sq / 2f, y + sq + 17f * scale, tp);
+            }
+        }
+        float legendY = startY + 88f * scale;
+        tp.setAlpha(150); tp.setTextSize(9f * scale);
+        canvas.drawText("Less", startX + gridW / 2f - 38f * scale, legendY, tp);
+        canvas.drawText("More", startX + gridW / 2f + 38f * scale, legendY, tp);
+        for (int i = 0; i < 4; i++) {
+            float x = startX + gridW / 2f - 18f * scale + i * 10f * scale;
+            paint.setColor(ints[0][i]);
+            canvas.drawRoundRect(new RectF(x, legendY - 7f * scale, x + 7f * scale, legendY), 2f * scale, 2f * scale, paint);
         }
         tp.setAlpha(255);
-
-        Calendar todayCal = getMidnightCalendar();
-        int todayDow = (todayCal.get(Calendar.DAY_OF_WEEK) + 5) % 7; // Mon=0 .. Sun=6
-        long mondayThisWeekMs = todayCal.getTimeInMillis() - (todayDow * 86400000L);
-        long heatmapStartMs = data.heatmapStartMs > 0 ? data.heatmapStartMs : (mondayThisWeekMs - (51L * 7L * 86400000L));
-
-        int heatmapLen = data.heatmap != null ? data.heatmap.length : 0;
-        int startCol = Math.max(0, heatmapLen - previewWeeks);
-        int todayColIdx = previewWeeks - 1;
-
-        String[] monthNames = {"Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
-        int lastMonth = -1;
-
-        float rowsStartY = startY + headerH;
-
-        for (int r = 0; r < rows; r++) {
-            int colIdx = startCol + r;
-            long weekStartMs = heatmapStartMs + (colIdx * 7L * 86400000L);
-            Calendar weekCal = getMidnightCalendar();
-            weekCal.setTimeInMillis(weekStartMs);
-            // Use Thursday, the midpoint of this Monday-start week. This labels a
-            // Sep 28–Oct 4 row as OCT, which is the month containing most of its days.
-            weekCal.add(Calendar.DAY_OF_YEAR, 3);
-            int month = weekCal.get(Calendar.MONTH);
-
-            float rowY = rowsStartY + r * (sq + gap);
-
-            // Draw month label on the left if month changed
-            if (r == 0 || month != lastMonth) {
-                lastMonth = month;
-                tp.setTextSize(9f * dp * data.gridScale);
-                tp.setTypeface(Typeface.create(Typeface.DEFAULT, Typeface.BOLD));
-                tp.setTextAlign(Paint.Align.RIGHT);
-                tp.setColor(fg[0]);
-                tp.setAlpha(150);
-                canvas.drawText(monthNames[month].toUpperCase(), startX + monthColW - 6f * dp, rowY + sq * 0.75f, tp);
-                tp.setAlpha(255);
-            }
-
-            // Draw 7 day squares in this week row
-            for (int c = 0; c < 7; c++) {
-                float x = cellsStartX + c * (sq + gap);
-                float y = rowY;
-
-                boolean isToday = (r == todayColIdx) && (c == todayDow);
-                boolean isFuture = (r == todayColIdx) && (c > todayDow);
-
-                int level = 0;
-                if (!isFuture && data.heatmap != null && colIdx >= 0 && colIdx < data.heatmap.length) {
-                    level = clamp(data.heatmap[colIdx][c]);
-                }
-
-                paint.setColor(isFuture ? Color.argb(20, 255, 255, 255) : ints[0][level]);
-                if (level >= 2 && !isFuture) {
-                    paint.setShadowLayer(6f * dp, 0, 0, ints[0][level]);
-                } else {
-                    paint.clearShadowLayer();
-                }
-
-                RectF rect = new RectF(x, y, x + sq, y + sq);
-                canvas.drawRoundRect(rect, cr, cr, paint);
-
-                if (isToday) {
-                    paint.clearShadowLayer();
-                    paint.setStyle(Paint.Style.STROKE);
-                    paint.setStrokeWidth(2f * dp);
-                    paint.setColor(accent[0]);
-
-                    float inset = 1f * dp;
-                    RectF innerRect = new RectF(x + inset, y + inset, x + sq - inset, y + sq - inset);
-                    float innerCr = Math.max(0, cr - inset);
-                    canvas.drawRoundRect(innerRect, innerCr, innerCr, paint);
-                    paint.setStyle(Paint.Style.FILL);
-                }
-            }
-        }
-
-        paint.clearShadowLayer();
-        drawStatsPill(canvas, cellsStartX, cellsStartX + cols * sq + (cols - 1) * gap, rowsStartY + rows * sq + (rows - 1) * gap + 24f * dp, data, tp, fg, dp);
+        drawStatsPill(canvas, startX, startX + gridW, legendY + 28f * scale, data, tp, fg, dp);
     }
 
     // ── Frosted Liquid-Glass Widget Card ────────────────────────────────
@@ -1215,7 +1167,7 @@ public class GrainWallpaperService extends WallpaperService {
 
         @Override
         public void onSharedPreferenceChanged(SharedPreferences p, String key) {
-            if (KEY_LIVE_DATA.equals(key) || KEY_PHOTO_PATH.equals(key)) {
+            if (KEY_LIVE_DATA.equals(key) || KEY_PHOTO_PATH.equals(key) || KEY_PREVIEW_DATA.equals(key) || KEY_PREVIEW_PHOTO.equals(key)) {
                 reloadData();
                 if (visible) handler.post(drawRunner);
             }
@@ -1245,7 +1197,9 @@ public class GrainWallpaperService extends WallpaperService {
         private void reloadData() {
             try {
                 SharedPreferences p = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-                cachedData = WallpaperData.fromJson(p.getString(KEY_LIVE_DATA, null));
+                boolean preview = isPreview() && p.contains(KEY_PREVIEW_DATA);
+                cachedData = WallpaperData.fromJson(p.getString(preview ? KEY_PREVIEW_DATA : KEY_LIVE_DATA, null));
+                if (preview) cachedData.photoPathOverride = p.getString(KEY_PREVIEW_PHOTO, null);
             } catch (Throwable t) {
                 t.printStackTrace();
             }

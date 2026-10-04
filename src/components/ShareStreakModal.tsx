@@ -1,6 +1,8 @@
 import React from "react";
 import { SheetShell } from "./SheetShell";
 import { Share2, Copy, Check, Flame, Trophy } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
+import { shareNativeText } from "../lib/backup-download";
 
 export function ShareStreakModal({
   onClose,
@@ -21,7 +23,7 @@ export function ShareStreakModal({
 }) {
   const [copied, setCopied] = React.useState(false);
 
-  const appUrl = typeof window !== "undefined" ? window.location.origin : "";
+  const appUrl = "https://trygrain.vercel.app";
   const shareText = `I'm on a ${currentStreak}-day streak on Grain! Building 1% better habits daily.${appUrl ? ` ${appUrl}` : ""}`;
 
   const copyShareText = async () => {
@@ -82,6 +84,11 @@ export function ShareStreakModal({
           <button
             type="button"
             onClick={async () => {
+              if (Capacitor.isNativePlatform()) {
+                try { await shareNativeText(shareText); }
+                catch { onShowToast("Could not share summary"); }
+                return;
+              }
               if (navigator.share) {
                 try {
                   await navigator.share({

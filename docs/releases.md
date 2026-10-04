@@ -3,7 +3,15 @@
 Keep one current APK at `releases/android/grain.apk`. Root-level APKs, APKs in
 website public assets, and versioned APK copies are not part of the repository.
 
-The current artifact is **v1.18**, Android version code **20**.
+The current artifact is **v1.23**, Android version code **25**.
+
+This build includes the [app audit fixes and validation](qa/app-audit-v1.19.md), fading in-app notices, a Create habit shortcut on both home-screen widgets, removal of the Widget wallpaper layout, and a rolling 7-day wallpaper view replacing Weeks.
+
+v1.22 adds a custom accent editor with a shade pad, hue slider, hex entry, and progress-color preview, and places fading notices below the top controls.
+
+v1.23 replaces the Deck celebration and mismatched empty states with quiet, theme-aware glass cards. Deck completion copy distinguishes check-ins from pending numeric habits.
+
+SHA-256: `ae19e715a2331ea6d1e43f9df349c664ba73a3e1973ad01f48774594506b521a`.
 
 On Windows, run from the repository root:
 

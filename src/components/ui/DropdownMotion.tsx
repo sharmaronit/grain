@@ -26,6 +26,7 @@ export function DropdownMotion({ open, className = "", children }: DropdownMotio
     <div
       className={`grain-dropdown-motion ${open ? "grain-dropdown-motion--open" : "grain-dropdown-motion--closed pointer-events-none"} ${className}`}
       aria-hidden={!open}
+      inert={!open}
     >
       {children}
     </div>

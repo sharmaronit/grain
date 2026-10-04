@@ -125,6 +125,7 @@ export const HabitCard = memo(function HabitCard({
         ) : (
           <button
             type="button"
+            aria-label={`${isDone ? "Undo" : "Complete"} ${habit.name}`}
             onClick={(e) => {
               e.stopPropagation();
               onToggle(quadrant, index);
@@ -155,17 +156,5 @@ export const HabitCard = memo(function HabitCard({
         <ArrowRight className="h-4 w-4 text-mute opacity-0 group-hover:opacity-100 transition-all duration-200 shrink-0" />
       )}
     </div>
-  );
-}, (prev, next) => {
-  return (
-    prev.habit.id === next.habit.id &&
-    prev.habit.name === next.habit.name &&
-    prev.habit.done === next.habit.done &&
-    prev.habit.streak === next.habit.streak &&
-    prev.quadrant === next.quadrant &&
-    prev.index === next.index &&
-    prev.isSelectionMode === next.isSelectionMode &&
-    prev.isSelected === next.isSelected &&
-    prev.showDivider === next.showDivider
   );
 });

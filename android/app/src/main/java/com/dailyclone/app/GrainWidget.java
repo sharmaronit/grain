@@ -29,6 +29,10 @@ public class GrainWidget extends AppWidgetProvider {
         }
         for (int id : appWidgetManager.getAppWidgetIds(new ComponentName(context, GrainCompactWidget.class)))
             HabitWidgetViews.update(context, appWidgetManager, id, true);
+        for (int id : appWidgetManager.getAppWidgetIds(new ComponentName(context, GrainHeatmapWidget.class)))
+            HabitSummaryWidgetViews.update(context, appWidgetManager, id, true);
+        for (int id : appWidgetManager.getAppWidgetIds(new ComponentName(context, GrainProgressWidget.class)))
+            HabitSummaryWidgetViews.update(context, appWidgetManager, id, false);
     }
 
     @Override public void onAppWidgetOptionsChanged(Context context, AppWidgetManager manager, int id, Bundle options) {
@@ -36,6 +40,6 @@ public class GrainWidget extends AppWidgetProvider {
     }
 
     @Override public void onDeleted(Context context, int[] ids) {
-        for (int id : ids) context.getSharedPreferences("grain_widget_config", 0).edit().remove("ids_" + id).remove("user_" + id).apply();
+        WidgetDesign.delete(context, ids);
     }
 }
