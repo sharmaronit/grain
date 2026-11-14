@@ -17,7 +17,7 @@ Website: [trygrain.vercel.app](https://trygrain.vercel.app/)
 | `docs/` | Development, features, design, and release documentation |
 | `scripts/` | Android build automation |
 | `tests/` | App tests |
-| `releases/android/grain.apk` | The single current APK |
+| `releases/android/grain.apk` | Local build output, ignored by Git (download from [Releases](https://github.com/sharmaronit/grain/releases/latest)) |
 | `archive/` | Previous website implementation and capture tools |
 
 Generated web builds go into `dist/app/` and `landing/dist/`. They are ignored by Git.
