@@ -12,9 +12,9 @@ dist
 dist-ssr
 /dist-spa/
 
-# Keep a single canonical Android release artifact.
+# APKs are published as GitHub Release assets, never committed.
 *.apk
-!/releases/android/grain.apk
+/releases/
 .output
 .vinxi
 .tanstack/**
