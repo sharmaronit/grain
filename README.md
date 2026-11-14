@@ -4,6 +4,12 @@ A habit and goal tracker for building everyday discipline.
 
 Website: [trygrain.vercel.app](https://trygrain.vercel.app/)
 
+Download the latest Android build from [Releases](https://github.com/sharmaronit/grain/releases/latest).
+
+| Today | Consistency | Deck | Live wallpaper |
+|---|---|---|---|
+| <img src="landing/public/screenshots/today.png" width="200" alt="Today screen with current streak and up-next habit"> | <img src="landing/public/screenshots/consistency.png" width="200" alt="Consistency journey with streak stats"> | <img src="landing/public/screenshots/deck.png" width="200" alt="Deck view for sorting tasks by priority"> | <img src="landing/public/screenshots/wallpaper-hq.jpeg" width="200" alt="Year heatmap live wallpaper editor"> |
+
 ## Repository
 
 | Folder | Purpose |
